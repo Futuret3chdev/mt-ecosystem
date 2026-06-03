@@ -941,7 +941,7 @@ export default function MTWalletApp() {
                     <div className="text-emerald-400 text-xl font-semibold -mt-1">$MT</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-zinc-500">Retrieved from our mt-core node (not Solana)</div>
+                    <div className="text-xs text-zinc-500">On our MT chain (same address string as your SOL addr, but different chain). Send native $MT here when connected to a mt-core node.</div>
                     <div className="mt-6 flex gap-3">
                       <button onClick={() => { setActiveTab('send-receive'); setShowSendModal(true); }} className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 active:bg-white transition rounded-2xl text-black font-semibold text-sm flex items-center gap-2">
                         <Send className="w-4 h-4" /> SEND
@@ -977,7 +977,7 @@ export default function MTWalletApp() {
                 <div className="mt-8 pt-6 border-t border-zinc-900 text-xs flex gap-6 text-zinc-400 font-mono">
                   <div>NETWORK FEE: <span className="text-emerald-400">{currentFeeLabel}</span></div>
                   <div>NONCE: {mtNonce}</div>
-                  <div>ADDRESS: <button onClick={() => copy(mtAddress)} className="underline decoration-dotted hover:text-white">{shortAddr(mtAddress)}</button></div>
+                  <div>ADDRESS (native MT): <button onClick={() => copy(mtAddress)} className="underline decoration-dotted hover:text-white">{shortAddr(mtAddress)}</button></div>
                 </div>
               </div>
 
@@ -1005,8 +1005,8 @@ export default function MTWalletApp() {
                   </div>
                   <div className="text-4xl font-semibold tabular-nums mt-1">{solMTBalance.toFixed(2)}</div>
                   <div className="text-[10px] text-emerald-400/70 mt-1">
-                    Send real $MT (SPL) to the SOL addr of this wallet to receive here. 
-                    If 0: 1) activate the exact wallet (SOL addr must match the one you funded), 2) make sure Moralis key is active (via Settings or VITE_MORALIS_API_KEY env var + redeploy), 3) click force sync. The app now filters out public RPCs known to cause ERR_CERT_AUTHORITY_INVALID and auto-switches on cert/network errors.
+                    This is the $MT (SPL) you sent on Solana to the SOL addr (same string as MT addr above, but on Solana chain). 
+                    If 0: 1) activate the exact wallet, 2) make sure Moralis key active, 3) force sync. Filters bad RPCs.
                   </div>
                   {getMoralisApiKey() ? (
                     <div className="mt-1 text-[10px] text-emerald-400">Moralis key active — using reliable primary path for $MT SPL (like your working game fetch example).</div>
@@ -1120,7 +1120,7 @@ export default function MTWalletApp() {
                   )}
                 </div>
                 <div className="text-[10px] text-zinc-500 mt-3">{isLoggedIn ? 'Backed up to your account (encrypted). Login on any device.' : 'Local only to this browser.'}</div>
-                <div className="text-[10px] text-emerald-400/80 mt-1">Native MT PRIMARY. Solana $MT (SPL) in side card. For reliable fetches on the public site, set VITE_MORALIS_API_KEY env var on your deploy platform (see Settings). Or paste key locally in Settings. Activate matching wallet + force sync.</div>
+                <div className="text-[10px] text-emerald-400/80 mt-1">Native MT (top card, our chain) for the MT addr — needs mt-core running + node URL in Settings + native $MT sent to it (use faucet for local). The Solana SPL $MT you sent (side card) is on Solana to the SOL addr (same string as MT addr, different chain). Key or good RPC for SPL side.</div>
               </div>
             )}
           </div>
