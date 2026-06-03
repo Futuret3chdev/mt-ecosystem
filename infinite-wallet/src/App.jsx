@@ -31,6 +31,9 @@ import {
   fetchJupiterQuote,
   executeJupiterSwap,
   getSolanaKeypair,
+  getCustomSolanaRpc,
+  setCustomSolanaRpc,
+  clearSolanaBalanceCache,
 
   // new auth + multi
   AUTH_URL,
@@ -93,6 +96,7 @@ export default function MTWalletApp() {
   const [editingWalletId, setEditingWalletId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('#10b981'); // default emerald
+  const [customSolRpc, setCustomSolRpc] = useState(getCustomSolanaRpc() || '');
 
   // Ref to always have the latest wallet for refreshAll (avoids stale closure when switching wallets)
   const latestWalletRef = useRef(null);
@@ -972,6 +976,7 @@ export default function MTWalletApp() {
                                 onClick={async (e) => { 
                                   e.stopPropagation(); 
                                   try {
+                                    clearSolanaBalanceCache();
                                     const bal = await fetchSolanaMTBalance(solAddr);
                                     setSolMTBalance(bal);
                                     setStatus(`Queried on-chain Solana $MT for this addr: ${bal}`);
@@ -1306,6 +1311,38 @@ export default function MTWalletApp() {
             </div>
 
             <button onClick={handleDeleteVault} className="text-red-400 text-sm underline underline-offset-4">Permanently delete vault from this browser</button>
+
+            <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-4">
+              <div className="font-semibold text-sm mb-2">Solana RPC (for real $MT balances)</div>
+              <div className="text-xs text-zinc-400 mb-2">Public endpoints can 403/rate limit. Paste your own (free from ankr.com, helius.dev, quicknode.com etc.) for reliable queries.</div>
+              <div className="flex gap-2">
+                <input 
+                  value={customSolRpc} 
+                  onChange={e => setCustomSolRpc(e.target.value)} 
+                  placeholder="https://your-rpc-url" 
+                  className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono" 
+                />
+                <button 
+                  onClick={() => {
+                    setCustomSolanaRpc(customSolRpc);
+                    setStatus('Solana RPC updated. Refresh balances to use it.');
+                  }} 
+                  className="px-4 py-2 rounded-xl bg-emerald-500 text-black text-sm font-bold"
+                >
+                  Save
+                </button>
+                <button 
+                  onClick={() => {
+                    setCustomSolRpc('');
+                    setCustomSolanaRpc('');
+                    setStatus('Reverted to public RPC list.');
+                  }} 
+                  className="px-3 py-2 rounded-xl border border-zinc-700 text-sm"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
 
             <div className="text-xs text-zinc-500 pt-4">MT Node: {MT_NODE || 'demo (Solana only)'} • All fees ultra-low and fixed. Future developer APIs + social connect endpoints will be self-hosted.</div>
           </div>

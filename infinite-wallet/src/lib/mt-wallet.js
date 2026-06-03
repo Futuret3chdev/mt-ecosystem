@@ -304,8 +304,13 @@ let _currentRpcIndex = 0;
 const _solBalanceCache = new Map(); // addr -> {balance, ts}
 const CACHE_TTL_MS = 15000; // 15s cache for balances
 
+export function clearSolanaBalanceCache() {
+  _solBalanceCache.clear();
+}
+
 export function getSolConnection() {
-  const rpc = SOLANA_RPCS[_currentRpcIndex] || SOLANA_RPCS[0];
+  const custom = getCustomSolanaRpc();
+  const rpc = custom || SOLANA_RPCS[_currentRpcIndex] || SOLANA_RPCS[0];
   if (!_solConnection || _solConnection.rpcEndpoint !== rpc) {
     _solConnection = new Connection(rpc, 'confirmed');
   }
@@ -313,9 +318,30 @@ export function getSolConnection() {
 }
 
 function switchToNextSolanaRpc() {
+  if (getCustomSolanaRpc()) {
+    // if user set custom, don't auto-switch the list
+    return;
+  }
   _currentRpcIndex = (_currentRpcIndex + 1) % SOLANA_RPCS.length;
   _solConnection = null; // force recreate
   console.warn('Switched Solana RPC due to error, now using', SOLANA_RPCS[_currentRpcIndex]);
+}
+
+export function getCustomSolanaRpc() {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('mt_custom_solana_rpc') || null;
+}
+
+export function setCustomSolanaRpc(url) {
+  if (typeof window === 'undefined') return;
+  const trimmed = (url || '').trim();
+  if (trimmed) {
+    localStorage.setItem('mt_custom_solana_rpc', trimmed);
+  } else {
+    localStorage.removeItem('mt_custom_solana_rpc');
+  }
+  _solConnection = null; // force new connection on next use
+  _currentRpcIndex = 0;
 }
 
 export async function fetchSolanaMTBalance(solanaPublicKeyStr) {
