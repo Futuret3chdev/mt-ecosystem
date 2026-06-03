@@ -181,6 +181,7 @@ export function deleteVault() {
  * Node API helpers (MT native chain)
  */
 export async function fetchMTBalance(address) {
+  if (!MT_NODE) return { balance: 0, nonce: 0 };
   try {
     const res = await fetch(`${MT_NODE}/account/${address}`);
     if (!res.ok) return { balance: 0, nonce: 0 };
@@ -193,6 +194,7 @@ export async function fetchMTBalance(address) {
 }
 
 export async function fetchMTNFTs(owner) {
+  if (!MT_NODE) return [];
   try {
     const res = await fetch(`${MT_NODE}/nfts/${owner}`);
     if (!res.ok) return [];
@@ -203,6 +205,7 @@ export async function fetchMTNFTs(owner) {
 }
 
 export async function fetchMTTxs(address) {
+  if (!MT_NODE) return [];
   try {
     const res = await fetch(`${MT_NODE}/explorer/txs/${address}`);
     if (!res.ok) return [];
@@ -216,6 +219,7 @@ export async function fetchMTTxs(address) {
  * Submit signed MT transaction
  */
 export async function submitMTTx(unsignedTx, signature) {
+  if (!MT_NODE) throw new Error('Native MT node not configured (demo mode)');
   const body = { ...unsignedTx, signature };
   const res = await fetch(`${MT_NODE}/tx`, {
     method: 'POST',
@@ -235,6 +239,7 @@ export async function submitMTTx(unsignedTx, signature) {
  */
 export async function requestTestFunds(address) {
   if (!address) throw new Error('No address');
+  if (!MT_NODE) throw new Error('Faucet only available when local MT node is running');
   const res = await fetch(`${MT_NODE}/faucet`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
