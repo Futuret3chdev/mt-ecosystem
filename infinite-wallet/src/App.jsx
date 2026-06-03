@@ -243,6 +243,16 @@ export default function MTWalletApp() {
       setPassword('');
       setConfirmPassword('');
       setShowCreate(false);
+      // Add to local multi-wallets list for guest mode
+      const localEntry = {
+        id: 'local_' + Date.now().toString(36),
+        name: 'Local Wallet',
+        publicKey: w.publicKey,
+        encryptedData: localStorage.getItem('mt_vault_v1') || '', // the old single vault
+        createdAt: Date.now(),
+      };
+      addOrUpdateLocalWallet(localEntry);
+      setMyWallets(prev => [...prev.filter(x => x.id !== localEntry.id), localEntry]);
       setStatus('New wallet created and encrypted locally. BACK UP YOUR SEED PHRASE NOW.');
       setTimeout(() => {
         generateQR(w.publicKey);
