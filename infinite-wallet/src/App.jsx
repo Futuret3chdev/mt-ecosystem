@@ -185,18 +185,24 @@ export default function MTWalletApp() {
     setStatus('Syncing balances from MT node and Solana...');
 
     try {
-      // MT native
-      const mt = await fetchMTBalance(currentMtAddress);
-      setMtBalance(mt.balance);
-      setMtNonce(mt.nonce);
+      // MT native (only if a local or public MT node is configured; on Vercel live this is null)
+      if (MT_NODE) {
+        const mt = await fetchMTBalance(currentMtAddress);
+        setMtBalance(mt.balance);
+        setMtNonce(mt.nonce);
 
-      // NFTs on MT
-      const ownedNfts = await fetchMTNFTs(currentMtAddress);
-      setNfts(ownedNfts);
+        // NFTs on MT
+        const ownedNfts = await fetchMTNFTs(currentMtAddress);
+        setNfts(ownedNfts);
 
-      // Activity
-      const history = await fetchMTTxs(currentMtAddress);
-      setTxs(history.sort((a, b) => (b.time || 0) - (a.time || 0)));
+        // Activity
+        const history = await fetchMTTxs(currentMtAddress);
+        setTxs(history.sort((a, b) => (b.time || 0) - (a.time || 0)));
+      } else {
+        // On live preview, native MT is 0 (use local node for real native balances)
+        setMtBalance(0);
+        setMtNonce(0);
+      }
 
       // Solana $MT + SOL (for fees / bridge context) — this is the "real money" $MT
       if (currentSolAddress) {
@@ -609,7 +615,7 @@ export default function MTWalletApp() {
                     }
                   }} className="space-y-4">
                     <input type="text" placeholder="Email or Phone" value={accountEmail || accountPhone} onChange={(e) => { const v = e.target.value; if (v.includes('@')) setAccountEmail(v); else setAccountPhone(v); }} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
-                    <input type="password" placeholder="Password" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" required />
+                    <input type="password" autoComplete="current-password" placeholder="Password" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" required />
                     {authError && <div className="text-red-400 text-xs">{authError}</div>}
                     <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider mt-2">SIGN IN</button>
                     <div className="text-center text-xs">
@@ -638,7 +644,7 @@ export default function MTWalletApp() {
                   }} className="space-y-4">
                     <input type="email" placeholder="Email address" value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
                     <input type="tel" placeholder="Phone number" value={accountPhone} onChange={(e) => setAccountPhone(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
-                    <input type="password" placeholder="Password (min 6)" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" required />
+                    <input type="password" autoComplete="new-password" placeholder="Password (min 6)" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" required />
                     {authError && <div className="text-red-400 text-xs">{authError}</div>}
                     <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider">CREATE ACCOUNT</button>
                     <div className="text-center text-xs">
@@ -693,8 +699,8 @@ export default function MTWalletApp() {
                 {/* CREATE LOCAL */}
                 {showCreate && (
                   <form onSubmit={handleCreateWallet} className="mt-4 space-y-4">
-                    <input type="password" required minLength={6} placeholder="Password to encrypt this wallet" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
-                    <input type="password" required placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
+                    <input type="password" autoComplete="new-password" required minLength={6} placeholder="Password to encrypt this wallet" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
+                    <input type="password" autoComplete="new-password" required placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
                     {authError && <div className="text-red-400 text-xs">{authError}</div>}
                     <div className="flex gap-2">
                       <button type="button" onClick={() => setShowCreate(false)} className="flex-1 py-2 border border-zinc-700 rounded-xl text-sm">Cancel</button>
@@ -707,8 +713,8 @@ export default function MTWalletApp() {
                 {showImport && (
                   <form onSubmit={handleImportWallet} className="mt-4 space-y-4">
                     <textarea value={importMnemonic} onChange={(e) => setImportMnemonic(e.target.value)} placeholder="12 or 24 word recovery phrase" className="w-full h-20 bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-2 text-sm font-mono" />
-                    <input type="password" required minLength={6} placeholder="New password for this wallet" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
-                    <input type="password" required placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
+                    <input type="password" autoComplete="new-password" required minLength={6} placeholder="New password for this wallet" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
+                    <input type="password" autoComplete="new-password" required placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
                     {authError && <div className="text-red-400 text-xs">{authError}</div>}
                     <div className="flex gap-2">
                       <button type="button" onClick={() => setShowImport(false)} className="flex-1 py-2 border border-zinc-700 rounded-xl text-sm">Cancel</button>
@@ -738,7 +744,7 @@ export default function MTWalletApp() {
                     }
                   }} className="mt-4 space-y-3">
                     <div className="text-xs text-center">Existing local wallets detected on this device</div>
-                    <input type="password" placeholder="Password for local wallets" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
+                    <input type="password" autoComplete="current-password" placeholder="Password for local wallets" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
                     {authError && <div className="text-red-400 text-xs text-center">{authError}</div>}
                     <button type="submit" className="w-full py-2.5 bg-white text-black font-bold text-sm rounded-2xl">Unlock local wallets</button>
                   </form>

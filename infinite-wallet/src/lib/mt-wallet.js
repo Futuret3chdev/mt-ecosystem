@@ -13,10 +13,14 @@ import bs58 from 'bs58';
 import { Buffer } from 'buffer';
 
 // MT Node (local dev by default - later configurable / prod endpoint)
-export const MT_NODE = 'http://localhost:4000';
+export const MT_NODE = (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app'))
+  ? null // no public MT node yet; native MT only works when running local mt-core
+  : 'http://localhost:4000';
 
 // Auth service (for email/phone accounts + cross-device encrypted wallet backup)
-export const AUTH_URL = 'http://localhost:4001';
+export const AUTH_URL = (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app'))
+  ? null // demo mode falls back to localStorage-only
+  : 'http://localhost:4001';
 
 // Fixed ultra-low fee (marketed as ~1 cent SOL equivalent)
 export const MT_TX_FEE = 0.01;
@@ -277,7 +281,7 @@ import {
 } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 
-const SOLANA_RPC = 'https://api.mainnet-beta.solana.com'; // or devnet for test
+const SOLANA_RPC = 'https://rpc.ankr.com/solana'; // more reliable public endpoint than public mainnet-beta (avoids frequent 403s)
 const SOL_MT_MINT = new PublicKey('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump');
 
 let _solConnection = null;
@@ -286,35 +290,40 @@ export function getSolConnection() {
   return _solConnection;
 }
 
-export async function fetchSolanaMTBalance(solanaPublicKeyStr) {
-  try {
-    const conn = getSolConnection();
-    const owner = new PublicKey(solanaPublicKeyStr);
-    const ata = await getAssociatedTokenAddress(SOL_MT_MINT, owner);
-    const account = await getAccount(conn, ata);
-    const decimals = 6;
-    const balance = Number(account.amount) / 10 ** decimals;
-    return balance;
-  } catch (e) {
-    // Fallback: use getTokenAccountsByOwner which is more reliable for newly received tokens
+export async function fetchSolanaMTBalance(solanaPublicKeyStr, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const conn = getSolConnection();
       const owner = new PublicKey(solanaPublicKeyStr);
-      const res = await conn.getTokenAccountsByOwner(owner, { mint: SOL_MT_MINT });
-      if (res.value.length > 0) {
-        // Parse the balance from the account data manually (first 8 bytes after discriminator for amount in u64 little endian)
-        // Simpler: since we have the lib, try getAccount on the found pubkey
-        const pubkey = res.value[0].pubkey;
-        const account = await getAccount(conn, pubkey);
-        const decimals = 6;
-        return Number(account.amount) / 10 ** decimals;
+      const ata = await getAssociatedTokenAddress(SOL_MT_MINT, owner);
+      const account = await getAccount(conn, ata);
+      const decimals = 6;
+      const balance = Number(account.amount) / 10 ** decimals;
+      return balance;
+    } catch (e) {
+      if (attempt === retries) {
+        // Final attempt: fallback to getTokenAccountsByOwner
+        try {
+          const conn = getSolConnection();
+          const owner = new PublicKey(solanaPublicKeyStr);
+          const res = await conn.getTokenAccountsByOwner(owner, { mint: SOL_MT_MINT });
+          if (res.value.length > 0) {
+            const pubkey = res.value[0].pubkey;
+            const account = await getAccount(conn, pubkey);
+            const decimals = 6;
+            return Number(account.amount) / 10 ** decimals;
+          }
+          return 0;
+        } catch (e2) {
+          console.warn('Solana $MT balance fetch failed for', solanaPublicKeyStr, e2.message || e.message);
+          return 0;
+        }
       }
-      return 0;
-    } catch (e2) {
-      console.warn('Solana $MT balance fetch fallback failed for', solanaPublicKeyStr, e2.message);
-      return 0;
+      // Wait a bit before retry (exponential backoff for rate limits/403s)
+      await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
     }
   }
+  return 0;
 }
 
 export async function fetchSolanaSOLBalance(solanaPublicKeyStr) {
