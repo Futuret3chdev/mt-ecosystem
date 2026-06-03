@@ -31,7 +31,7 @@ export default function WalletPromo() {
                 <div className="font-mono text-emerald-400 text-xs mb-1">LIVE &amp; REAL</div>
                 <ul className="space-y-1.5 opacity-80">
                   <li>Mint real on-chain NFTs in wallet</li>
-                  <li>Buy / Sell $MT on live Jupiter &amp; Raydium</li>
+                  <li>Buy / Sell $MT fully inside the wallet (Jupiter routing, your keys sign)</li>
                   <li>Rockets (cross-game utility)</li>
                   <li>Self-built everything — no fake metrics</li>
                 </ul>

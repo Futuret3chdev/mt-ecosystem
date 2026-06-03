@@ -853,7 +853,7 @@ export default function MTWalletApp() {
               </div>
 
               <div className="text-[10px] text-center text-zinc-500">
-                The entire swap (quote → tx construction → signing → send) happens inside this wallet using your Solana keys. No redirects.
+                The entire swap (quote → tx construction → signing with your wallet's Solana key → broadcast) happens inside this wallet. No external sites or redirects. {wallet && getSolanaKeypair && <span className="font-mono block">Solana addr: {getSolanaKeypair(wallet)?.publicKey.toBase58().slice(0,8)}...</span>}
               </div>
             </div>
           </div>
