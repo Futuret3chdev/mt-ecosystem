@@ -13,20 +13,36 @@ type Asset = {
   logo?: string;
 };
 
-type FlowType = 'bridge' | 'swap' | 'harvest' | 'report' | null;
+type FlowType = 'bridge' | 'swap' | 'harvest' | 'report' | 'nft-designer' | 'rockets-staking' | 'multi-wallet' | 'constellation' | null;
 
 export default function PortfolioManager() {
   const [price, setPrice] = useState(0);
-  const [assets, setAssets] = useState<Asset[]>([
-    { symbol: 'MT', name: 'Native MT', balance: 124567890, chain: 'MT (PRIMARY — OUR NETWORK)', color: '#10b981', logo: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png' },
-    { symbol: '$MT', name: 'SPL $MT', balance: 45678901, chain: 'Solana', color: '#f59e0b', logo: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png' },
-    { symbol: 'ROCKET', name: 'Rockets', balance: 1247, chain: 'TAP Ecosystem', color: '#8b5cf6' },
-    { symbol: 'NFT', name: 'NFTs', balance: 7, chain: 'MT + Solana', color: '#ec4899' },
+
+  // Multi-wallet support for the switcher feature
+  const [wallets, setWallets] = useState([
+    { id: 'main', name: 'Primary Vault', balanceMT: 124567890, balanceSPL: 45678901, rockets: 1247, nfts: 7 },
+    { id: 'trading', name: 'Trading Desk', balanceMT: 23400000, balanceSPL: 189000000, rockets: 320, nfts: 2 },
+    { id: 'games', name: 'TAP Games Vault', balanceMT: 8900000, balanceSPL: 12000000, rockets: 4520, nfts: 14 },
+    { id: 'nft', name: 'NFT Collector', balanceMT: 450000, balanceSPL: 3200000, rockets: 180, nfts: 31 },
   ]);
+  const [currentWalletId, setCurrentWalletId] = useState('main');
+
+  const currentWallet = wallets.find(w => w.id === currentWalletId)!;
+
+  // Assets derived from current wallet for display
+  const assets: Asset[] = [
+    { symbol: 'MT', name: 'Native MT', balance: currentWallet.balanceMT, chain: 'MT (PRIMARY — OUR NETWORK)', color: '#10b981', logo: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png' },
+    { symbol: '$MT', name: 'SPL $MT', balance: currentWallet.balanceSPL, chain: 'Solana', color: '#f59e0b', logo: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png' },
+    { symbol: 'ROCKET', name: 'Rockets', balance: currentWallet.rockets, chain: 'TAP Ecosystem', color: '#8b5cf6' },
+    { symbol: 'NFT', name: 'NFTs', balance: currentWallet.nfts, chain: 'MT + Solana', color: '#ec4899' },
+  ];
+
   const [activeFlow, setActiveFlow] = useState<FlowType>(null);
   const [flowStep, setFlowStep] = useState(0);
   const [flowData, setFlowData] = useState<any>({});
   const [message, setMessage] = useState<string | null>(null);
+  const [nftPreview, setNftPreview] = useState({ color: '#10b981', type: 'Rocket', accessory: 'Wings' }); // for NFT designer
+  const [stakedRockets, setStakedRockets] = useState(0); // for staking preview (demo only)
 
   // Live $MT price for realistic valuation
   useEffect(() => {
@@ -44,8 +60,13 @@ export default function PortfolioManager() {
   const nativeMT = assets.find(a => a.symbol === 'MT')!;
   const splMT = assets.find(a => a.symbol === '$MT')!;
 
-  const updateAsset = (symbol: string, newBalance: number) => {
-    setAssets(prev => prev.map(a => a.symbol === symbol ? { ...a, balance: Math.max(0, Math.floor(newBalance)) } : a));
+  // Update current wallet's balances (supports multi-wallet)
+  const updateCurrentWallet = (updates: Partial<typeof currentWallet>) => {
+    setWallets(prev => prev.map(w =>
+      w.id === currentWalletId
+        ? { ...w, ...updates, balanceMT: Math.max(0, Math.floor(updates.balanceMT ?? w.balanceMT)), balanceSPL: Math.max(0, Math.floor(updates.balanceSPL ?? w.balanceSPL)), rockets: Math.max(0, Math.floor(updates.rockets ?? w.rockets)), nfts: Math.max(0, Math.floor(updates.nfts ?? w.nfts)) }
+        : w
+    ));
   };
 
   const showToast = (text: string) => {
@@ -77,11 +98,9 @@ export default function PortfolioManager() {
         const amt = flowData.amount || 5000000;
         const fromNative = flowData.direction === 'native-to-spl';
         if (fromNative) {
-          updateAsset('MT', nativeMT.balance - amt);
-          updateAsset('$MT', splMT.balance + amt);
+          updateCurrentWallet({ balanceMT: currentWallet.balanceMT - amt, balanceSPL: currentWallet.balanceSPL + amt });
         } else {
-          updateAsset('$MT', splMT.balance - amt);
-          updateAsset('MT', nativeMT.balance + amt);
+          updateCurrentWallet({ balanceSPL: currentWallet.balanceSPL - amt, balanceMT: currentWallet.balanceMT + amt });
         }
         showToast(`Bridge complete • ${amt.toLocaleString()} $MT moved on-chain`);
         setTimeout(() => closeFlow(), 1200);
@@ -90,8 +109,7 @@ export default function PortfolioManager() {
 
     if (activeFlow === 'harvest') {
       const earned = flowData.earned || 180 + Math.floor(Math.random() * 120);
-      const rockets = assets.find(a => a.symbol === 'ROCKET')!;
-      updateAsset('ROCKET', rockets.balance + earned);
+      updateCurrentWallet({ rockets: currentWallet.rockets + earned });
       showToast(`+${earned} Rockets harvested from TAP • auto to wallet`);
       setTimeout(() => closeFlow(), 900);
     }
@@ -105,6 +123,38 @@ export default function PortfolioManager() {
       const report = `MT-ECO-VERIFIED-${Date.now().toString(36).toUpperCase()}`;
       showToast(`On-chain report ${report} generated — includes native MT tx proofs (better than third-party trackers)`);
       setTimeout(() => closeFlow(), 1600);
+    }
+
+    // New: NFT designer - "mint" the previewed design
+    if (activeFlow === 'nft-designer') {
+      updateCurrentWallet({ nfts: currentWallet.nfts + 1 });
+      showToast(`Minted new ${nftPreview.type} NFT (${nftPreview.color} with ${nftPreview.accessory}) — added to current vault`);
+      setTimeout(() => closeFlow(), 900);
+    }
+
+    // New: Rockets staking preview
+    if (activeFlow === 'rockets-staking') {
+      const stakeAmt = flowData.stakeAmt || 200;
+      const duration = flowData.duration || 30;
+      if (currentWallet.rockets >= stakeAmt) {
+        setStakedRockets(prev => prev + stakeAmt);
+        updateCurrentWallet({ rockets: currentWallet.rockets - stakeAmt });
+        showToast(`Staked ${stakeAmt} Rockets for ${duration} days • Projected +${Math.floor(stakeAmt * 0.015 * (duration/30))} extra Rockets (demo APY)`);
+      } else {
+        showToast('Not enough Rockets to stake');
+      }
+      setTimeout(() => closeFlow(), 1100);
+    }
+
+    // New: Multi-wallet switcher - just a confirmation since switching is instant via cards
+    if (activeFlow === 'multi-wallet') {
+      showToast('Wallet switched. All balances, NFTs, and flows now reflect the selected vault.');
+      setTimeout(() => closeFlow(), 600);
+    }
+
+    // Constellation is visual, no "complete" needed but can close
+    if (activeFlow === 'constellation') {
+      setTimeout(() => closeFlow(), 400);
     }
   };
 
@@ -132,6 +182,31 @@ export default function PortfolioManager() {
       title: 'On-Chain Reports',
       desc: 'CoinLedger-style but on-chain verified. Native + SPL + Rockets + NFTs with proofs.',
       icon: '📊',
+    },
+    // New cool features requested
+    {
+      key: 'nft-designer' as const,
+      title: 'NFT Designer',
+      desc: 'Design custom MT Companions / Rockets NFTs live. Pick traits, preview, mint directly to vault.',
+      icon: '🎨',
+    },
+    {
+      key: 'rockets-staking' as const,
+      title: 'Rockets Staking Preview',
+      desc: 'Stake Rockets for boosted TAP yields. Real utility management flow (demo APY & projections).',
+      icon: '📈',
+    },
+    {
+      key: 'multi-wallet' as const,
+      title: 'Multi-Wallet Switcher',
+      desc: 'Switch between vaults (Primary, Trading, Games, NFT). See isolated balances — strict separation.',
+      icon: '👛',
+    },
+    {
+      key: 'constellation' as const,
+      title: 'Ecosystem Constellation',
+      desc: 'Interactive visual map of the entire MT ECO SYSTEM — nodes for wallet, core, TAP, bridges & more.',
+      icon: '✨',
     },
   ];
 
@@ -166,14 +241,10 @@ export default function PortfolioManager() {
             <div className="flex-1" />
             <button
               onClick={() => {
-                // "Import sample high-balance wallet" — feels like real management
-                setAssets([
-                  { symbol: 'MT', name: 'Native MT', balance: 215818000, chain: 'MT (PRIMARY — OUR NETWORK)', color: '#10b981' },
-                  { symbol: '$MT', name: 'SPL $MT', balance: 89000000, chain: 'Solana', color: '#f59e0b' },
-                  { symbol: 'ROCKET', name: 'Rockets', balance: 2840, chain: 'TAP Ecosystem', color: '#8b5cf6' },
-                  { symbol: 'NFT', name: 'NFTs', balance: 19, chain: 'MT + Solana', color: '#ec4899' },
-                ]);
-                showToast('Sample vault loaded (top holder style). All flows work on real data.');
+                // Switch to a "top holder" style wallet (multi-wallet demo)
+                setCurrentWalletId('main');
+                updateCurrentWallet({ balanceMT: 215818000, balanceSPL: 89000000, rockets: 2840, nfts: 19 });
+                showToast('Switched to Top Holder sample vault. All flows work on it.');
               }}
               className="px-5 py-2 rounded-xl border border-white/20 text-sm hover:bg-white/5 active:bg-white/10"
             >
@@ -181,8 +252,8 @@ export default function PortfolioManager() {
             </button>
             <button
               onClick={() => {
-                const newBal = nativeMT.balance + 25000000;
-                updateAsset('MT', newBal);
+                const newBal = currentWallet.balanceMT + 25000000;
+                updateCurrentWallet({ balanceMT: newBal });
                 showToast('Received 25M Native MT from faucet (demo)');
               }}
               className="px-5 py-2 rounded-xl border border-emerald-400/40 text-sm text-emerald-400 hover:bg-emerald-400/5"
@@ -190,6 +261,27 @@ export default function PortfolioManager() {
               + Receive Native MT
             </button>
           </div>
+        </div>
+
+        {/* Multi-wallet switcher — cool feature: strict isolation like real accounts */}
+        <div className="mb-8">
+          <div className="text-xs uppercase tracking-[3px] opacity-60 mb-2">MULTI-WALLET SWITCHER (STRICT ISOLATION)</div>
+          <div className="flex flex-wrap gap-3">
+            {wallets.map((w) => (
+              <button
+                key={w.id}
+                onClick={() => {
+                  setCurrentWalletId(w.id);
+                  setStakedRockets(0); // reset demo stake per wallet
+                  showToast(`Switched to ${w.name}`);
+                }}
+                className={`px-4 py-2 rounded-2xl border text-sm transition ${currentWalletId === w.id ? 'border-emerald-400 bg-emerald-400/10 text-emerald-400' : 'border-white/15 hover:bg-white/5'}`}
+              >
+                {w.name} <span className="opacity-50 text-xs">({w.rockets + stakedRockets} R)</span>
+              </button>
+            ))}
+          </div>
+          <div className="text-[10px] mt-1 opacity-50">Each vault is completely isolated (no cross-account leakage). Matches real INFINITE WALLET behavior.</div>
         </div>
 
         {/* Asset breakdown — clean management view */}
@@ -224,6 +316,57 @@ export default function PortfolioManager() {
               </div>
             </motion.div>
           ))}
+        </div>
+
+        {/* Constellation visual of the ecosystem — cool interactive feature */}
+        <div className="mb-10">
+          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-2">THE MT ECO SYSTEM CONSTELLATION</div>
+          <div className="text-2xl font-semibold tracking-tight mb-4">Everything connected. Tap a node.</div>
+
+          <div className="relative h-[220px] rounded-3xl border border-white/10 bg-black/60 overflow-hidden flex items-center justify-center">
+            <svg width="100%" height="100%" className="absolute inset-0" viewBox="0 0 800 220">
+              {/* Connections (lines between nodes) */}
+              <g stroke="#10b981" strokeOpacity="0.25" strokeWidth="1">
+                <line x1="120" y1="110" x2="260" y2="70" />
+                <line x1="260" y1="70" x2="400" y2="110" />
+                <line x1="400" y1="110" x2="540" y2="55" />
+                <line x1="400" y1="110" x2="540" y2="165" />
+                <line x1="540" y1="55" x2="680" y2="110" />
+                <line x1="540" y1="165" x2="680" y2="110" />
+                <line x1="260" y1="70" x2="400" y2="170" />
+                <line x1="120" y1="110" x2="400" y2="170" />
+              </g>
+
+              {/* Nodes - clickable via foreignObject or overlay buttons for simplicity */}
+            </svg>
+
+            {/* Animated nodes using motion.div positioned absolutely */}
+            {[
+              { id: 'core', label: 'MT Core\n(161.97.106.182)', x: '15%', y: '50%', delay: 0 },
+              { id: 'wallet', label: 'INFINITE\nWALLET', x: '32%', y: '32%', delay: 0.2 },
+              { id: 'token', label: '$MT +\nNative', x: '50%', y: '50%', delay: 0.4 },
+              { id: 'tap', label: 'TAP\nShop/Match', x: '67%', y: '25%', delay: 0.1 },
+              { id: 'games', label: 'Games &\nNFTs', x: '67%', y: '75%', delay: 0.3 },
+              { id: 'bridges', label: '100+ Chain\nBridges', x: '85%', y: '50%', delay: 0.5 },
+            ].map((node, idx) => (
+              <motion.div
+                key={idx}
+                whileHover={{ scale: 1.15, transition: { duration: 0.1 } }}
+                animate={{ y: [0, -4, 0] }}
+                transition={{ duration: 2.5 + idx * 0.3, repeat: Infinity, ease: 'easeInOut', delay: node.delay }}
+                onClick={() => {
+                  showToast(`${node.label.replace('\n', ' ')} — ${node.id === 'core' ? 'Our self-hosted node powering everything' : node.id === 'wallet' ? 'The gateway to all flows' : 'Connected in the constellation'}`);
+                  // Bonus: clicking can "select" in a real version
+                }}
+                className="absolute cursor-pointer text-center px-3 py-1 rounded-full bg-white/5 border border-emerald-400/30 text-xs font-mono tracking-tight leading-tight"
+                style={{ left: node.x, top: node.y, transform: 'translate(-50%, -50%)' }}
+              >
+                {node.label.split('\n').map((l, i) => <div key={i}>{l}</div>)}
+              </motion.div>
+            ))}
+
+            <div className="absolute bottom-3 right-3 text-[10px] opacity-40">Tap nodes • Self-built universe • Infinite connections</div>
+          </div>
         </div>
 
         {/* The good stuff: actual management flows */}
@@ -331,6 +474,99 @@ export default function PortfolioManager() {
                     <p className="opacity-80 mb-4">Generate a cryptographically verifiable report that includes Native MT transactions (from our node), SPL activity, Rockets earnings, and NFT provenance. Far beyond simple price trackers.</p>
                     <button onClick={() => completeStep()} className="w-full py-4 rounded-2xl border border-white/30 font-medium">GENERATE ON-CHAIN VERIFIED REPORT</button>
                     <div className="text-[10px] mt-3 opacity-50">Includes merkle-style proofs from mt-core. Exportable. Future: direct tax filing connectors.</div>
+                  </div>
+                )}
+
+                {/* NEW: NFT Designer */}
+                {activeFlow === 'nft-designer' && (
+                  <div className="mt-6">
+                    <div className="mb-4 text-sm opacity-80">Live NFT designer for MT Companions / Cosmic Rockets. Changes update the preview instantly.</div>
+
+                    <div className="flex flex-col md:flex-row gap-8 items-center">
+                      {/* Live preview */}
+                      <div className="w-48 h-48 rounded-3xl border border-white/10 flex items-center justify-center text-6xl relative overflow-hidden" style={{ background: nftPreview.color + '22' }}>
+                        <div style={{ color: nftPreview.color }} className="text-[120px] drop-shadow">🚀</div>
+                        <div className="absolute text-xs tracking-widest opacity-70 bottom-4">{nftPreview.type} • {nftPreview.accessory}</div>
+                      </div>
+
+                      {/* Controls */}
+                      <div className="space-y-4 flex-1">
+                        <div>
+                          <div className="text-xs opacity-60 mb-1">COLOR / THEME</div>
+                          <div className="flex gap-2">
+                            {['#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#3b82f6'].map(c => (
+                              <button key={c} onClick={() => setNftPreview(p => ({...p, color: c}))} className="w-8 h-8 rounded-full border border-white/20" style={{background: c}} />
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs opacity-60 mb-1">TYPE</div>
+                          <div className="flex gap-2 flex-wrap">
+                            {['Rocket', 'Companion', 'Starship', 'Artifact'].map(t => (
+                              <button key={t} onClick={() => setNftPreview(p => ({...p, type: t}))} className={`px-3 py-1 rounded-xl border text-sm ${nftPreview.type === t ? 'border-emerald-400' : 'border-white/10'}`}>{t}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs opacity-60 mb-1">ACCESSORY</div>
+                          <div className="flex gap-2 flex-wrap">
+                            {['Wings', 'Crown', 'Shield', 'Laser', 'Jetpack'].map(a => (
+                              <button key={a} onClick={() => setNftPreview(p => ({...p, accessory: a}))} className={`px-3 py-1 rounded-xl border text-sm ${nftPreview.accessory === a ? 'border-emerald-400' : 'border-white/10'}`}>{a}</button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button onClick={() => completeStep()} className="mt-6 w-full py-4 rounded-2xl bg-white text-black font-semibold tracking-wider">MINT THIS DESIGN TO CURRENT WALLET (demo)</button>
+                    <div className="text-[10px] text-center mt-2 opacity-50">Real mint uses INFINITE WALLET + our native NFT layer at 1¢ fees. Design saved on-chain forever.</div>
+                  </div>
+                )}
+
+                {/* NEW: Rockets Staking Preview */}
+                {activeFlow === 'rockets-staking' && (
+                  <div className="mt-6 space-y-5">
+                    <div>Stake Rockets to boost future TAP earnings and NFT rewards.</div>
+                    <div>
+                      <div className="flex justify-between text-xs mb-1 opacity-60"><span>Amount to stake</span><span>{flowData.stakeAmt || 200} Rockets</span></div>
+                      <input type="range" min="50" max={Math.min(3000, currentWallet.rockets)} step="10" value={flowData.stakeAmt || 200} onChange={e => setFlowData({...flowData, stakeAmt: parseInt(e.target.value)})} className="w-full accent-emerald-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs opacity-60 mb-1">Lock duration (days)</div>
+                      <div className="flex gap-2">
+                        {[7, 30, 90, 180].map(d => <button key={d} onClick={() => setFlowData({...flowData, duration: d})} className={`px-4 py-1 rounded-xl border text-sm ${ (flowData.duration||30) === d ? 'border-emerald-400' : 'border-white/10'}`}>{d}d</button>)}
+                      </div>
+                    </div>
+                    <div className="p-4 bg-white/5 rounded-2xl text-sm">
+                      Projected yield: +{Math.floor( (flowData.stakeAmt||200) * 0.015 * ((flowData.duration||30)/30) )} Rockets<br />
+                      <span className="text-xs opacity-60">15% APY (demo) • Auto-compounds in TAP games • Unstake anytime</span>
+                    </div>
+                    <button onClick={() => completeStep({ stakeAmt: flowData.stakeAmt || 200, duration: flowData.duration || 30 })} className="w-full py-4 rounded-2xl bg-emerald-400 text-black font-semibold">STAKE ROCKETS (preview — affects demo balance)</button>
+                  </div>
+                )}
+
+                {/* NEW: Multi-wallet switcher (enhanced in flow) */}
+                {activeFlow === 'multi-wallet' && (
+                  <div className="mt-6">
+                    <p className="opacity-80 mb-4">All wallets are strictly isolated (Jason's vaults never visible to other accounts). Click any to switch the entire management view.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {wallets.map(w => (
+                        <button key={w.id} onClick={() => { setCurrentWalletId(w.id); completeStep(); }} className="text-left p-4 rounded-2xl border border-white/10 hover:border-emerald-400/50">
+                          <div className="font-semibold">{w.name}</div>
+                          <div className="text-xs opacity-70 mt-1">{w.balanceMT.toLocaleString()} MT • {w.rockets} R • {w.nfts} NFTs</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* NEW: Constellation (opens enhanced view) */}
+                {activeFlow === 'constellation' && (
+                  <div className="mt-6 text-center">
+                    <p className="opacity-80 mb-4">The full self-built constellation. Every node is connected without third parties.</p>
+                    <div className="inline-block text-6xl mb-3">✨ 🌌 🔗</div>
+                    <p className="text-sm">MT Core • INFINITE WALLET • TAP (Shop • Match • Transport • Studio) • 100+ Bridges • Native NFTs • Rockets Economy • Security Layer</p>
+                    <button onClick={() => completeStep()} className="mt-4 px-8 py-3 rounded-2xl border border-white/30">CLOSE VISUAL</button>
                   </div>
                 )}
               </motion.div>
