@@ -489,8 +489,9 @@ export async function fetchSolanaMTBalanceMoralis(solanaPublicKeyStr, moralisKey
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) {
       const token = data[0];
-      // Moralis returns balance as string in smallest units, with decimals info
-      const raw = token.balance || '0';
+      // Moralis response uses "amount" / "amountRaw" (not "balance") in recent API.
+      // Fall back to "balance" for compatibility. Use amountRaw when present for precision.
+      const raw = token.amountRaw || token.balance || token.amount || '0';
       const dec = token.decimals || 6;
       return Number(raw) / Math.pow(10, dec);
     }
