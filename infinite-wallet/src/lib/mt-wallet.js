@@ -13,9 +13,52 @@ import bs58 from 'bs58';
 import { Buffer } from 'buffer';
 
 // MT Node (local dev by default - later configurable / prod endpoint)
-export const MT_NODE = (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app'))
-  ? null // no public MT node yet; native MT only works when running local mt-core
-  : 'http://localhost:4000';
+// On Vercel/live we default to null (no public node), but user can set a custom one in Settings
+// (e.g. their deployed mt-core on Render/Railway, or localhost when testing locally).
+// NOTE: always use getMTNode() at call time so custom settings + VITE_MT_NODE_URL apply without reload.
+// The old MT_NODE const is kept for a few legacy references but getMTNode() is the source of truth.
+export const MT_NODE = (() => {
+  if (typeof window === 'undefined') return 'http://localhost:4000';
+  const local = localStorage.getItem('mt_custom_mt_node');
+  if (local) return local;
+  // Also respect build-time default here for the const
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_MT_NODE_URL) {
+      return import.meta.env.VITE_MT_NODE_URL;
+    }
+  } catch (_) {}
+  if (window.location.hostname.includes('vercel.app')) return null;
+  return 'http://localhost:4000';
+})();
+
+export function getDefaultMTNode() {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      return import.meta.env.VITE_MT_NODE_URL || null;
+    }
+  } catch (_) {}
+  return null;
+}
+
+export function getMTNode() {
+  if (typeof window === 'undefined') return 'http://localhost:4000';
+  const local = localStorage.getItem('mt_custom_mt_node');
+  if (local) return local;
+  const fromEnv = getDefaultMTNode();
+  if (fromEnv) return fromEnv;
+  if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) return null;
+  return 'http://localhost:4000';
+}
+
+export function setMTNode(url) {
+  if (typeof window === 'undefined') return;
+  const trimmed = (url || '').trim();
+  if (trimmed) {
+    localStorage.setItem('mt_custom_mt_node', trimmed);
+  } else {
+    localStorage.removeItem('mt_custom_mt_node');
+  }
+}
 
 // Auth service (for email/phone accounts + cross-device encrypted wallet backup)
 export const AUTH_URL = (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app'))
@@ -181,9 +224,10 @@ export function deleteVault() {
  * Node API helpers (MT native chain)
  */
 export async function fetchMTBalance(address) {
-  if (!MT_NODE) return { balance: 0, nonce: 0 };
+  const node = getMTNode();
+  if (!node) return { balance: 0, nonce: 0 };
   try {
-    const res = await fetch(`${MT_NODE}/account/${address}`);
+    const res = await fetch(`${node}/account/${address}`);
     if (!res.ok) return { balance: 0, nonce: 0 };
     const data = await res.json();
     return { balance: Number(data.balance || 0), nonce: Number(data.nonce || 0) };
@@ -194,9 +238,10 @@ export async function fetchMTBalance(address) {
 }
 
 export async function fetchMTNFTs(owner) {
-  if (!MT_NODE) return [];
+  const node = getMTNode();
+  if (!node) return [];
   try {
-    const res = await fetch(`${MT_NODE}/nfts/${owner}`);
+    const res = await fetch(`${node}/nfts/${owner}`);
     if (!res.ok) return [];
     return await res.json();
   } catch {
@@ -205,9 +250,10 @@ export async function fetchMTNFTs(owner) {
 }
 
 export async function fetchMTTxs(address) {
-  if (!MT_NODE) return [];
+  const node = getMTNode();
+  if (!node) return [];
   try {
-    const res = await fetch(`${MT_NODE}/explorer/txs/${address}`);
+    const res = await fetch(`${node}/explorer/txs/${address}`);
     if (!res.ok) return [];
     return await res.json();
   } catch {
@@ -219,9 +265,10 @@ export async function fetchMTTxs(address) {
  * Submit signed MT transaction
  */
 export async function submitMTTx(unsignedTx, signature) {
-  if (!MT_NODE) throw new Error('Native MT node not configured (demo mode)');
+  const node = getMTNode();
+  if (!node) throw new Error('Native MT node not configured (demo mode)');
   const body = { ...unsignedTx, signature };
-  const res = await fetch(`${MT_NODE}/tx`, {
+  const res = await fetch(`${node}/tx`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -239,8 +286,9 @@ export async function submitMTTx(unsignedTx, signature) {
  */
 export async function requestTestFunds(address) {
   if (!address) throw new Error('No address');
-  if (!MT_NODE) throw new Error('Faucet only available when local MT node is running');
-  const res = await fetch(`${MT_NODE}/faucet`, {
+  const node = getMTNode();
+  if (!node) throw new Error('Faucet only available when local MT node is running');
+  const res = await fetch(`${node}/faucet`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ address }),
@@ -286,14 +334,27 @@ import {
 } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 
-// List of public Solana mainnet RPCs (tried in order on errors like 403).
-// These are public and can be rate limited; for production use your own (e.g. Helius, QuickNode, Alchemy free tier).
+// Prioritized Solana mainnet RPCs for reliable $MT (SPL) and SOL balance reads + swaps.
+// Exactly the ones the user provided (Helius first, then QuickNode, then public mainnet).
+// Custom RPC in Settings (or VITE_SOLANA_RPC_URL build-time default) overrides the entire list.
+// We intentionally avoid flaky public endpoints that can return ERR_CERT_AUTHORITY_INVALID.
 const SOLANA_RPCS = [
-  'https://solana.public-rpc.com',
-  'https://api.mainnet-beta.solana.com',
-  'https://solana-api.projectserum.com',
-  'https://rpc.ankr.com/solana',
+  'https://mainnet.helius-rpc.com/?api-key=61a3cb76-ffd8-4dde-bb49-35cae29566c8', // Helius first (user's working key)
+  'https://billowing-multi-grass.solana-mainnet.quiknode.pro/aa4bc2cb96a4abb5cc363c8bbeec7f8ebde29dce', // user's QuickNode
+  'https://api.mainnet-beta.solana.com', // public last resort
 ];
+
+// Domains known to cause ERR_CERT_AUTHORITY_INVALID in some browsers/networks.
+// We filter them out at runtime to prevent repeated failed requests and console spam.
+const BAD_RPC_DOMAINS = ['solana.public-rpc.com', 'public-rpc.com'];
+
+function getUsableRpcs() {
+  const custom = getCustomSolanaRpc();
+  if (custom) {
+    return [custom];
+  }
+  return SOLANA_RPCS.filter(rpc => !BAD_RPC_DOMAINS.some(bad => rpc.includes(bad)));
+}
 
 const SOL_MT_MINT = new PublicKey('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump');
 
@@ -304,13 +365,25 @@ let _currentRpcIndex = 0;
 const _solBalanceCache = new Map(); // addr -> {balance, ts}
 const CACHE_TTL_MS = 15000; // 15s cache for balances
 
+// Prevent log spam on repeated failures for the same address
+const _lastWarnTime = new Map(); // addr -> timestamp
+const WARN_COOLDOWN_MS = 30000; // only warn once every 30s per address
+
 export function clearSolanaBalanceCache() {
   _solBalanceCache.clear();
 }
 
 export function getSolConnection() {
+  const usable = getUsableRpcs();
   const custom = getCustomSolanaRpc();
-  const rpc = custom || SOLANA_RPCS[_currentRpcIndex] || SOLANA_RPCS[0];
+  let rpc;
+  if (custom) {
+    rpc = custom;
+  } else {
+    // make sure index is within usable
+    const idx = Math.min(_currentRpcIndex, usable.length - 1);
+    rpc = usable[idx] || usable[0];
+  }
   if (!_solConnection || _solConnection.rpcEndpoint !== rpc) {
     _solConnection = new Connection(rpc, 'confirmed');
   }
@@ -319,17 +392,30 @@ export function getSolConnection() {
 
 function switchToNextSolanaRpc() {
   if (getCustomSolanaRpc()) {
-    // if user set custom, don't auto-switch the list
+    // if user set custom (or VITE_SOLANA_RPC_URL default), don't auto-switch the list
     return;
   }
-  _currentRpcIndex = (_currentRpcIndex + 1) % SOLANA_RPCS.length;
+  const usable = getUsableRpcs();
+  _currentRpcIndex = (_currentRpcIndex + 1) % usable.length;
   _solConnection = null; // force recreate
-  console.warn('Switched Solana RPC due to error, now using', SOLANA_RPCS[_currentRpcIndex]);
+  // Only log switch at warn level occasionally to avoid console spam
+  console.warn('Switched Solana RPC due to error, now using', usable[_currentRpcIndex]);
+}
+
+export function getDefaultSolanaRpc() {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      return import.meta.env.VITE_SOLANA_RPC_URL || null;
+    }
+  } catch (_) {}
+  return null;
 }
 
 export function getCustomSolanaRpc() {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('mt_custom_solana_rpc') || null;
+  const local = localStorage.getItem('mt_custom_solana_rpc');
+  if (local) return local;
+  return getDefaultSolanaRpc();
 }
 
 export function setCustomSolanaRpc(url) {
@@ -345,11 +431,30 @@ export function setCustomSolanaRpc(url) {
 }
 
 // Moralis integration for reliable Solana $MT balances and price (user's bot key works well)
+// 
+// The key can be provided in two ways:
+// 1. Build-time (recommended for live public site): set VITE_MORALIS_API_KEY env var on your hosting platform (Vercel etc).
+//    It gets baked into the client bundle (visible to anyone who inspects the JS — same exposure as before).
+// 2. Per-browser override: user pastes in Settings → saved to localStorage.
+//
+// getMoralisApiKey() always returns the effective key (local override wins, else the build-time default).
 // WARNING: exposing API key in client is not ideal for prod (rate limits, security). 
-// For live demo it's useful. Prefer backend proxy for real deployment.
+// Prefer a backend proxy + your own endpoint for real production.
+export function getDefaultMoralisApiKey() {
+  try {
+    // Vite statically replaces import.meta.env.VITE_* at build time for the client bundle.
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      return import.meta.env.VITE_MORALIS_API_KEY || null;
+    }
+  } catch (_) {}
+  return null;
+}
+
 export function getMoralisApiKey() {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('mt_moralis_api_key') || null;
+  const local = localStorage.getItem('mt_moralis_api_key');
+  if (local) return local;
+  return getDefaultMoralisApiKey();
 }
 
 export function setMoralisApiKey(key) {
@@ -429,8 +534,10 @@ export async function fetchSolanaMTBalance(solanaPublicKeyStr) {
     // fall through to RPC if Moralis failed
   }
 
-  // Try all RPCs on 403/key errors
-  for (let rpcAttempt = 0; rpcAttempt < SOLANA_RPCS.length; rpcAttempt++) {
+  // Try RPCs in priority order. Switch on ANY error (403, rate limit, cert issues, network, "failed to fetch", etc.)
+  // This prevents hammering a single bad/flaky RPC (e.g. ones that throw ERR_CERT_AUTHORITY_INVALID).
+  const usableRpcsForLoop = getUsableRpcs();
+  for (let rpcAttempt = 0; rpcAttempt < usableRpcsForLoop.length; rpcAttempt++) {
     try {
       const conn = getSolConnection();
       const owner = new PublicKey(solanaPublicKeyStr);
@@ -441,12 +548,16 @@ export async function fetchSolanaMTBalance(solanaPublicKeyStr) {
       _solBalanceCache.set(solanaPublicKeyStr, { balance, ts: Date.now() });
       return balance;
     } catch (e) {
-      const msg = (e.message || '').toLowerCase();
-      if (msg.includes('403') || msg.includes('forbidden') || msg.includes('api key')) {
+      const msg = (e.message || '').toLowerCase() + ' ' + (e.toString?.() || '');
+      const shouldSwitch = msg.includes('403') || msg.includes('forbidden') || msg.includes('api key') ||
+                           msg.includes('failed to fetch') || msg.includes('network') || msg.includes('cert') ||
+                           msg.includes('timeout') || msg.includes('invalid') || msg.includes('abort');
+
+      if (shouldSwitch && !getCustomSolanaRpc()) {
         switchToNextSolanaRpc();
-        continue;
       }
-      // other error, try fallback getTokenAccountsByOwner for this RPC
+
+      // Fallback to getTokenAccountsByOwner (useful when ATA doesn't exist yet or for some RPCs)
       try {
         const conn = getSolConnection();
         const owner = new PublicKey(solanaPublicKeyStr);
@@ -459,10 +570,18 @@ export async function fetchSolanaMTBalance(solanaPublicKeyStr) {
           _solBalanceCache.set(solanaPublicKeyStr, { balance, ts: Date.now() });
           return balance;
         }
+        // No token account = 0 balance for this mint
         return 0;
       } catch (e2) {
-        console.warn('Solana $MT balance fetch failed for', solanaPublicKeyStr, e2.message || e.message);
-        // continue to next RPC or return 0 at end
+        if (!getCustomSolanaRpc()) {
+          switchToNextSolanaRpc();
+        }
+        const now = Date.now();
+        const last = _lastWarnTime.get(solanaPublicKeyStr) || 0;
+        if (now - last > WARN_COOLDOWN_MS) {
+          _lastWarnTime.set(solanaPublicKeyStr, now);
+          console.warn('Solana $MT balance fetch failed for', solanaPublicKeyStr, e2.message || e.message);
+        }
       }
     }
   }
@@ -476,7 +595,8 @@ export async function fetchSolanaSOLBalance(solanaPublicKeyStr) {
     return cached.balance;
   }
 
-  for (let rpcAttempt = 0; rpcAttempt < SOLANA_RPCS.length; rpcAttempt++) {
+  const usableRpcsForLoop = getUsableRpcs();
+  for (let rpcAttempt = 0; rpcAttempt < usableRpcsForLoop.length; rpcAttempt++) {
     try {
       const conn = getSolConnection();
       const lamports = await conn.getBalance(new PublicKey(solanaPublicKeyStr));
@@ -484,12 +604,15 @@ export async function fetchSolanaSOLBalance(solanaPublicKeyStr) {
       _solBalanceCache.set(cacheKey, { balance: bal, ts: Date.now() });
       return bal;
     } catch (e) {
-      const msg = (e.message || '').toLowerCase();
-      if (msg.includes('403') || msg.includes('forbidden') || msg.includes('api key')) {
+      const msg = (e.message || '').toLowerCase() + ' ' + (e.toString?.() || '');
+      const shouldSwitch = msg.includes('403') || msg.includes('forbidden') || msg.includes('api key') ||
+                           msg.includes('failed to fetch') || msg.includes('network') || msg.includes('cert') ||
+                           msg.includes('timeout') || msg.includes('invalid');
+
+      if (shouldSwitch && !getCustomSolanaRpc()) {
         switchToNextSolanaRpc();
-        continue;
       }
-      return 0;
+      // continue to try next RPC instead of immediately returning 0
     }
   }
   return 0;
@@ -520,6 +643,7 @@ const USER_PROFILE_KEY = 'mt_user_profile';
 const LOCAL_WALLETS_KEY = 'mt_local_wallets_v2'; // supports multiple
 
 export function getAuthToken() {
+  if (typeof window === 'undefined') return null;
   return localStorage.getItem(AUTH_TOKEN_KEY);
 }
 
@@ -549,6 +673,7 @@ export function saveUserProfile(profile) {
  * Local multi-wallet storage (encrypted blobs)
  */
 export function getLocalWallets() {
+  if (typeof window === 'undefined') return [];
   try {
     return JSON.parse(localStorage.getItem(LOCAL_WALLETS_KEY) || '[]');
   } catch {

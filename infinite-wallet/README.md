@@ -4,8 +4,8 @@ Phantom-grade, self-built, self-custodial wallet for the MT ECO SYSTEM.
 
 - 100% local key management (bip39 mnemonic → ed25519)
 - AES-GCM + PBKDF2 encrypted vault (password protected, never sent anywhere)
-- Native MT chain support (compatible with mt-core node: tweetnacl + bs58 signatures)
-- Solana $MT SPL balance + SOL for bridge context
+- Native MT chain PRIMARY (balances/NFTs/txs/sends retrieved from our mt-core /account etc; never from Solana for the native asset)
+- Solana $MT (SPL) + SOL only as secondary (for current token holdings, gas, Jupiter in-wallet swaps, future bridge). Uses prioritized RPCs (Helius + QuickNode defaults) for reliable balance queries.
 - Built-in NFT minting on MT chain
 - Rockets (cross-game utility) display
 - Self-built bridge flows (Solana burn proof → MT mint)
@@ -29,12 +29,25 @@ Create or import a wallet (12-word seed), set a strong password. Everything is e
 
 3. (Important for testing) Once both are running, in the wallet Portfolio view you will see a "🚰 Get 1000 Test $MT (dev faucet)" button right under your balance (only shown for localhost node). Click it — the local node will instantly credit your wallet 1000 test MT so you can try real sends, NFT mints, etc. without touching genesis multisig.
 
-Send / NFT transactions are signed locally and submitted to the node at http://localhost:4000.
+Native MT balance is always fetched from our node first (see Settings → MT Node URL to point at a running or deployed mt-core so live previews or remote can retrieve from "us"). Solana queries only hit for the SPL leg.
+Send / NFT transactions (native) are signed locally and submitted to the node at http://localhost:4000 (or your configured MT Node).
 
 ## Production / Deploy
 
 - Build: `npm run build`
 - The output in `dist/` is a static site. Deploy to any static host (or the wallet.futuret3ch.com.au domain).
+
+**For reliable public Solana $MT (SPL) balances on the live site without every visitor pasting a key:**
+
+Add an environment variable on your hosting platform (Vercel, Railway, etc.):
+
+- **Key:** `VITE_MORALIS_API_KEY`
+- **Value:** your full Moralis JWT token (the one that starts with `eyJhbGci...`)
+- Redeploy / trigger a new build after setting it.
+
+The key will be used as the default (baked into the client JS at build time). Visitors can still override it per-browser in the wallet's Settings tab. See the in-app Settings UI for more details. (Note: any client-side key is visible in the built bundle.)
+
+Same pattern works for `VITE_` vars if you want to default the custom RPC or MT node.
 
 ## Security Notes
 

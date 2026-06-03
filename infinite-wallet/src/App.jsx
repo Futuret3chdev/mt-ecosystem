@@ -22,7 +22,6 @@ import {
   submitMTTx,
   requestTestFunds,
   MT_TX_FEE,
-  MT_NODE,
   fetchSolanaMTBalance,
   fetchSolanaSOLBalance,
   deriveSolanaKeypairFromSeed,
@@ -36,6 +35,15 @@ import {
   clearSolanaBalanceCache,
   getMoralisApiKey,
   setMoralisApiKey,
+  getDefaultMoralisApiKey,
+
+  // MT node (native primary source)
+  getMTNode,
+  setMTNode,
+  getDefaultMTNode,
+
+  // Solana RPC default support
+  getDefaultSolanaRpc,
 
   // new auth + multi
   AUTH_URL,
@@ -98,8 +106,20 @@ export default function MTWalletApp() {
   const [editingWalletId, setEditingWalletId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('#10b981'); // default emerald
-  const [customSolRpc, setCustomSolRpc] = useState(getCustomSolanaRpc() || '');
-  const [moralisKey, setMoralisKey] = useState(getMoralisApiKey() || '');
+  // These *_input states hold only the *localStorage override* value (for the form fields).
+  // The effective value used by the app (getCustom..., getMTNode, getMoralisApiKey) falls back to VITE_* env defaults.
+  const [customSolRpc, setCustomSolRpc] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('mt_custom_solana_rpc') || '';
+  });
+  const [moralisKey, setMoralisKey] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('mt_moralis_api_key') || '';
+  });
+  const [customMtNode, setCustomMtNode] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('mt_custom_mt_node') || '';
+  });
 
   // Ref to always have the latest wallet for refreshAll (avoids stale closure when switching wallets)
   const latestWalletRef = useRef(null);
@@ -189,11 +209,13 @@ export default function MTWalletApp() {
       : '';
 
     setLoadingBalances(true);
-    setStatus('Syncing balances from MT node and Solana...');
+    setStatus('Syncing native MT (our network) + Solana side...');
 
     try {
-      // MT native (only if a local or public MT node is configured; on Vercel live this is null)
-      if (MT_NODE) {
+      // NATIVE MT from our chain is ALWAYS PRIMARY for this wallet (MT addr is the native identity)
+      // We retrieve from mt-core /account first. Solana fetches are secondary (SPL token / current bridge context only).
+      const node = getMTNode ? getMTNode() : null;
+      if (node) {
         const mt = await fetchMTBalance(currentMtAddress);
         setMtBalance(mt.balance);
         setMtNonce(mt.nonce);
@@ -206,13 +228,15 @@ export default function MTWalletApp() {
         const history = await fetchMTTxs(currentMtAddress);
         setTxs(history.sort((a, b) => (b.time || 0) - (a.time || 0)));
       } else {
-        // On live preview, native MT is 0 (use local node for real native balances)
+        // demo / no node configured: native MT shows 0 (point a custom MT node in Settings to retrieve from us)
         setMtBalance(0);
         setMtNonce(0);
       }
 
-      // Solana $MT + SOL (for fees / bridge context) — this is the "real money" $MT
+      // Solana $MT + SOL — secondary / for SPL holdings (e.g. the pump.fun $MT) + gas for in-wallet Jupiter swaps / future bridge
+      // Always clear short cache on manual/activate refresh so user sees fresh on-chain value (e.g. after a send to the SOL addr)
       if (currentSolAddress) {
+        clearSolanaBalanceCache();
         const [smt, ssol] = await Promise.all([
           fetchSolanaMTBalance(currentSolAddress),
           fetchSolanaSOLBalance(currentSolAddress),
@@ -221,7 +245,7 @@ export default function MTWalletApp() {
         setSolSOLBalance(ssol);
       }
 
-      setStatus('Balances synced • All data from on-chain sources');
+      setStatus('Balances synced • Native MT primary from our network');
     } catch (e) {
       setStatus(`Sync partial: ${e.message}`);
     } finally {
@@ -511,17 +535,53 @@ export default function MTWalletApp() {
         }
       }
 
-      // Directly query using the (now guaranteed) solana addr
+      // PRIMARY: fetch native MT balance from OUR network (mt-core /account for the MT addr)
+      // This wallet is native to MT ECO SYSTEM — we retrieve balances from us first.
+      const mtAddrForEntry = entry.publicKey || entry.address;
+      let nativeBal = 0;
+      if (mtAddrForEntry) {
+        try {
+          const mt = await fetchMTBalance(mtAddrForEntry);
+          setMtBalance(mt.balance);
+          setMtNonce(mt.nonce || 0);
+          nativeBal = mt.balance;
+        } catch (e) { /* ignore */ }
+      }
+
+      // SECONDARY: Solana SPL (only for the pump token context / bridge / in-wallet swaps)
       if (entry.solanaPublicKey) {
         try {
+          clearSolanaBalanceCache();
           const bal = await fetchSolanaMTBalance(entry.solanaPublicKey);
           setSolMTBalance(bal);
-          setStatus(`Activated. Solana $MT balance for this wallet: ${bal}`);
-        } catch (e) { /* ignore */ }
+          setStatus(`Activated: ${entry.name}. Native MT (our network): ${nativeBal} • Solana SPL: ${bal}`);
+        } catch (e) { 
+          setStatus(`Activated: ${entry.name}. Native MT (our network): ${nativeBal}`);
+        }
+      } else {
+        setStatus(`Activated: ${entry.name}. Native MT (our network primary): ${nativeBal}`);
       }
     } catch (e) {
       setStatus('Failed to unlock wallet with this password: ' + e.message);
       alert('Wrong password or corrupted data for this wallet.');
+    }
+  }
+
+  // Force sync NATIVE MT balance from our chain for a specific wallet entry (primary source)
+  async function forceSyncNativeForEntry(entryId, mtAddr) {
+    if (!mtAddr) return;
+    try {
+      const balData = await fetchMTBalance(mtAddr);
+      // Update the main UI balances (user is inspecting this wallet's native state)
+      setMtBalance(balData.balance);
+      setMtNonce(balData.nonce || 0);
+      setStatus(`Native MT from our network (${shortAddr(mtAddr)}): ${balData.balance} • (primary for this MT-native wallet)`);
+      // If this entry matches active, also ensure active id
+      if (entryId && activeWalletId !== entryId) {
+        // don't auto switch, just show the native value in the cards for now
+      }
+    } catch (err) {
+      setStatus('Native MT force sync failed: ' + (err.message || err));
     }
   }
 
@@ -808,7 +868,7 @@ export default function MTWalletApp() {
           <div className="flex items-center gap-3 text-sm">
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-2xl text-xs font-mono text-zinc-400">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              {MT_NODE ? MT_NODE.replace('http://', '') : 'demo (Solana only)'}
+              {(() => { const n = getMTNode ? getMTNode() : null; return n ? n.replace('http://', '') : 'demo (native MT off, Solana side only)'; })()}
             </div>
 
             {mtAddress && (
@@ -876,12 +936,12 @@ export default function MTWalletApp() {
                         <span className="text-xs text-zinc-400">Active: {(myWallets.find(x=>x.id===activeWalletId)?.name) || 'Wallet'}</span>
                       </div>
                     )}
-                    <div className="uppercase tracking-[2px] text-xs text-emerald-400 font-semibold">Native MT • On MT Chain</div>
+                    <div className="uppercase tracking-[2px] text-xs text-emerald-400 font-semibold">NATIVE MT (PRIMARY — OUR NETWORK)</div>
                     <div className="mt-3 text-6xl font-black tabular-nums tracking-[-2.5px]">{mtBalance.toFixed(2)}</div>
                     <div className="text-emerald-400 text-xl font-semibold -mt-1">$MT</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-zinc-500">Your primary asset on the MT network</div>
+                    <div className="text-xs text-zinc-500">Retrieved from our mt-core node (not Solana)</div>
                     <div className="mt-6 flex gap-3">
                       <button onClick={() => { setActiveTab('send-receive'); setShowSendModal(true); }} className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 active:bg-white transition rounded-2xl text-black font-semibold text-sm flex items-center gap-2">
                         <Send className="w-4 h-4" /> SEND
@@ -890,7 +950,12 @@ export default function MTWalletApp() {
                         <QrCode className="w-4 h-4" /> RECEIVE
                       </button>
                     </div>
-                    { (MT_NODE && MT_NODE.includes('localhost') || (typeof window !== 'undefined' && window.location.hostname === 'localhost')) && (
+                    {(() => {
+                      const n = getMTNode ? getMTNode() : null;
+                      const isLocalNode = n && (n.includes('localhost') || n.includes('127.0.0.1'));
+                      const isLocalHost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+                      return (isLocalNode || isLocalHost);
+                    })() && (
                       <button
                         onClick={async () => {
                           try {
@@ -916,12 +981,37 @@ export default function MTWalletApp() {
                 </div>
               </div>
 
-              {/* Side assets */}
+              {/* Side assets - secondary to the native MT primary card */}
               <div className="space-y-5">
                 <div className="rounded-3xl bg-zinc-950 border border-zinc-800 p-6">
-                  <div className="text-xs text-zinc-400">SOLANA $MT (SPL) — real token balance</div>
+                  <div className="flex items-center justify-between text-xs text-zinc-400">
+                    <span>SOLANA $MT (SPL) — real token on Solana</span>
+                    <button 
+                      onClick={async () => {
+                        if (!solAddress) { setStatus('No Solana address for active wallet'); return; }
+                        try {
+                          clearSolanaBalanceCache();
+                          const bal = await fetchSolanaMTBalance(solAddress);
+                          setSolMTBalance(bal);
+                          setStatus(`Force synced Solana $MT (SPL): ${bal}`);
+                        } catch (err) {
+                          setStatus('Solana $MT sync failed: ' + (err.message || 'see console'));
+                        }
+                      }}
+                      className="text-[10px] underline text-emerald-300 hover:text-emerald-400"
+                    >
+                      force sync
+                    </button>
+                  </div>
                   <div className="text-4xl font-semibold tabular-nums mt-1">{solMTBalance.toFixed(2)}</div>
-                  <div className="text-xs text-emerald-400/70">This is the $MT you receive on Solana. Use the SOL address of the active wallet to receive more.</div>
+                  <div className="text-[10px] text-emerald-400/70 mt-1">
+                    Send real $MT (SPL) to the SOL addr of this wallet to receive here. 
+                    If 0: 1) activate the exact wallet (SOL addr must match the one you funded), 2) make sure Moralis key is set (via Settings or VITE_MORALIS_API_KEY env var + redeploy), 3) click force sync. The app now filters out public RPCs known to cause ERR_CERT_AUTHORITY_INVALID and auto-switches on cert/network errors.
+                  </div>
+                  {!getMoralisApiKey() && solMTBalance === 0 && (
+                    <div className="mt-2 text-[10px] text-orange-400">No Moralis key (neither local nor VITE_MORALIS_API_KEY default). Go to Settings and add one (or configure the env var on the hosting platform + redeploy). This avoids falling back to flaky public RPCs that often cause ERR_CERT_AUTHORITY_INVALID.</div>
+                  )}
+                  <div className="text-[10px] text-zinc-500 mt-1">SOL addr: <button onClick={() => copy(solAddress)} className="underline decoration-dotted">{shortAddr(solAddress)}</button></div>
                 </div>
                 <div className="rounded-3xl bg-zinc-950 border border-zinc-800 p-6">
                   <div className="text-xs text-zinc-400">SOL (for bridging / fees / swap gas)</div>
@@ -968,49 +1058,44 @@ export default function MTWalletApp() {
                           </div>
                           <div className="text-[10px] font-mono text-zinc-500 mt-0.5 truncate">
                             MT: {mtAddr ? mtAddr.slice(0,8) + '...' : '—'}
+                            <button 
+                              onClick={async (e) => { 
+                                e.stopPropagation(); 
+                                await forceSyncNativeForEntry(w.id, mtAddr); 
+                              }} 
+                              className="ml-1 text-[9px] underline text-emerald-300">force sync native</button>
                           </div>
-                          {solAddr && (
-                            <div className="text-[10px] font-mono text-blue-400 truncate">
-                              SOL: {solAddr.slice(0,8)}...
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); copy(solAddr, 'Solana address'); }} 
-                                className="ml-1 text-[9px] underline text-blue-300">copy</button>
-                              <button 
-                                onClick={async (e) => { 
-                                  e.stopPropagation(); 
-                                  try {
-                                    clearSolanaBalanceCache();
-                                    const bal = await fetchSolanaMTBalance(solAddr);
-                                    setSolMTBalance(bal);
-                                    setStatus(`Queried on-chain Solana $MT for this addr: ${bal}`);
-                                  } catch(err) {
-                                    setStatus('Query failed: ' + err.message);
-                                  }
-                                }} 
-                                className="ml-1 text-[9px] underline text-emerald-300">force sync</button>
-                            </div>
-                          )}
-                          {!solAddr && activeWalletId === w.id && solAddress && (
-                            <div className="text-[10px] font-mono text-blue-400 truncate">
-                              SOL (active): {solAddress.slice(0,8)}...
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); copy(solAddress, 'Solana address'); }} 
-                                className="ml-1 text-[9px] underline text-blue-300">copy</button>
-                              <button 
-                                onClick={async (e) => { 
-                                  e.stopPropagation(); 
-                                  try {
-                                    clearSolanaBalanceCache();
-                                    const bal = await fetchSolanaMTBalance(solAddress);
-                                    setSolMTBalance(bal);
-                                    setStatus(`Queried on-chain Solana $MT: ${bal}`);
-                                  } catch(err) {
-                                    setStatus('Query failed: ' + err.message);
-                                  }
-                                }} 
-                                className="ml-1 text-[9px] underline text-emerald-300">force sync</button>
-                            </div>
-                          )}
+                          {(() => {
+                            // For the active wallet, always make the Solana force sync visible,
+                            // even if the persisted entry is old and missing solanaPublicKey.
+                            // Use persisted if present, else the currently derived one for the active wallet.
+                            const isActive = activeWalletId === w.id;
+                            const displaySol = solAddr || (isActive ? solAddress : null);
+                            if (!displaySol) return null;
+                            const label = solAddr ? 'SOL:' : (isActive ? 'SOL (active):' : null);
+                            if (!label) return null;
+                            return (
+                              <div className="text-[10px] font-mono text-blue-400 truncate">
+                                {label} {displaySol.slice(0,8)}...
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); copy(displaySol, 'Solana address'); }} 
+                                  className="ml-1 text-[9px] underline text-blue-300">copy</button>
+                                <button 
+                                  onClick={async (e) => { 
+                                    e.stopPropagation(); 
+                                    try {
+                                      clearSolanaBalanceCache();
+                                      const bal = await fetchSolanaMTBalance(displaySol);
+                                      setSolMTBalance(bal);
+                                      setStatus(`Queried on-chain Solana $MT (SPL) for this addr: ${bal}`);
+                                    } catch(err) {
+                                      setStatus('Query failed: ' + err.message);
+                                    }
+                                  }} 
+                                  className="ml-1 text-[9px] underline text-emerald-300">force sync SPL</button>
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className="flex gap-1 items-center flex-shrink-0" onClick={e => e.stopPropagation()}>
                           <button onClick={() => activateWalletEntry(w)} className="text-xs px-2.5 py-0.5 rounded bg-emerald-500 text-black">ACTIVATE</button>
@@ -1031,7 +1116,7 @@ export default function MTWalletApp() {
                   )}
                 </div>
                 <div className="text-[10px] text-zinc-500 mt-3">{isLoggedIn ? 'Backed up to your account (encrypted). Login on any device.' : 'Local only to this browser.'}</div>
-                <div className="text-[10px] text-amber-400/80 mt-1">For real $MT or SOL: send to the SOL address of the specific wallet (copy from list). Native MT is for the custom chain (use faucet when running local node).</div>
+                <div className="text-[10px] text-emerald-400/80 mt-1">Native MT PRIMARY. Solana $MT (SPL) in side card. For reliable fetches on the public site, set VITE_MORALIS_API_KEY env var on your deploy platform (see Settings). Or paste key locally in Settings. Activate matching wallet + force sync.</div>
               </div>
             )}
           </div>
@@ -1042,7 +1127,7 @@ export default function MTWalletApp() {
           <div className="max-w-xl mx-auto">
             <div className="text-center mb-6">
               <div className="font-semibold text-2xl">Buy &amp; Sell $MT</div>
-              <div className="text-sm text-zinc-400 mt-1">Executed 100% inside this wallet • Powered by Jupiter for best rates on Solana</div>
+              <div className="text-sm text-zinc-400 mt-1">Executed 100% inside this wallet • Jupiter quote + local Solana sign for the SPL $MT leg (native MT chain primary elsewhere)</div>
             </div>
 
             <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 space-y-5">
@@ -1337,19 +1422,33 @@ export default function MTWalletApp() {
             <button onClick={handleDeleteVault} className="text-red-400 text-sm underline underline-offset-4">Permanently delete vault from this browser</button>
 
             <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-4">
-              <div className="font-semibold text-sm mb-2">Solana RPC (for real $MT balances)</div>
-              <div className="text-xs text-zinc-400 mb-2">Public endpoints can 403/rate limit. Paste your own (free from ankr.com, helius.dev, quicknode.com etc.) for reliable queries.</div>
+              <div className="font-semibold text-sm mb-2">Solana RPC (for real $MT balances + swaps)</div>
+              <div className="text-xs text-zinc-400 mb-2">Good defaults now included (Helius + your QuickNode first, then public). Paste a custom URL here to override for this browser only.</div>
               <div className="flex gap-2">
                 <input 
                   value={customSolRpc} 
                   onChange={e => setCustomSolRpc(e.target.value)} 
-                  placeholder="https://your-rpc-url" 
+                  placeholder="https://your-rpc-url (leave blank for project default)" 
                   className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono" 
                 />
                 <button 
-                  onClick={() => {
+                  onClick={async () => {
                     setCustomSolanaRpc(customSolRpc);
-                    setStatus('Solana RPC updated. Refresh balances to use it.');
+                    setStatus('Solana RPC updated. Refreshing Solana balances with new RPC...');
+                    if (solAddress) {
+                      clearSolanaBalanceCache();
+                      try {
+                        const [mtBal, solBal] = await Promise.all([
+                          fetchSolanaMTBalance(solAddress),
+                          fetchSolanaSOLBalance(solAddress)
+                        ]);
+                        setSolMTBalance(mtBal);
+                        setSolSOLBalance(solBal);
+                        setStatus(`RPC updated. Solana $MT: ${mtBal} SOL: ${solBal}`);
+                      } catch (e) {
+                        setStatus('RPC updated. Click REFRESH or force sync to use it.');
+                      }
+                    }
                   }} 
                   className="px-4 py-2 rounded-xl bg-emerald-500 text-black text-sm font-bold"
                 >
@@ -1359,18 +1458,24 @@ export default function MTWalletApp() {
                   onClick={() => {
                     setCustomSolRpc('');
                     setCustomSolanaRpc('');
-                    setStatus('Reverted to public RPC list.');
+                    setStatus('Reverted to project default / public RPC list.');
                   }} 
                   className="px-3 py-2 rounded-xl border border-zinc-700 text-sm"
                 >
                   Reset
                 </button>
               </div>
+
+              {!customSolRpc && getDefaultSolanaRpc && getDefaultSolanaRpc() && (
+                <div className="text-[10px] text-emerald-400 mt-1">Using project default RPC (VITE_SOLANA_RPC_URL). Enter a URL above + Save to override only in this browser.</div>
+              )}
+
+              <div className="text-[10px] text-zinc-400 mt-1">To set a default for all visitors: add env var <span className="font-mono">VITE_SOLANA_RPC_URL</span> on the hosting platform and redeploy.</div>
             </div>
 
             <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
               <div className="font-semibold text-sm mb-2">Moralis API Key (for reliable $MT balances &amp; price)</div>
-              <div className="text-xs text-zinc-400 mb-2">Your bot key works great for this. Paste it here — used for per-wallet SPL balances (better than public RPCs for mainnet reads).</div>
+              <div className="text-xs text-zinc-400 mb-2">Your bot key works great. Paste a value here to override the project default just for this browser. Leave blank to use the build-time default.</div>
               <div className="flex gap-2">
                 <input 
                   type="password"
@@ -1380,10 +1485,21 @@ export default function MTWalletApp() {
                   className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono" 
                 />
                 <button 
-                  onClick={() => {
+                  onClick={async () => {
                     setMoralisApiKey(moralisKey);
                     clearSolanaBalanceCache();
-                    setStatus('Moralis key saved. Use force sync to refresh balances.');
+                    setStatus('Moralis key saved. Updating Solana $MT from key...');
+                    if (solAddress) {
+                      try {
+                        const bal = await fetchSolanaMTBalance(solAddress);
+                        setSolMTBalance(bal);
+                        setStatus(`Moralis key saved. Solana $MT for active wallet: ${bal}`);
+                      } catch (e) {
+                        setStatus('Moralis key saved. Use force sync SPL or REFRESH to update.');
+                      }
+                    } else {
+                      setStatus('Moralis key saved. Activate a wallet then REFRESH or use force sync in list.');
+                    }
                   }} 
                   className="px-4 py-2 rounded-xl bg-emerald-500 text-black text-sm font-bold"
                 >
@@ -1394,17 +1510,66 @@ export default function MTWalletApp() {
                     setMoralisKey('');
                     setMoralisApiKey('');
                     clearSolanaBalanceCache();
-                    setStatus('Moralis key cleared. Falling back to public RPCs.');
+                    setStatus('Moralis key cleared (now using project default if configured).');
                   }} 
                   className="px-3 py-2 rounded-xl border border-zinc-700 text-sm"
                 >
                   Clear
                 </button>
               </div>
-              <div className="text-[10px] text-orange-400/70 mt-1">Note: Key is stored only in your browser localStorage. For production, proxy through your own backend.</div>
+
+              {!moralisKey && getDefaultMoralisApiKey && getDefaultMoralisApiKey() && (
+                <div className="text-[10px] text-emerald-400 mt-1">Using project-wide default key from build (VITE_MORALIS_API_KEY). Any value you Save + the key above will override it only in this browser.</div>
+              )}
+
+              <div className="text-[10px] text-orange-400/70 mt-1">
+                To set the default for everyone on the live site: add an Environment Variable on your hosting platform (Vercel etc) with key <span className="font-mono">VITE_MORALIS_API_KEY</span> and your full token as the value. Then redeploy. 
+                Local overrides (this browser) always win. For real prod, use a backend proxy instead of shipping the key in the JS bundle.
+              </div>
             </div>
 
-            <div className="text-xs text-zinc-500 pt-4">MT Node: {MT_NODE || 'demo (Solana only)'} • All fees ultra-low and fixed. Future developer APIs + social connect endpoints will be self-hosted.</div>
+            {/* Custom MT Node - so we retrieve native balances FROM US, not Solana */}
+            <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
+              <div className="font-semibold text-sm mb-2 text-emerald-400">MT Node URL (PRIMARY balance source — our native chain)</div>
+              <div className="text-xs text-zinc-400 mb-2">This wallet is native to the MT network. Set your mt-core URL (localhost:4000 or your public Render/Railway/etc deploy) here so balances, NFTs, txs, sends come from /account on OUR node, not Solana RPCs/Moralis. Leave blank to use project default.</div>
+              <div className="flex gap-2">
+                <input 
+                  value={customMtNode} 
+                  onChange={e => setCustomMtNode(e.target.value)} 
+                  placeholder="http://localhost:4000 or https://your-mt-core.onrender.com (blank = project default)"
+                  className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono" 
+                />
+                <button 
+                  onClick={() => {
+                    setMTNode(customMtNode);
+                    setStatus('MT Node updated — native balances will now retrieve from our network.');
+                    // re-sync if we have a wallet
+                    if (wallet) setTimeout(refreshAll, 50);
+                  }} 
+                  className="px-4 py-2 rounded-xl bg-emerald-500 text-black text-sm font-bold"
+                >
+                  Save
+                </button>
+                <button 
+                  onClick={() => {
+                    setCustomMtNode('');
+                    setMTNode('');
+                    setStatus('MT Node cleared — falling back to project default or demo (Solana side only).');
+                  }} 
+                  className="px-3 py-2 rounded-xl border border-zinc-700 text-sm"
+                >
+                  Clear
+                </button>
+              </div>
+
+              {!customMtNode && getDefaultMTNode && getDefaultMTNode() && (
+                <div className="text-[10px] text-emerald-400 mt-1">Using project default MT node (VITE_MT_NODE_URL). Enter a URL above + Save to override only in this browser.</div>
+              )}
+
+              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getMTNode ? (getMTNode() || 'none (demo)') : '—'} • To set a default for the live site, use env var <span className="font-mono">VITE_MT_NODE_URL</span> + redeploy.</div>
+            </div>
+
+            <div className="text-xs text-zinc-500 pt-4">Native MT from our network is always primary for this wallet. Solana only for SPL/bridge context.</div>
           </div>
         )}
       </div>

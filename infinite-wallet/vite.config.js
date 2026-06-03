@@ -34,7 +34,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    // Forces Vite to pre-process these specific Node-based packages
-    include: ['bip39', 'bip32', 'tiny-secp256k1', 'buffer'],
+    // Forces Vite to pre-process these specific packages that have Node shims
+    include: ['bip39', 'buffer'],
   },
 });
