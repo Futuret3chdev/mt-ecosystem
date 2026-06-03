@@ -292,14 +292,28 @@ export async function fetchSolanaMTBalance(solanaPublicKeyStr) {
     const owner = new PublicKey(solanaPublicKeyStr);
     const ata = await getAssociatedTokenAddress(SOL_MT_MINT, owner);
     const account = await getAccount(conn, ata);
-    // SPL has 6 decimals for pump tokens usually? pump.fun uses 6 for meme usually, but check actual
-    // For safety we will return raw and format in UI. Most pump are 6 decimals.
-    const decimals = 6; // common for pump.fun
+    const decimals = 6;
     const balance = Number(account.amount) / 10 ** decimals;
     return balance;
   } catch (e) {
-    // No ATA or 0 balance or RPC error
-    return 0;
+    // Fallback: use getTokenAccountsByOwner which is more reliable for newly received tokens
+    try {
+      const conn = getSolConnection();
+      const owner = new PublicKey(solanaPublicKeyStr);
+      const res = await conn.getTokenAccountsByOwner(owner, { mint: SOL_MT_MINT });
+      if (res.value.length > 0) {
+        // Parse the balance from the account data manually (first 8 bytes after discriminator for amount in u64 little endian)
+        // Simpler: since we have the lib, try getAccount on the found pubkey
+        const pubkey = res.value[0].pubkey;
+        const account = await getAccount(conn, pubkey);
+        const decimals = 6;
+        return Number(account.amount) / 10 ** decimals;
+      }
+      return 0;
+    } catch (e2) {
+      console.warn('Solana $MT balance fetch fallback failed for', solanaPublicKeyStr, e2.message);
+      return 0;
+    }
   }
 }
 
@@ -520,7 +534,13 @@ export async function createNewWalletForAccount(name = 'Main Wallet', password, 
 
   if (backupToCloud && getAuthToken()) {
     try {
-      await backupWallet(name, encryptedPayload, w.publicKey);
+      await backupWallet({
+        name,
+        encryptedData: encryptedPayload,
+        address: w.publicKey,  // MT address
+        solanaPublicKey,       // important for real $MT balance display and queries
+        color: '#10b981'
+      });
     } catch (e) {
       console.warn('Cloud backup failed (will retry later)', e);
     }

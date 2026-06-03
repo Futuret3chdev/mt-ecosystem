@@ -485,6 +485,13 @@ export default function MTWalletApp() {
       setStatus(`Activated wallet: ${entry.name}`);
       // refresh will be triggered by the useEffect on [wallet]
       generateQR(w.publicKey);
+      // Extra: directly query the stored solana addr for real $MT to ensure it shows even if main refresh has issues
+      if (entry.solanaPublicKey) {
+        try {
+          const bal = await fetchSolanaMTBalance(entry.solanaPublicKey);
+          setSolMTBalance(bal);
+        } catch (e) { /* ignore */ }
+      }
     } catch (e) {
       setStatus('Failed to unlock wallet with this password: ' + e.message);
       alert('Wrong password or corrupted data for this wallet.');
@@ -941,6 +948,18 @@ export default function MTWalletApp() {
                               <button 
                                 onClick={(e) => { e.stopPropagation(); copy(solAddr, 'Solana address'); }} 
                                 className="ml-1 text-[9px] underline text-blue-300">copy</button>
+                              <button 
+                                onClick={async (e) => { 
+                                  e.stopPropagation(); 
+                                  try {
+                                    const bal = await fetchSolanaMTBalance(solAddr);
+                                    setSolMTBalance(bal);
+                                    setStatus(`Queried on-chain Solana $MT for this addr: ${bal}`);
+                                  } catch(err) {
+                                    setStatus('Query failed: ' + err.message);
+                                  }
+                                }} 
+                                className="ml-1 text-[9px] underline text-emerald-300">force sync</button>
                             </div>
                           )}
                         </div>
