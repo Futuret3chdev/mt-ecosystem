@@ -180,7 +180,7 @@ export default function PortfolioManager() {
     {
       key: 'report' as const,
       title: 'On-Chain Reports',
-      desc: 'CoinLedger-style but on-chain verified. Native + SPL + Rockets + NFTs with proofs.',
+      desc: 'On-chain verified reports. Native + SPL + Rockets + NFTs with proofs.',
       icon: '📊',
     },
     // New cool features requested
@@ -218,7 +218,7 @@ export default function PortfolioManager() {
             <div className="text-xs tracking-[3px] text-emerald-400 mb-2">MANAGEMENT, NOT JUST TRACKING</div>
             <div className="text-4xl md:text-5xl font-semibold tracking-[-1.6px]">Infinite Portfolio.<br />Real flows. Real ownership.</div>
             <p className="mt-3 max-w-xl text-lg opacity-70">
-              coinledger watches numbers. We give you command-center flows that actually move your assets, earn utility, and prove everything on-chain — all inside INFINITE WALLET.
+              Real command-center flows that actually move your assets, earn utility, and prove everything on-chain — all inside INFINITE WALLET.
             </p>
           </div>
           <div className="text-right hidden md:block">
@@ -389,7 +389,7 @@ export default function PortfolioManager() {
             ))}
           </div>
 
-          {/* Active flow simulator — the "better than coinledger" part */}
+          {/* Active flow simulator — real management flows */}
           <AnimatePresence>
             {activeFlow && (
               <motion.div
