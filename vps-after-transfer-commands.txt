@@ -1,0 +1,85 @@
+# After you have successfully transferred the good node.js (you now see the modern banner + Persistence line),
+# but it fails with EADDRINUSE on 4000 (because another game is using the port),
+
+# IMPORTANT: If you only transferred node.js before, the supporting modules (nfts.js, txlog.js) are likely still old.
+# This causes the "getInternalNFTs is not a function" errors in logs.
+# From your Windows machine, upload the modules (run these in PowerShell on Windows):
+
+scp "E:\mt-ecosystem\mt-core\nfts.js" root@161.97.106.182:/opt/mt-ecosystem/mt-core/nfts.js
+scp "E:\mt-ecosystem\mt-core\txlog.js" root@161.97.106.182:/opt/mt-ecosystem/mt-core/txlog.js
+scp "E:\mt-ecosystem\mt-core\ledger.js" root@161.97.106.182:/opt/mt-ecosystem/mt-core/ledger.js
+scp "E:\mt-ecosystem\mt-core\constants.js" root@161.97.106.182:/opt/mt-ecosystem/mt-core/constants.js
+scp "E:\mt-ecosystem\mt-core\crypto.js" root@161.97.106.182:/opt/mt-ecosystem/mt-core/crypto.js
+
+# (Use WinSCP GUI if scp is tricky)
+
+# Then on VPS:
+
+# 1. Edit .env to use a free port (4001 is recommended)
+nano /opt/mt-ecosystem/mt-core/.env
+# Change the first line to:
+# PORT=4001
+# Save (Ctrl+O, Enter, Ctrl+X)
+
+# 2. Make sure ownership (in case)
+chown mtcore:mtcore /opt/mt-ecosystem/mt-core/.env /opt/mt-ecosystem/mt-core/nfts.js /opt/mt-ecosystem/mt-core/txlog.js
+
+# 3. Test manually with the new port (this should now BIND and STAY RUNNING)
+cd /opt/mt-ecosystem/mt-core
+PORT=4001 sudo -u mtcore /usr/bin/node node.js
+# You should see:
+# 🟢 MT Node running at http://0.0.0.0:4001
+# ...
+# Persistence: ...
+# And the process stays (no immediate exit, no EADDRINUSE error).
+# Press Ctrl+C when you've confirmed it stays up for 10+ seconds.
+#
+# NOTE: Prefixing "PORT=4001 " is required for direct manual runs
+# (node.js reads process.env.PORT; it does not auto-source .env like systemd does).
+
+# 4. Restart the systemd service
+sudo systemctl restart mt-core
+sudo systemctl status mt-core --no-pager
+# Should now show Active: active (running) without auto-restart loop.
+
+# 5. Test health from the VPS itself
+curl http://localhost:4001/health
+
+# 6. Test from your Windows PC (the real external test)
+# Run this in PowerShell on your Windows machine:
+# curl -v http://161.97.106.182:4001/health
+# Should return 200 OK with JSON like {"ok":true,"network":"MT Private Network", ...}
+
+# 7. Credit the Test Account (use the new port!)
+curl -X POST http://161.97.106.182:4001/faucet \
+  -H "Content-Type: application/json" \
+  -d '{"address":"63NQwG9YbgSQrBM4EqwYagnqc3pzKayTAC5KBtdKGSSX"}'
+
+# Check the balance
+curl http://161.97.106.182:4001/account/63NQwG9YbgSQrBM4EqwYagnqc3pzKayTAC5KBtdKGSSX
+
+# 8. In the live wallet (https://infinite-wallet.vercel.app):
+# - Go to Settings
+# - Set "MT Node URL (PRIMARY balance source — our native chain)" to exactly:
+#   http://161.97.106.182:4001
+# - Click Save
+# - Activate the "Test Account" (the one with 63NQwG9Y... address)
+# - Click REFRESH ON-CHAIN or the "force sync native" button on that row
+#
+# The big "NATIVE MT (PRIMARY — OUR NETWORK)" card should now show real balance (~1000 after faucet)
+# instead of the demo 0.00.
+# The side "SOLANA $MT (SPL)" card keeps showing the real Solana balance (your 22.00).
+
+# If the external curl on :4001 still fails (connection refused), you may need to open the port:
+# sudo ufw allow 4001/tcp
+# Then re-test.
+
+# Once everything works, you can later put nginx in front of 4001 for a nicer URL/SSL if desired.
+
+# The service will now survive restarts because the good code has:
+# - setInterval for periodic save
+# - const server = app.listen(...)
+# - process.on SIGTERM etc. for graceful shutdown save
+# - error handler on the server
+
+echo "Run the steps above in order. Paste outputs of step 3 (manual), step 4 (status), and step 6 (external curl) here if anything still fails."

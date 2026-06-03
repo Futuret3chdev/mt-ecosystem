@@ -52,7 +52,10 @@ export function getMTNode() {
 
 export function setMTNode(url) {
   if (typeof window === 'undefined') return;
-  const trimmed = (url || '').trim();
+  let trimmed = (url || '').trim();
+  if (trimmed && !/^https?:\/\//i.test(trimmed)) {
+    trimmed = 'http://' + trimmed;
+  }
   if (trimmed) {
     localStorage.setItem('mt_custom_mt_node', trimmed);
   } else {
@@ -281,13 +284,13 @@ export async function submitMTTx(unsignedTx, signature) {
 }
 
 /**
- * DEV ONLY: Request test MT from the local node faucet.
+ * Request test MT from the configured node faucet (your own node).
  * Gives the wallet 1000 MT instantly so you can test sends, NFT mints, etc.
  */
 export async function requestTestFunds(address) {
   if (!address) throw new Error('No address');
   const node = getMTNode();
-  if (!node) throw new Error('Faucet only available when local MT node is running');
+  if (!node) throw new Error('Faucet only available when a MT node is configured in Settings');
   const res = await fetch(`${node}/faucet`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -1,14 +1,18 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 
 const { verifyTx, verifyMultisig } = require('./crypto');
 const { applyTransaction, getAccount, accounts } = require('./ledger');
-const { nfts, getNFTsByOwner } = require('./nfts');
+const { nfts, getNFTsByOwner, loadNFTs, getInternalNFTs } = require('./nfts');
 const {
   getAllTxs,
   getTxByHash,
   getTxsByAddress,
+  loadTxLog,
+  getInternalTxLog,
 } = require('./txlog');
 
 const {
@@ -24,11 +28,103 @@ const app = express();
 
 /**
  * =========================
+ * CONFIG - Perfect for Contabo / self-hosted VPS
+ * =========================
+ */
+const PORT = process.env.PORT || 4000;
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:5173,https://infinite-wallet.vercel.app,https://*.vercel.app').split(',');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
+const NFTS_FILE = path.join(DATA_DIR, 'nfts.json');
+const TXLOG_FILE = path.join(DATA_DIR, 'txlog.json');
+
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+/**
+ * =========================
+ * SIMPLE PERSISTENCE (JSON files)
+ * Load on boot, save every 30s + on shutdown.
+ * This is the minimum you need before launching on Contabo.
+ * Later you can swap to SQLite/Postgres.
+ * =========================
+ */
+function loadState() {
+  try {
+    if (fs.existsSync(ACCOUNTS_FILE)) {
+      const saved = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8'));
+      Object.assign(accounts, saved);
+      console.log(`[mt-core] Loaded ${Object.keys(accounts).length} accounts from ${ACCOUNTS_FILE}`);
+    }
+  } catch (e) {
+    console.warn('[mt-core] Could not load accounts:', e.message);
+  }
+
+  try {
+    if (fs.existsSync(NFTS_FILE)) {
+      const savedNFTs = JSON.parse(fs.readFileSync(NFTS_FILE, 'utf8'));
+      loadNFTs(savedNFTs);
+      console.log(`[mt-core] Loaded NFTs from ${NFTS_FILE}`);
+    }
+  } catch (e) {
+    console.warn('[mt-core] Could not load NFTs:', e.message);
+  }
+
+  try {
+    if (fs.existsSync(TXLOG_FILE)) {
+      const savedTxLog = JSON.parse(fs.readFileSync(TXLOG_FILE, 'utf8'));
+      loadTxLog(savedTxLog);
+      console.log(`[mt-core] Loaded ${getAllTxs().length} txs from ${TXLOG_FILE}`);
+    }
+  } catch (e) {
+    console.warn('[mt-core] Could not load txlog:', e.message);
+  }
+}
+
+function saveState() {
+  try {
+    fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(accounts, null, 2));
+  } catch (e) {
+    console.error('[mt-core] Failed to persist accounts:', e.message);
+  }
+
+  try {
+    fs.writeFileSync(NFTS_FILE, JSON.stringify(getInternalNFTs(), null, 2));
+  } catch (e) {
+    console.error('[mt-core] Failed to persist NFTs:', e.message);
+  }
+
+  try {
+    fs.writeFileSync(TXLOG_FILE, JSON.stringify(getInternalTxLog(), null, 2));
+  } catch (e) {
+    console.error('[mt-core] Failed to persist txlog:', e.message);
+  }
+}
+
+function setupPersistence() {
+  loadState();
+
+  setInterval(saveState, 30000); // every 30 seconds
+
+  const shutdown = () => {
+    console.log('[mt-core] Shutting down, saving state...');
+    saveState();
+    process.exit(0);
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}
+
+setupPersistence();
+
+/**
+ * =========================
  * NETWORK IDENTITY
  * =========================
  */
-const NETWORK_NAME = 'MT Private Network';
-const NETWORK_ID = 'mt-private-1';
+const NETWORK_NAME = process.env.NETWORK_NAME || 'MT Private Network';
+const NETWORK_ID = process.env.NETWORK_ID || 'mt-private-1';
 
 /**
  * =========================
@@ -48,7 +144,7 @@ if (!accounts[GENESIS_ADDRESS]) {
  * =========================
  */
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  origin: CORS_ORIGINS,
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type'],
 }));
@@ -77,7 +173,7 @@ app.get('/health', (_, res) => {
  * Submit Transaction
  * =========================
  */
-app.post('/tx', (req, res) => {
+app.post('/tx', async (req, res) => {
   const { signature, signatures, ...unsignedTx } = req.body;
 
   /**
@@ -86,7 +182,7 @@ app.post('/tx', (req, res) => {
    */
   if (unsignedTx.type === 'MINT_FROM_PROOF') {
     try {
-      applyTransaction(req.body);
+      await applyTransaction(req.body);
       return res.json({ ok: true, fee: 0 });
     } catch (err) {
       return res.status(400).json({ error: err.message });
@@ -134,7 +230,7 @@ app.post('/tx', (req, res) => {
    * ===== APPLY TRANSACTION =====
    */
   try {
-    applyTransaction(req.body);
+    await applyTransaction(req.body);
     res.json({ ok: true, fee: TX_FEE });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -239,8 +335,8 @@ app.get('/nfts/:owner', (req, res) => {
  * Start MT Node
  * =========================
  */
-app.listen(4000, () => {
-  console.log('🟢 MT Node running at http://localhost:4000');
+const server = app.listen(PORT, () => {
+  console.log(`🟢 MT Node running at http://0.0.0.0:${PORT}`);
   console.log(`🌐 Network: ${NETWORK_NAME} (${NETWORK_ID})`);
   console.log(`💰 Total Supply: ${TOTAL_SUPPLY.toLocaleString()} MT`);
   console.log(
@@ -248,5 +344,12 @@ app.listen(4000, () => {
   );
   console.log(`🔒 Genesis Locked: ${GENESIS_LOCKED}`);
   console.log(`💸 Fixed TX Fee: ${TX_FEE} MT`);
-  console.log(`🚰 Dev faucet: POST http://localhost:4000/faucet { "address": "..." }  (gives 1000 test MT)`);
+  console.log(`💾 Persistence: ${ACCOUNTS_FILE}`);
+  console.log(`🚰 Dev faucet: POST /faucet { "address": "..." }  (gives 1000 test MT)`);
+  console.log(`🔗 Health: GET /health`);
+});
+
+server.on('error', (err) => {
+  console.error('[mt-core] Server error:', err);
+  process.exit(1);
 });

@@ -954,12 +954,13 @@ export default function MTWalletApp() {
                       const n = getMTNode ? getMTNode() : null;
                       const isLocalNode = n && (n.includes('localhost') || n.includes('127.0.0.1'));
                       const isLocalHost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-                      return (isLocalNode || isLocalHost);
+                      const hasConfiguredNode = !!n; // show for any configured node (e.g. your own remote VPS node)
+                      return (isLocalNode || isLocalHost || hasConfiguredNode);
                     })() && (
                       <button
                         onClick={async () => {
                           try {
-                            setStatus('Requesting test MT from local faucet...');
+                            setStatus('Requesting test MT from node faucet...');
                             const r = await requestTestFunds(mtAddress);
                             setStatus(`Faucet success: +${r.credited} test MT`);
                             await refreshAll();
@@ -969,7 +970,7 @@ export default function MTWalletApp() {
                         }}
                         className="mt-3 w-full text-xs py-1.5 rounded-xl border border-dashed border-emerald-800/60 text-emerald-400 hover:bg-emerald-950/40 transition"
                       >
-                        🚰 Get 1000 Test $MT (dev faucet)
+                        🚰 Get 1000 Test $MT (faucet)
                       </button>
                     )}
                   </div>
@@ -1535,17 +1536,22 @@ export default function MTWalletApp() {
             {/* Custom MT Node - so we retrieve native balances FROM US, not Solana */}
             <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
               <div className="font-semibold text-sm mb-2 text-emerald-400">MT Node URL (PRIMARY balance source — our native chain)</div>
-              <div className="text-xs text-zinc-400 mb-2">This wallet is native to the MT network. Set your mt-core URL (localhost:4000 or your public Render/Railway/etc deploy) here so balances, NFTs, txs, sends come from /account on OUR node, not Solana RPCs/Moralis. Leave blank to use project default.</div>
+              <div className="text-xs text-zinc-400 mb-2">This wallet is native to the MT network. Set your mt-core URL (use the full http://IP:port for your VPS, e.g. http://161.97.106.182:4001). The live site on Vercel will use whatever you save here. Leave blank for demo (Solana side only).</div>
               <div className="flex gap-2">
                 <input 
                   value={customMtNode} 
                   onChange={e => setCustomMtNode(e.target.value)} 
-                  placeholder="http://localhost:4000 or https://your-mt-core.onrender.com (blank = project default)"
+                  placeholder="http://161.97.106.182:4001 or http://localhost:4000 (for local testing)"
                   className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono" 
                 />
                 <button 
                   onClick={() => {
-                    setMTNode(customMtNode);
+                    let url = (customMtNode || '').trim();
+                    if (url && !/^https?:\/\//i.test(url)) {
+                      url = 'http://' + url;
+                    }
+                    setCustomMtNode(url);
+                    setMTNode(url);
                     setStatus('MT Node updated — native balances will now retrieve from our network.');
                     // re-sync if we have a wallet
                     if (wallet) setTimeout(refreshAll, 50);

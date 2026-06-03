@@ -15,17 +15,26 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 4001;
 
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,https://*.vercel.app').split(',');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const BACKUPS_FILE = path.join(DATA_DIR, 'backups.json');
+
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'https://*.vercel.app'],
-  methods: ['GET', 'POST', 'PUT'],
+  origin: CORS_ORIGINS,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }));
 app.use(express.json({ limit: '1mb' }));
 
-// In-memory stores (replace with real DB later: postgres, etc.)
+// In-memory stores (will be persisted to JSON)
 const users = new Map(); // email -> user
 const phoneToEmail = new Map(); // phone -> email for lookup
 const sessions = new Map(); // token -> { userId, email }
@@ -33,6 +42,53 @@ const backups = new Map(); // userId -> array of {id, name, encryptedData, addre
 
 // Demo verification codes (for live demo without real email/SMS yet)
 const pendingVerifications = new Map(); // email -> { code, userData }
+
+/**
+ * Simple file persistence for auth (good for small VPS deployments like Contabo)
+ */
+function loadAuthData() {
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      const u = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+      for (const [k, v] of Object.entries(u)) users.set(k, v);
+    }
+    if (fs.existsSync(BACKUPS_FILE)) {
+      const b = JSON.parse(fs.readFileSync(BACKUPS_FILE, 'utf8'));
+      for (const [k, v] of Object.entries(b)) backups.set(k, v);
+    }
+    // Rebuild phoneToEmail
+    for (const user of users.values()) {
+      if (user.phone) phoneToEmail.set(user.phone, user.email);
+    }
+    console.log(`[mt-auth] Loaded ${users.size} users from disk`);
+  } catch (e) {
+    console.warn('[mt-auth] Could not load persisted data:', e.message);
+  }
+}
+
+function saveAuthData() {
+  try {
+    const uObj = {};
+    for (const [k, v] of users) uObj[k] = v;
+    fs.writeFileSync(USERS_FILE, JSON.stringify(uObj, null, 2));
+
+    const bObj = {};
+    for (const [k, v] of backups) bObj[k] = v;
+    fs.writeFileSync(BACKUPS_FILE, JSON.stringify(bObj, null, 2));
+  } catch (e) {
+    console.error('[mt-auth] Failed to save data:', e.message);
+  }
+}
+
+function setupAuthPersistence() {
+  loadAuthData();
+  setInterval(saveAuthData, 30000);
+  const shutdown = () => { saveAuthData(); process.exit(0); };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}
+
+setupAuthPersistence();
 
 function hashPassword(pw) {
   return bcrypt.hashSync(pw, 10);
@@ -259,7 +315,8 @@ app.delete('/wallets/:id', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🔐 MT Auth service running on http://localhost:${PORT}`);
+  console.log(`🔐 MT Auth service running on http://0.0.0.0:${PORT}`);
   console.log('Supports email + phone signup, multiple wallets per user, encrypted cross-device backup.');
-  console.log('DEMO MODE: verification codes are returned in /signup response for testing.');
+  console.log('💾 Persistence: using JSON files in', DATA_DIR);
+  console.log('DEMO MODE: verification codes are returned in /signup response for testing. (Remove for real prod)');
 });

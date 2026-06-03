@@ -1,4 +1,20 @@
-const nfts = {}; // tokenId -> { owner, metadata }
+let nfts = {}; // tokenId -> { owner, metadata }
+
+/**
+ * Load nfts from object (for persistence)
+ */
+function loadNFTs(savedNFTs) {
+  if (savedNFTs && typeof savedNFTs === 'object') {
+    nfts = savedNFTs;
+  }
+}
+
+/**
+ * Get internal for saving
+ */
+function getInternalNFTs() {
+  return nfts;
+}
 
 function mintNFT({ tokenId, owner, metadata }) {
   if (nfts[tokenId]) {
@@ -35,4 +51,6 @@ module.exports = {
   getNFT,
   getNFTsByOwner,
   nfts,
+  loadNFTs,
+  getInternalNFTs,
 };

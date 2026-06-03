@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-const txLog = [];
+let txLog = [];
 
 /**
  * Create deterministic transaction hash
@@ -48,9 +48,27 @@ function getTxsByAddress(address) {
   );
 }
 
+/**
+ * Load tx log from array (for persistence)
+ */
+function loadTxLog(savedLog) {
+  if (Array.isArray(savedLog)) {
+    txLog = savedLog;
+  }
+}
+
+/**
+ * Get internal log for saving
+ */
+function getInternalTxLog() {
+  return txLog;
+}
+
 module.exports = {
   recordTx,
   getAllTxs,
   getTxByHash,
   getTxsByAddress,
+  loadTxLog,
+  getInternalTxLog,
 };
