@@ -1,0 +1,8 @@
+{
+  "asset": "MT",
+  "decimals": 9,
+  "totalSupply": "1000000000",
+  "canonical": true,
+  "issuers": ["GENESIS_MULTISIG"],
+  "proofVersion": 1
+}

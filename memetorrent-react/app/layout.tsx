@@ -1,0 +1,25 @@
+import './globals.css';
+import Navbar from '@/components/nav/Navbar';
+import Footer from '@/components/footer/Footer';
+
+export const metadata = {
+  title: 'MT ECO SYSTEM | $MT • Self-Built Wallet • 1¢ Fees',
+  description: 'Next-generation decentralized on-chain network. Native $MT token. Phantom-grade self-built MT Wallet. NFTs, Rockets, self-built bridges. No third parties.',
+  icons: { icon: '/favicon.ico' },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en" className="dark">
+      <body className="bg-black text-white">
+        <Navbar />
+        <main className="min-h-screen">{children}</main>
+        <Footer />
+      </body>
+    </html>
+  );
+}
