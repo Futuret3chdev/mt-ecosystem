@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Lock, Unlock, Copy, Check, ArrowUpRight, ArrowDownLeft, QrCode, Send, Download,
@@ -94,6 +94,12 @@ export default function MTWalletApp() {
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('#10b981'); // default emerald
 
+  // Ref to always have the latest wallet for refreshAll (avoids stale closure when switching wallets)
+  const latestWalletRef = useRef(null);
+  useEffect(() => {
+    latestWalletRef.current = wallet;
+  }, [wallet]);
+
   // App state
   const [activeTab, setActiveTab] = useState('portfolio');
   const [status, setStatus] = useState('MT Wallet ready • Self-custodial • Ultra-low fees');
@@ -165,30 +171,38 @@ export default function MTWalletApp() {
   };
 
   // Refresh all on-chain data for current wallet
+  // Uses ref to get the *latest* active wallet even if called from old closures
   const refreshAll = async () => {
-    if (!wallet) return;
+    const currentWallet = latestWalletRef.current || wallet;
+    if (!currentWallet) return;
+
+    const currentMtAddress = currentWallet.publicKey || '';
+    const currentSolAddress = currentWallet.solanaSeed 
+      ? deriveSolanaKeypairFromSeed(currentWallet.solanaSeed).publicKey 
+      : '';
+
     setLoadingBalances(true);
     setStatus('Syncing balances from MT node and Solana...');
 
     try {
       // MT native
-      const mt = await fetchMTBalance(mtAddress);
+      const mt = await fetchMTBalance(currentMtAddress);
       setMtBalance(mt.balance);
       setMtNonce(mt.nonce);
 
       // NFTs on MT
-      const ownedNfts = await fetchMTNFTs(mtAddress);
+      const ownedNfts = await fetchMTNFTs(currentMtAddress);
       setNfts(ownedNfts);
 
       // Activity
-      const history = await fetchMTTxs(mtAddress);
+      const history = await fetchMTTxs(currentMtAddress);
       setTxs(history.sort((a, b) => (b.time || 0) - (a.time || 0)));
 
-      // Solana $MT + SOL (for fees / bridge context)
-      if (solAddress) {
+      // Solana $MT + SOL (for fees / bridge context) — this is the "real money" $MT
+      if (currentSolAddress) {
         const [smt, ssol] = await Promise.all([
-          fetchSolanaMTBalance(solAddress),
-          fetchSolanaSOLBalance(solAddress),
+          fetchSolanaMTBalance(currentSolAddress),
+          fetchSolanaSOLBalance(currentSolAddress),
         ]);
         setSolMTBalance(smt);
         setSolSOLBalance(ssol);
@@ -426,6 +440,16 @@ export default function MTWalletApp() {
     }
   }, [isUnlocked, isLoggedIn]);
 
+  // Auto-refresh balances/NFTs when the active wallet changes (fixes stale balances after selecting different wallet)
+  useEffect(() => {
+    if (wallet) {
+      const t = setTimeout(() => {
+        refreshAll();
+      }, 30);
+      return () => clearTimeout(t);
+    }
+  }, [wallet]);
+
   // Keyboard escape for modals
   useEffect(() => {
     const onKey = (e) => {
@@ -459,10 +483,8 @@ export default function MTWalletApp() {
       setMasterPassword(passwordToUse);
       setAccountPassword(''); // clear form
       setStatus(`Activated wallet: ${entry.name}`);
-      setTimeout(() => {
-        generateQR(w.publicKey);
-        refreshAll();
-      }, 80);
+      // refresh will be triggered by the useEffect on [wallet]
+      generateQR(w.publicKey);
     } catch (e) {
       setStatus('Failed to unlock wallet with this password: ' + e.message);
       alert('Wrong password or corrupted data for this wallet.');
@@ -863,12 +885,12 @@ export default function MTWalletApp() {
               {/* Side assets */}
               <div className="space-y-5">
                 <div className="rounded-3xl bg-zinc-950 border border-zinc-800 p-6">
-                  <div className="text-xs text-zinc-400">SOLANA $MT (SPL)</div>
+                  <div className="text-xs text-zinc-400">SOLANA $MT (SPL) — real token balance</div>
                   <div className="text-4xl font-semibold tabular-nums mt-1">{solMTBalance.toFixed(2)}</div>
-                  <div className="text-xs text-emerald-400/70">Bridge coming soon • 1:1</div>
+                  <div className="text-xs text-emerald-400/70">This is the $MT you receive on Solana. Use the SOL address of the active wallet to receive more.</div>
                 </div>
                 <div className="rounded-3xl bg-zinc-950 border border-zinc-800 p-6">
-                  <div className="text-xs text-zinc-400">SOL (for bridging / fees)</div>
+                  <div className="text-xs text-zinc-400">SOL (for bridging / fees / swap gas)</div>
                   <div className="text-4xl font-semibold tabular-nums mt-1">{solSOLBalance.toFixed(4)}</div>
                   <div className="text-xs text-zinc-500">Solana mainnet • {shortAddr(solAddress)}</div>
                 </div>
