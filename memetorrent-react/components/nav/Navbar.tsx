@@ -11,6 +11,10 @@ export default function Navbar() {
 
         <div className="flex items-center gap-8 text-sm">
           <a href="#features" className="opacity-70 hover:opacity-100">Features</a>
+          <a href="#management" className="opacity-70 hover:opacity-100">Management</a>
+          <a href="#ecosystem" className="opacity-70 hover:opacity-100">Ecosystem</a>
+          <a href="#stats" className="opacity-70 hover:opacity-100">Live $MT</a>
+          <a href="#tap" className="opacity-70 hover:opacity-100">TAP</a>
           <a href={LINKS.wallet} target="_blank" className="opacity-70 hover:opacity-100">INFINITE WALLET</a>
           <a href={LINKS.jupiter} target="_blank" className="opacity-70 hover:opacity-100">Buy $MT</a>
           <a href="#security" className="opacity-70 hover:opacity-100">Security</a>

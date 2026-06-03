@@ -58,6 +58,11 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   transition: background 0.25s ease, color 0.25s ease;
+  scroll-behavior: smooth;
+}
+
+section[id] {
+  scroll-margin-top: 20px;
 }
 /* ===== Subtle background depth ===== */
 body {
@@ -90,11 +95,11 @@ body {
 }
 
 @keyframes logo-dance {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3.5px); }
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-4px) rotate(1.5deg); }
 }
 
 .logo-dance {
-  animation: logo-dance 2.8s ease-in-out infinite;
+  animation: logo-dance 2.6s ease-in-out infinite;
   will-change: transform;
 }

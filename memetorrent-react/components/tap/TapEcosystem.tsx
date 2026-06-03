@@ -20,7 +20,7 @@ const NFTS_GAMES = [
 
 export default function TapEcosystem() {
   return (
-    <section className="py-20 border-t border-white/10 bg-black">
+    <section id="tap" className="py-20 border-t border-white/10 bg-black">
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-xs tracking-[3px] text-emerald-400 mb-3">TAP ECO SYSTEM — COMING SOON</div>
         <div className="text-4xl font-semibold tracking-[-1.5px] max-w-3xl mb-4">

@@ -101,7 +101,7 @@ export default function TokenStats() {
   const marketCapNum = parseFloat((stats.market_cap || '$0').replace(/[$,]/g, ''));
 
   return (
-    <section className="py-12">
+    <section id="stats" className="py-12">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

@@ -29,7 +29,7 @@ export default function Features() {
   ];
 
   return (
-    <section className="py-20 border-t border-white/10">
+    <section id="features" className="py-20 border-t border-white/10">
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-xs tracking-[3px] text-emerald-400 mb-3">WHY MT IS DIFFERENT</div>
         <div className="text-4xl font-semibold tracking-[-1.5px] max-w-2xl">No rented chains. No rented wallets. No rented trust.</div>
