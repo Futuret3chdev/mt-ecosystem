@@ -6,7 +6,7 @@ The official marketing + on-ramp site for the MT ECO SYSTEM.
 - $MT token stats (via existing API)
 - Ecosystem highlights
 - Features: 1¢ fees, self-built everything, NFTs, Rockets, self-built bridges
-- Prominent INFINITE WALLET promo linking to https://infinite-wallet.vercel.app/ (all links in this site updated from old wallet.futuret3ch.com.au)
+- Prominent INFINITE WALLET promo linking to https://wallet.futuret3ch.com.au/ (all links in this site updated from old wallet.futuret3ch.com.au)
 - Security section (self-custody emphasis)
 - Ready for future developer API / social connect (Meta/Google/Microsoft) pages
 
