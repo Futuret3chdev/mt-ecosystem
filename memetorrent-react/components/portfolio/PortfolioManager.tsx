@@ -74,7 +74,7 @@ export default function PortfolioManager() {
     setTimeout(() => setMessage(null), 2400);
   };
 
-  // Flow handlers — real-feeling management flows, better than passive trackers
+  // Flow handlers — real-feeling self-custodial management flows
   const startFlow = (type: FlowType) => {
     setActiveFlow(type);
     setFlowStep(0);
@@ -121,7 +121,7 @@ export default function PortfolioManager() {
 
     if (activeFlow === 'report') {
       const report = `MT-ECO-VERIFIED-${Date.now().toString(36).toUpperCase()}`;
-      showToast(`On-chain report ${report} generated — includes native MT tx proofs (better than third-party trackers)`);
+      showToast(`On-chain report ${report} generated — includes native MT tx proofs from our core node`);
       setTimeout(() => closeFlow(), 1600);
     }
 
@@ -471,7 +471,7 @@ export default function PortfolioManager() {
                 {/* Report flow — the "better" part */}
                 {activeFlow === 'report' && (
                   <div className="mt-6">
-                    <p className="opacity-80 mb-4">Generate a cryptographically verifiable report that includes Native MT transactions (from our node), SPL activity, Rockets earnings, and NFT provenance. Far beyond simple price trackers.</p>
+                    <p className="opacity-80 mb-4">Generate a cryptographically verifiable report that includes Native MT transactions (from our node), SPL activity, Rockets earnings, and NFT provenance. All on-chain proofs included.</p>
                     <button onClick={() => completeStep()} className="w-full py-4 rounded-2xl border border-white/30 font-medium">GENERATE ON-CHAIN VERIFIED REPORT</button>
                     <div className="text-[10px] mt-3 opacity-50">Includes merkle-style proofs from mt-core. Exportable. Future: direct tax filing connectors.</div>
                   </div>
