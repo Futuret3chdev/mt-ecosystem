@@ -338,6 +338,7 @@ import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 // Exactly the ones the user provided (Helius first, then QuickNode, then public mainnet).
 // Custom RPC in Settings (or VITE_SOLANA_RPC_URL build-time default) overrides the entire list.
 // We intentionally avoid flaky public endpoints that can return ERR_CERT_AUTHORITY_INVALID.
+// Updated to ensure live site uses reliable paths for the funded wallet 63NQwG9Y...
 const SOLANA_RPCS = [
   'https://mainnet.helius-rpc.com/?api-key=61a3cb76-ffd8-4dde-bb49-35cae29566c8', // Helius first (user's working key)
   'https://billowing-multi-grass.solana-mainnet.quiknode.pro/aa4bc2cb96a4abb5cc363c8bbeec7f8ebde29dce', // user's QuickNode
