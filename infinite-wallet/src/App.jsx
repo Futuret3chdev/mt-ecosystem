@@ -1006,10 +1006,14 @@ export default function MTWalletApp() {
                   <div className="text-4xl font-semibold tabular-nums mt-1">{solMTBalance.toFixed(2)}</div>
                   <div className="text-[10px] text-emerald-400/70 mt-1">
                     Send real $MT (SPL) to the SOL addr of this wallet to receive here. 
-                    If 0: 1) activate the exact wallet (SOL addr must match the one you funded), 2) make sure Moralis key is set (via Settings or VITE_MORALIS_API_KEY env var + redeploy), 3) click force sync. The app now filters out public RPCs known to cause ERR_CERT_AUTHORITY_INVALID and auto-switches on cert/network errors.
+                    If 0: 1) activate the exact wallet (SOL addr must match the one you funded), 2) make sure Moralis key is active (via Settings or VITE_MORALIS_API_KEY env var + redeploy), 3) click force sync. The app now filters out public RPCs known to cause ERR_CERT_AUTHORITY_INVALID and auto-switches on cert/network errors.
                   </div>
-                  {!getMoralisApiKey() && solMTBalance === 0 && (
-                    <div className="mt-2 text-[10px] text-orange-400">No Moralis key (neither local nor VITE_MORALIS_API_KEY default). Go to Settings and add one (or configure the env var on the hosting platform + redeploy). This avoids falling back to flaky public RPCs that often cause ERR_CERT_AUTHORITY_INVALID.</div>
+                  {getMoralisApiKey() ? (
+                    <div className="mt-1 text-[10px] text-emerald-400">Moralis key active — using reliable primary path for $MT SPL (like your working game fetch example).</div>
+                  ) : (
+                    !getMoralisApiKey() && solMTBalance === 0 && (
+                      <div className="mt-2 text-[10px] text-orange-400">No Moralis key (neither local nor VITE_MORALIS_API_KEY default). Go to Settings and add one (or configure the env var on the hosting platform + redeploy). This avoids falling back to flaky public RPCs that often cause ERR_CERT_AUTHORITY_INVALID.</div>
+                    )
                   )}
                   <div className="text-[10px] text-zinc-500 mt-1">SOL addr: <button onClick={() => copy(solAddress)} className="underline decoration-dotted">{shortAddr(solAddress)}</button></div>
                 </div>
