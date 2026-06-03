@@ -4,7 +4,7 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-y-3 justify-between">
         <div>© {new Date().getFullYear()} MT ECO SYSTEM — Built by FutureT3ch. All core components self-hosted and self-built.</div>
         <div className="flex gap-x-6">
-          <a href="https://infinite-wallet.vercel.app/" target="_blank" className="hover:text-white">MT Wallet</a>
+          <a href="https://infinite-wallet.vercel.app/" target="_blank" className="hover:text-white">MT Wallet</a> {/* updated to new production wallet */}
           <a href="https://jup.ag/swap/SOL-ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump" target="_blank" className="hover:text-white">$MT on Jupiter</a>
           <span>Developer API &amp; licenses — coming soon</span>
         </div>

@@ -5,7 +5,7 @@ export const LINKS = {
   raydium: `https://raydium.io/swap/?inputMint=sol&outputMint=${MT_CONTRACT}`,
   jupiter: `https://jup.ag/swap/SOL-${MT_CONTRACT}`,
   pumpfun: `https://pump.fun/coin/${MT_CONTRACT}`,
-  wallet: 'https://infinite-wallet.vercel.app/',
+  wallet: 'https://infinite-wallet.vercel.app/', // All launch CTAs in memetorrent-react point here (updated from old wallet.futuret3ch.com.au)
   whitepaper: '/whitepaper.pdf',
   // Future self-hosted
   docs: '#',
