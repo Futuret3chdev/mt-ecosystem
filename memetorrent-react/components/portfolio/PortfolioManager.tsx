@@ -574,6 +574,28 @@ export default function PortfolioManager() {
           </AnimatePresence>
         </div>
 
+        {/* Promote specialty wallets: Couples & Business (first-class in INFINITE WALLET) */}
+        <div className="mt-10 pt-8 border-t border-white/10">
+          <div className="text-xs uppercase tracking-[3px] opacity-60 mb-2">SPECIALTY WALLETS</div>
+          <div className="text-2xl font-semibold tracking-tight mb-2">Built for life &amp; business.</div>
+          <p className="text-sm opacity-70 max-w-xl mb-6">The first Couples Wallet for shared secure access + Business Vaults with team flows, reporting, and branded management. All powered by the same self-custodial INFINITE WALLET — create in one click, backed up encrypted to your account.</p>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="rounded-3xl border border-purple-400/30 bg-white/[0.01] p-6">
+              <div className="text-purple-400 text-xs tracking-widest">FOR COUPLES</div>
+              <div className="font-semibold text-xl mt-1">Our Couples Wallet</div>
+              <p className="text-sm opacity-70 mt-2">Shared vault with dual control options, joint Rockets earnings, private NFTs, and seamless handoff. The first dedicated couples product in self-custody.</p>
+              <a href="https://infinite-wallet.vercel.app/" target="_blank" className="mt-4 inline-block text-sm text-purple-400 hover:underline">Create in INFINITE WALLET →</a>
+            </div>
+            <div className="rounded-3xl border border-blue-400/30 bg-white/[0.01] p-6">
+              <div className="text-blue-400 text-xs tracking-widest">FOR BUSINESSES</div>
+              <div className="font-semibold text-xl mt-1">Business Vault</div>
+              <p className="text-sm opacity-70 mt-2">Team-managed with role-based views, on-chain audit reports, bulk bridges/swaps, and dedicated support flows. Enterprise-ready self-custody.</p>
+              <a href="https://infinite-wallet.vercel.app/" target="_blank" className="mt-4 inline-block text-sm text-blue-400 hover:underline">Create in INFINITE WALLET →</a>
+            </div>
+          </div>
+        </div>
+
         <div className="mt-8 text-center">
           <a href="https://infinite-wallet.vercel.app/" target="_blank" className="inline-block text-sm px-8 py-3 rounded-2xl border border-white/30 hover:bg-white/5">LAUNCH INFINITE WALLET TO RUN THESE FLOWS FOR REAL →</a>
           <div className="text-[10px] mt-3 opacity-50">All balances, NFTs, and Rockets live forever in your self-custodial vault. No third parties. Infinite possibilities.</div>
