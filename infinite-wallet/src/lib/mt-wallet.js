@@ -52,13 +52,14 @@ export function getDefaultAuthURL() {
 export function getMTNode() {
   if (typeof window === 'undefined') return 'http://localhost:4000';
   const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
-  // On production live site (Vercel), force the official MT node (from VITE or the known ecosystem node).
-  // This prevents users from accidentally pointing to a wrong node and "losing" access to their native wallets/assets.
+  // On production live site (Vercel), use HTTPS proxy via our /api/mt if no explicit https VITE set.
+  // This allows real calls to the official node without browser mixed-content blocks (HTTPS page -> HTTPS vercel api -> HTTP node server-side).
+  // When the VPS node is behind HTTPS (certbot), set VITE_MT_NODE_URL=https://... in Vercel env and it will use direct.
   // Custom overrides only for local dev or licensed users (future).
   if (isVercel) {
     const fromEnv = getDefaultMTNode();
-    if (fromEnv) return fromEnv;
-    return 'http://161.97.106.182:4001'; // official ecosystem node (update when https is live)
+    if (fromEnv && fromEnv.startsWith('https')) return fromEnv;
+    return '/api/mt'; // vercel serverless proxy (secure from browser)
   }
   let local = localStorage.getItem('mt_custom_mt_node');
   if (local) {
@@ -95,10 +96,15 @@ export function setMTNode(url) {
 export function getAuthURL() {
   if (typeof window === 'undefined') return 'http://localhost:4001';
   const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+  // On production live site (Vercel), use HTTPS proxy via our /api/auth if no explicit https VITE set.
+  // This allows real auth (login, backed-up wallets per user, cross-device) without browser mixed-content blocks.
+  // Browser (HTTPS) -> Vercel /api/auth (HTTPS) -> VPS mt-auth (HTTP, server-side only).
+  // The per-user encrypted wallet data "stays hidden" on the auth server (only decrypts client-side with user's password).
+  // When the VPS auth is behind HTTPS (set up nginx+certbot), set VITE_AUTH_URL=https://... in Vercel env for the wallet project.
   if (isVercel) {
     const fromEnv = getDefaultAuthURL();
-    if (fromEnv) return fromEnv;
-    return 'http://161.97.106.182:4002'; // official ecosystem auth (update when https is live)
+    if (fromEnv && fromEnv.startsWith('https')) return fromEnv;
+    return '/api/auth'; // vercel serverless proxy (secure from browser, real storage on server)
   }
   let local = localStorage.getItem('mt_custom_auth_url');
   if (local) {
@@ -793,8 +799,14 @@ async function authFetch(path, options = {}) {
     ...(options.headers || {}),
   };
 
-  const authBase = getAuthURL();
-  // On production (Vercel) we have no public auth backend yet -> go straight to demo fallback
+  let authBase = getAuthURL();
+
+  // Handle vercel proxy base (relative /api/auth)
+  if (authBase && authBase.startsWith('/')) {
+    const origin = (typeof window !== 'undefined' && window.location.origin) || 'https://infinite-wallet.vercel.app';
+    authBase = origin + authBase;
+  }
+
   if (!authBase) {
     return getDemoAuthResponse(path, options);
   }
@@ -805,6 +817,8 @@ async function authFetch(path, options = {}) {
     if (!res.ok) throw new Error(data.error || 'Auth request failed');
     return data;
   } catch (e) {
+    // Fallback to demo only if real call fails (e.g. proxy or backend issue)
+    // On live Vercel this should now succeed via the /api/auth proxy -> real VPS storage
     return getDemoAuthResponse(path, options);
   }
 }
