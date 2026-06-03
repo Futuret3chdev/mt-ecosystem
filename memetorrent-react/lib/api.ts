@@ -52,54 +52,17 @@ export type Holder = {
 };
 
 export async function getTopHolders(): Promise<Holder[]> {
-  // Use public Solana RPC with fallbacks
-  const rpcUrls = [
-    'https://api.mainnet-beta.solana.com',
-    'https://ssc-dao.genesysgo.net',
-  ];
-
-  const tokenAddress = 'ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump';
-  const LAMPORTS_PER_TOKEN = 1_000_000; // for this token
-
-  for (const rpcUrl of rpcUrls) {
-    try {
-      const payload = {
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'getTokenLargestAccounts',
-        params: [tokenAddress, { commitment: 'confirmed' }],
-      };
-
-      const res = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        cache: 'no-store',
-      });
-
-      if (!res.ok) continue;
-
-      const data = await res.json();
-      if (data.error || !data.result?.value) continue;
-
-      const holders = data.result.value
-        .filter((h: any) => parseInt(h.amount) > 0)
-        .map((h: any) => ({
-          address: h.address,
-          uiAmount: parseInt(h.amount) / LAMPORTS_PER_TOKEN,
-        }))
-        .sort((a: Holder, b: Holder) => b.uiAmount - a.uiAmount)
-        .slice(0, 10);
-
-      return holders;
-    } catch (e) {
-      console.warn(`RPC ${rpcUrl} failed for holders`, e);
-    }
+  // Delegate to our internal Next.js API route (/app/api/holders/route.ts).
+  // This keeps the Helius key + RPC logic server-side only (never in client bundle),
+  // avoids browser CORS/403 issues entirely, and still gets real on-chain top holders.
+  // Falls back to mocks inside the route if needed.
+  const res = await fetch('/api/holders', { cache: 'no-store' });
+  if (!res.ok) {
+    // last resort mock
+    return Array.from({ length: 5 }, (_, i) => ({
+      address: `DemoHolder${i + 1}...${Math.random().toString(36).slice(2, 6)}`,
+      uiAmount: 1000000 + Math.random() * 50000000,
+    }));
   }
-
-  // Fallback mock if all fail
-  return Array.from({ length: 5 }, (_, i) => ({
-    address: `FakeHolder${i + 1}...${Math.random().toString(36).slice(2, 6)}`,
-    uiAmount: Math.random() * 1000000000,
-  }));
+  return res.json();
 }

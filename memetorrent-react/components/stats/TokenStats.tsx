@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getTokenStats, getTopHolders, MTStatsRaw, Holder } from '@/lib/api';
 
-// 100+ chains we plan to bridge with (logos via public or text for now)
-const BRIDGE_CHAINS = [
-  'Solana', 'Ethereum', 'Base', 'Arbitrum', 'Optimism', 'Polygon', 'Avalanche', 'BSC',
+// 100+ chains we plan to bridge with. Binance prominently included. Real images (not just names).
+const BRIDGE_CHAINS: string[] = [
+  'Binance Smart Chain (BSC)',
+  'Solana', 'Ethereum', 'Base', 'Arbitrum', 'Optimism', 'Polygon', 'Avalanche',
   'Bitcoin', 'Cardano', 'Polkadot', 'Cosmos', 'Near', 'Aptos', 'Sui', 'Sei',
   'TON', 'Tron', 'Fantom', 'Gnosis', 'Linea', 'Scroll', 'Blast', 'Mode',
   'Mantle', 'zkSync', 'Starknet', 'Celestia', 'Injective', 'Osmosis', 'dYdX', 'Juno',
@@ -17,16 +18,75 @@ const BRIDGE_CHAINS = [
   'Across', 'Synapse', 'Hop', 'Connext', 'Orbiter', 'Socket', 'LI.FI', 'Rango',
   '1inch', '0x', 'Paraswap', 'CowSwap', 'Uniswap', 'Sushi', 'Curve', 'Balancer',
   'Aave', 'Compound', 'Maker', 'Spark', 'Morpho', 'Pendle', 'Ethena', 'EigenLayer',
-  'Symbiotic', 'Karak', 'Renzo', 'Puffer', 'Mantle', 'Blast', 'Zora', 'Farcaster',
-  'Lens', 'Friend.tech', 'Pump.fun', 'Moonshot', 'Believe', 'Clanker', 'Bags', 'Moon',
-  'And 40+ more L1s/L2s coming via our self-built bridge verifier...'
+  'Symbiotic', 'Karak', 'Renzo', 'Puffer', 'Zora', 'Farcaster', 'Lens', 'Friend.tech',
+  'Pump.fun', 'Moonshot', 'Believe', 'Clanker', 'Bags', 'Moon',
+  // More L1s/L2s/DeFi + infra to reach 100+
+  'Cronos', 'OKX Chain', 'Celo', 'Moonbeam', 'Harmony', 'Klaytn', 'IoTeX', 'VeChain',
+  'Flow', 'Tezos', 'Algorand', 'Hedera', 'Theta', 'EOS', 'Waves', 'ICON',
+  'Qtum', 'NEO', 'Zilliqa', 'Elrond', 'Astar', 'Shiden', 'Karura', 'Acala',
+  'Phala', 'Unique', 'Quartz', 'Bifrost', 'Interlay', 'Parallel', 'Centrifuge', 'Nodle',
+  'Subspace', 'Aleph Zero', 'Kusama', 'Rococo', 'Westend', 'Litentry', 'Robonomics',
+  'And dozens more L1s, L2s, app-chains & bridges via our self-built verifier...'
 ];
+
+function getChainLogo(chain: string): string {
+  const key = chain.toLowerCase().replace(/[^a-z]/g, '');
+  const logos: Record<string, string> = {
+    binancesmartchainbsc: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/binance/info/logo.png',
+    solana: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png',
+    ethereum: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png',
+    base: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/info/logo.png',
+    arbitrum: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/arbitrum/info/logo.png',
+    optimism: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/optimism/info/logo.png',
+    polygon: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/polygon/info/logo.png',
+    avalanche: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/avalanchec/info/logo.png',
+    bitcoin: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/bitcoin/info/logo.png',
+    cardano: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/cardano/info/logo.png',
+    polkadot: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/polkadot/info/logo.png',
+    cosmos: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/cosmos/info/logo.png',
+    near: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/near/info/logo.png',
+    aptos: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/aptos/info/logo.png',
+    sui: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/sui/info/logo.png',
+    sei: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/sei/info/logo.png',
+    tron: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/tron/info/logo.png',
+    fantom: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/fantom/info/logo.png',
+    gnosis: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/gnosis/info/logo.png',
+    linea: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/linea/info/logo.png',
+    scroll: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/scroll/info/logo.png',
+    blast: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/blast/info/logo.png',
+    mantle: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/mantle/info/logo.png',
+    zksync: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/zksync/info/logo.png',
+    starknet: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/starknet/info/logo.png',
+    celestia: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/celestia/info/logo.png',
+    injective: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/injective/info/logo.png',
+    osmosis: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/osmosis/info/logo.png',
+    dydx: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/dydx/info/logo.png',
+    juno: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/juno/info/logo.png',
+    kava: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/kava/info/logo.png',
+    akash: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/akash/info/logo.png',
+    filecoin: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/filecoin/info/logo.png',
+    arweave: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/arweave/info/logo.png',
+    thegraph: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/graph/info/logo.png',
+    chainlink: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/chainlink/info/logo.png',
+    pyth: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/pyth/info/logo.png',
+    wormhole: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/wormhole/info/logo.png',
+    layerzero: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/layerzero/info/logo.png',
+    axelar: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/axelar/info/logo.png',
+    // add more as trustwallet/assets grows; fallback to symbol for the rest
+  };
+  return logos[key] || '';
+}
 
 export default function TokenStats() {
   const [stats, setStats] = useState<MTStatsRaw | null>(null);
   const [holders, setHolders] = useState<Holder[]>([]);
   const [showHolders, setShowHolders] = useState(false);
   const [loadingHolders, setLoadingHolders] = useState(false);
+
+  // Filter out the trailing note from the scrolling marquee list
+  const displayChains = BRIDGE_CHAINS.filter(
+    (c) => !c.toLowerCase().includes('more') && !c.toLowerCase().includes('dozens')
+  );
 
   useEffect(() => {
     getTokenStats().then(setStats).catch(console.error);
@@ -120,21 +180,40 @@ export default function TokenStats() {
                     )) : <div className="opacity-60">No holder data (RPC fallback used)</div>}
                   </div>
                 )}
-                <div className="text-[10px] mt-2 opacity-50">Data via public Solana RPCs + DexScreener. Not financial advice.</div>
+                <div className="text-[10px] mt-2 opacity-50">Data via Helius + public Solana RPCs (server-proxied) + DexScreener. Not financial advice.</div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Marquee of 100+ bridge chains - infinite possibilities */}
+          {/* Marquee of 100+ bridge chains - infinite possibilities (slowed way down, with real logos) */}
           <div className="mt-8 pt-6 border-t border-white/10 overflow-hidden">
             <div className="text-xs uppercase tracking-[3px] opacity-60 mb-3">COMING SOON: SELF-BUILT BRIDGES TO 100+ CHAINS</div>
             <div className="relative flex overflow-hidden [mask-image:linear-gradient(to_right,transparent,white_10%,white_90%,transparent)]">
-              <div className="flex animate-[marquee_40s_linear_infinite] gap-8 text-sm opacity-80 whitespace-nowrap">
-                {[...BRIDGE_CHAINS, ...BRIDGE_CHAINS].map((chain, idx) => (
-                  <span key={idx} className="flex items-center gap-2 px-4 py-1 rounded-full border border-white/10 bg-white/5">
-                    🌐 {chain}
-                  </span>
-                ))}
+              <div className="flex gap-6 text-sm opacity-80 whitespace-nowrap marquee-scroll">
+                {[...displayChains, ...displayChains].map((chain, idx) => {
+                  const logo = getChainLogo(chain);
+                  return (
+                    <span
+                      key={idx}
+                      className="flex items-center gap-2 px-4 py-1 rounded-full border border-white/10 bg-white/5"
+                    >
+                      {logo ? (
+                        <img
+                          src={logo}
+                          alt=""
+                          className="w-4 h-4 rounded-full object-contain"
+                          onError={(e) => {
+                            // graceful fallback if CDN image 404s
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <span className="text-[10px] opacity-70">🔗</span>
+                      )}
+                      {chain}
+                    </span>
+                  );
+                })}
               </div>
             </div>
             <div className="text-[10px] mt-2 opacity-50 text-center">Tap • Shop • Match • Transport • And dozens more utilities across chains</div>

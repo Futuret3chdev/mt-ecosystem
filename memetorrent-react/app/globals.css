@@ -75,8 +75,16 @@ body {
     var(--background);
 }
 
-/* Marquee for bridge chains */
+/* Marquee for bridge chains (slow, readable, pause on hover) */
 @keyframes marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
+}
+
+.marquee-scroll {
+  animation: marquee 120s linear infinite;
+}
+
+.marquee-scroll:hover {
+  animation-play-state: paused;
 }
