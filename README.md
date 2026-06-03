@@ -4,7 +4,7 @@
 
 Native token: **$MT** (`ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump`)
 
-- Self-built **MT Wallet** (Phantom-like, email + phone accounts, multiple wallets per user, cross-device access via our self-built auth)
+- Self-built **INFINITE WALLET** (Phantom-like, email + phone accounts, multiple wallets per user, cross-device access via our self-built auth)
 - Ultra-low fixed fees (~1¢ SOL equivalent)
 - On-chain NFTs (mint directly in the wallet)
 - **Rockets** — cross-game/platform utility earned in MT Games, stored and transferable via the wallet
@@ -18,7 +18,7 @@ Native token: **$MT** (`ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump`)
 
 ```
 mt-ecosystem/
-├── infinite-wallet/      # The official MT Wallet (Vite + React)
+├── infinite-wallet/      # The official INFINITE WALLET (Vite + React)
 │   └── Deploy to Vercel as static site (https://infinite-wallet.vercel.app)
 ├── memetorrent-react/    # Marketing + Web3 site (Next.js 16 + TS + Tailwind)
 │   └── Deploy to Vercel (memetorrent.futuret3ch.com.au)
@@ -39,7 +39,7 @@ npm run dev
 # Includes dev faucet: POST /faucet { "address": "..." }
 ```
 
-### 2. MT Wallet (frontend)
+### 2. INFINITE WALLET (frontend)
 ```powershell
 cd infinite-wallet
 npm install
@@ -84,7 +84,7 @@ The projects were already created and deployed via Vercel CLI during setup.
 
 Current live previews (auto-updating from GitHub `main`):
 - **Marketing site**: https://memetorrent-react.vercel.app (or the project-specific one)
-- **MT Wallet**: https://infinite-wallet.vercel.app (the production wallet)
+- **INFINITE WALLET**: https://infinite-wallet.vercel.app (the production wallet)
 
 **Manual / re-deploy steps if needed:**
 

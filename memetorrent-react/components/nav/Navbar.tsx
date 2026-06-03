@@ -11,10 +11,10 @@ export default function Navbar() {
 
         <div className="flex items-center gap-8 text-sm">
           <a href="#features" className="opacity-70 hover:opacity-100">Features</a>
-          <a href={LINKS.wallet} target="_blank" className="opacity-70 hover:opacity-100">MT Wallet</a>
+          <a href={LINKS.wallet} target="_blank" className="opacity-70 hover:opacity-100">INFINITE WALLET</a>
           <a href={LINKS.jupiter} target="_blank" className="opacity-70 hover:opacity-100">Buy $MT</a>
           <a href="#security" className="opacity-70 hover:opacity-100">Security</a>
-          <a href={LINKS.wallet} target="_blank" className="font-medium px-4 py-1.5 rounded-xl border border-white/30 hover:bg-white/5">Launch Wallet</a>
+          <a href={LINKS.wallet} target="_blank" className="font-medium px-4 py-1.5 rounded-xl border border-white/30 hover:bg-white/5">Launch Infinite Wallet</a>
           <ThemeToggle />
         </div>
       </div>

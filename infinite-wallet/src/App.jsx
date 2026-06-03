@@ -124,7 +124,7 @@ export default function MTWalletApp() {
 
   // App state
   const [activeTab, setActiveTab] = useState('portfolio');
-  const [status, setStatus] = useState('MT Wallet ready • Self-custodial • Ultra-low fees');
+  const [status, setStatus] = useState('INFINITE WALLET ready • Self-custodial • Ultra-low fees • Infinite possibilities');
   const [copied, setCopied] = useState('');
 
   // Balances
@@ -443,10 +443,10 @@ export default function MTWalletApp() {
     const tokenId = `mt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const metadata = {
       name: mintName.trim(),
-      description: mintDesignerText ? `Decorated: ${mintDesignerText}` : 'Minted via MT Wallet • MT ECO SYSTEM',
+      description: mintDesignerText ? `Decorated: ${mintDesignerText}` : 'Minted via INFINITE WALLET • MT ECO SYSTEM',
       image: mintImage || '', // data URL from upload or designer canvas (base64 image)
       attributes: [
-        { trait_type: 'Origin', value: 'MT Wallet' },
+        { trait_type: 'Origin', value: 'INFINITE WALLET' },
         mintDesignerText ? { trait_type: 'Designer Note', value: mintDesignerText } : null,
       ].filter(Boolean),
       created: new Date().toISOString(),
@@ -702,7 +702,7 @@ export default function MTWalletApp() {
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-500 flex items-center justify-center shadow-2xl shadow-emerald-500/30 mb-4">
               <span className="font-black text-3xl text-black tracking-[-2px]">MT</span>
             </div>
-            <div className="text-3xl font-black tracking-[-1.5px]">MT Wallet</div>
+            <div className="text-3xl font-black tracking-[-1.5px]">INFINITE WALLET</div>
             <div className="text-emerald-400 text-sm tracking-[3px] mt-1 font-mono">MT ECO SYSTEM</div>
           </div>
 
@@ -895,7 +895,7 @@ export default function MTWalletApp() {
                 <span className="font-black text-lg text-black tracking-[-1.5px]">MT</span>
               </div>
               <div>
-                <div className="font-bold tracking-tight text-xl leading-none">MT Wallet</div>
+                <div className="font-bold tracking-tight text-xl leading-none">INFINITE WALLET</div>
                 <div className="text-[10px] text-emerald-400/90 -mt-0.5 font-mono tracking-[1px]">MT ECO SYSTEM</div>
               </div>
             </div>
@@ -1172,7 +1172,7 @@ export default function MTWalletApp() {
           </div>
         )}
 
-        {/* BUY / SELL - fully in-wallet (Jupiter powered but executed inside MT Wallet) */}
+        {/* BUY / SELL - fully in-wallet (Jupiter powered but executed inside INFINITE WALLET) */}
         {activeTab === 'trade' && (
           <div className="max-w-xl mx-auto">
             <div className="text-center mb-6">

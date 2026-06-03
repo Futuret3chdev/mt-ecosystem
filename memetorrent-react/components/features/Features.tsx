@@ -8,7 +8,7 @@ export default function Features() {
     },
     {
       title: 'True Self-Built Wallet',
-      desc: 'MT Wallet is our Phantom equivalent. Full key control in-browser, encrypted vaults, QR, send, receive, NFT mint. No MetaMask, no Phantom, no third parties.',
+      desc: 'INFINITE WALLET is our Phantom equivalent. Full key control in-browser, encrypted vaults, QR, send, receive, NFT mint. No MetaMask, no Phantom, no third parties. Infinite possibilities.',
     },
     {
       title: 'Native NFTs & Creators',

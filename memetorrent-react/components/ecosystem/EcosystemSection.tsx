@@ -5,7 +5,7 @@ export default function EcosystemSection() {
       desc: 'Native token of the MT ECO SYSTEM. Ultra-low fixed fees. Real on-chain state machine powering everything.',
     },
     {
-      title: 'MT Wallet',
+      title: 'INFINITE WALLET',
       desc: 'Phantom-grade self-custodial wallet. Seed encrypted locally. Mint NFTs, hold Rockets, bridge assets. 100% ours.',
     },
     {

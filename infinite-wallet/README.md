@@ -1,4 +1,4 @@
-# MT Wallet — Official Wallet for the MT ECO SYSTEM
+# INFINITE WALLET — Official Wallet for the MT ECO SYSTEM
 
 Phantom-grade, self-built, self-custodial wallet for the MT ECO SYSTEM.
 

@@ -1,5 +1,5 @@
 /**
- * MT Wallet - Secure client-side wallet engine for MT ECO SYSTEM
+ * INFINITE WALLET - Secure client-side wallet engine for MT ECO SYSTEM
  * - Zero third-party auth (local only)
  * - Keys NEVER leave the browser
  * - Compatible with mt-core (ed25519 + tweetnacl + bs58 + JSON tx)

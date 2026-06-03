@@ -2,11 +2,11 @@
 
 The official marketing + on-ramp site for the MT ECO SYSTEM.
 
-- Hero with strong vision + direct "Launch MT Wallet" CTAs
+- Hero with strong vision + direct "Launch INFINITE WALLET" CTAs
 - $MT token stats (via existing API)
 - Ecosystem highlights
 - Features: 1¢ fees, self-built everything, NFTs, Rockets, self-built bridges
-- Prominent MT Wallet promo linking to https://infinite-wallet.vercel.app/ (all links in this site updated from old wallet.futuret3ch.com.au)
+- Prominent INFINITE WALLET promo linking to https://infinite-wallet.vercel.app/ (all links in this site updated from old wallet.futuret3ch.com.au)
 - Security section (self-custody emphasis)
 - Ready for future developer API / social connect (Meta/Google/Microsoft) pages
 
@@ -22,9 +22,9 @@ Builds to static output. Deploy alongside (or behind) the domain.
 
 ## Connection to Wallet
 
-The site promotes and links out to the standalone MT Wallet (Vite app in ../infinite-wallet).
+The site promotes and links out to the standalone INFINITE WALLET (Vite app in ../infinite-wallet).
 
-Future: deeper integration (connect button that can talk to a running MT Wallet instance via postMessage or injected provider, and "Sign in with MT" using our own lightweight social APIs).
+Future: deeper integration (connect button that can talk to a running INFINITE WALLET instance via postMessage or injected provider, and "Sign in with MT" using our own lightweight social APIs).
 
 See also: ../mt-core (the node), ../infinite-wallet (the actual wallet).
 
