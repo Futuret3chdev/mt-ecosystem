@@ -32,7 +32,17 @@ const app = express();
  * =========================
  */
 const PORT = process.env.PORT || 4000;
-const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:5173,https://infinite-wallet.vercel.app,https://*.vercel.app').split(',');
+const rawCors = process.env.CORS_ORIGINS || 'http://localhost:5173,https://infinite-wallet.vercel.app,https://*.vercel.app';
+const CORS_ORIGINS = rawCors.split(',').map(s => s.trim()).filter(Boolean);
+
+function isOriginAllowed(origin) {
+  if (!origin) return true; // allow curl, health checks, non-browser, same-origin etc.
+  if (CORS_ORIGINS.includes(origin)) return true;
+  // Support any Vercel preview or custom domain ending in vercel.app (so new hashes like -msue3u5bt- work without editing .env every time)
+  if (/^https?:\/\/[a-z0-9.-]+\.vercel\.app$/i.test(origin)) return true;
+  return false;
+}
+
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
 const NFTS_FILE = path.join(DATA_DIR, 'nfts.json');
@@ -144,7 +154,13 @@ if (!accounts[GENESIS_ADDRESS]) {
  * =========================
  */
 app.use(cors({
-  origin: CORS_ORIGINS,
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type'],
 }));

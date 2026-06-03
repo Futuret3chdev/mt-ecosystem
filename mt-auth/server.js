@@ -21,7 +21,17 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 4001;
 
-const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,https://*.vercel.app').split(',');
+const rawCors = process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,https://infinite-wallet.vercel.app,https://*.vercel.app';
+const CORS_ORIGINS = rawCors.split(',').map(s => s.trim()).filter(Boolean);
+
+function isOriginAllowed(origin) {
+  if (!origin) return true; // allow curl, health checks, non-browser, same-origin etc.
+  if (CORS_ORIGINS.includes(origin)) return true;
+  // Support any Vercel preview or custom domain ending in vercel.app (so new hashes like -msue3u5bt- work without editing .env every time)
+  if (/^https?:\/\/[a-z0-9.-]+\.vercel\.app$/i.test(origin)) return true;
+  return false;
+}
+
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const BACKUPS_FILE = path.join(DATA_DIR, 'backups.json');
@@ -29,7 +39,13 @@ const BACKUPS_FILE = path.join(DATA_DIR, 'backups.json');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 app.use(cors({
-  origin: CORS_ORIGINS,
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }));
 app.use(express.json({ limit: '1mb' }));
