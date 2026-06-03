@@ -41,6 +41,7 @@ import {
   getMTNode,
   setMTNode,
   getDefaultMTNode,
+  getDefaultAuthURL,
 
   // Solana RPC default support
   getDefaultSolanaRpc,
@@ -1679,6 +1680,9 @@ export default function MTWalletApp() {
               </div>
 
               <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getAuthURL ? (getAuthURL() || 'none (demo)') : '—'}</div>
+              {!customAuthUrl && getDefaultAuthURL && getDefaultAuthURL() && (
+                <div className="text-[10px] text-emerald-400 mt-1">Using project default Auth URL (VITE_AUTH_URL). Enter above + Save to override only in this browser.</div>
+              )}
             </div>
 
             <div className="text-xs text-zinc-500 pt-4">Primary holdings live on the MT native chain. Solana SPL is legacy for bridging.</div>
