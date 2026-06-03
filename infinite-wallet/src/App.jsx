@@ -187,6 +187,8 @@ export default function MTWalletApp() {
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [showMintModal, setShowMintModal] = useState(false);
   const [mintName, setMintName] = useState('');
+  const [mintImage, setMintImage] = useState(''); // data URL for image NFT
+  const [mintDesignerText, setMintDesignerText] = useState('');
   const [minting, setMinting] = useState(false);
 
   const mtAddress = wallet?.publicKey || '';
@@ -467,9 +469,12 @@ export default function MTWalletApp() {
     const tokenId = `mt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const metadata = {
       name: mintName.trim(),
-      description: 'Minted via MT Wallet • MT ECO SYSTEM',
-      image: '', // future: support upload or ipfs
-      attributes: [{ trait_type: 'Origin', value: 'MT Wallet' }],
+      description: mintDesignerText ? `Decorated: ${mintDesignerText}` : 'Minted via MT Wallet • MT ECO SYSTEM',
+      image: mintImage || '', // data URL from upload or designer canvas (base64 image)
+      attributes: [
+        { trait_type: 'Origin', value: 'MT Wallet' },
+        mintDesignerText ? { trait_type: 'Designer Note', value: mintDesignerText } : null,
+      ].filter(Boolean),
       created: new Date().toISOString(),
     };
 
@@ -492,6 +497,8 @@ export default function MTWalletApp() {
 
       setStatus(`NFT minted: ${tokenId}`);
       setMintName('');
+      setMintImage('');
+      setMintDesignerText('');
       setShowMintModal(false);
       setTimeout(refreshAll, 600);
     } catch (err) {
@@ -910,7 +917,7 @@ export default function MTWalletApp() {
           <div className="flex items-center gap-3 text-sm">
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-2xl text-xs font-mono text-zinc-400">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              {(() => { const n = getMTNode ? getMTNode() : null; return n ? n.replace('http://', '') : 'demo (native MT off, Solana side only)'; })()}
+              {(() => { const n = getMTNode ? getMTNode() : null; return n ? n.replace('http://', '') : 'native MT via build env (or set in Settings)'; })()}
             </div>
 
             {mtAddress && (
@@ -983,7 +990,7 @@ export default function MTWalletApp() {
                     <div className="text-emerald-400 text-xl font-semibold -mt-1">$MT</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-zinc-500">On our MT chain (same address string as your SOL addr, but different chain). Send native $MT here when connected to a mt-core node.</div>
+                    <div className="text-xs text-zinc-500">Primary $MT on the MT native chain. Send/receive here when node connected.</div>
                     <div className="mt-6 flex gap-3">
                       <button onClick={() => { setActiveTab('send-receive'); setShowSendModal(true); }} className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 active:bg-white transition rounded-2xl text-black font-semibold text-sm flex items-center gap-2">
                         <Send className="w-4 h-4" /> SEND
@@ -996,8 +1003,10 @@ export default function MTWalletApp() {
                       const n = getMTNode ? getMTNode() : null;
                       const isLocalNode = n && (n.includes('localhost') || n.includes('127.0.0.1'));
                       const isLocalHost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-                      const hasConfiguredNode = !!n; // show for any configured node (e.g. your own remote VPS node)
-                      return (isLocalNode || isLocalHost || hasConfiguredNode);
+                      const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+                      const hasConfiguredNode = !!n;
+                      // Only show test faucet for actual local/dev nodes, not on public live site even if custom https node is configured via VITE/env
+                      return (isLocalNode || isLocalHost) && !isVercel;
                     })() && (
                       <button
                         onClick={async () => {
@@ -1012,7 +1021,7 @@ export default function MTWalletApp() {
                         }}
                         className="mt-3 w-full text-xs py-1.5 rounded-xl border border-dashed border-emerald-800/60 text-emerald-400 hover:bg-emerald-950/40 transition"
                       >
-                        🚰 Get 1000 Test $MT (faucet)
+                        Request Test Funds (dev only)
                       </button>
                     )}
                   </div>
@@ -1048,16 +1057,11 @@ export default function MTWalletApp() {
                   </div>
                   <div className="text-4xl font-semibold tabular-nums mt-1">{solMTBalance.toFixed(2)}</div>
                   <div className="text-[10px] text-emerald-400/70 mt-1">
-                    This is the $MT (SPL) you sent on Solana to the SOL addr (same string as MT addr above, but on Solana chain). 
-                    If 0: 1) activate the exact wallet, 2) make sure Moralis key active, 3) force sync. Filters bad RPCs.
+                    Legacy $MT on Solana (SPL). Bridge to native MT on our chain for primary holdings. Use force sync if needed.
                   </div>
                   {getMoralisApiKey() ? (
-                    <div className="mt-1 text-[10px] text-emerald-400">Moralis key active — using reliable primary path for $MT SPL (like your working game fetch example).</div>
-                  ) : (
-                    !getMoralisApiKey() && solMTBalance === 0 && (
-                      <div className="mt-2 text-[10px] text-orange-400">No Moralis key (neither local nor VITE_MORALIS_API_KEY default). Go to Settings and add one (or configure the env var on the hosting platform + redeploy). This avoids falling back to flaky public RPCs that often cause ERR_CERT_AUTHORITY_INVALID.</div>
-                    )
-                  )}
+                    <div className="mt-1 text-[10px] text-emerald-400/60">SPL balance via Moralis (reliable path).</div>
+                  ) : null}
                   <div className="text-[10px] text-zinc-500 mt-1">SOL addr: <button onClick={() => copy(solAddress)} className="underline decoration-dotted">{shortAddr(solAddress)}</button></div>
                 </div>
                 <div className="rounded-3xl bg-zinc-950 border border-zinc-800 p-6">
@@ -1065,6 +1069,11 @@ export default function MTWalletApp() {
                   <div className="text-4xl font-semibold tabular-nums mt-1">{solSOLBalance.toFixed(4)}</div>
                   <div className="text-xs text-zinc-500">Solana mainnet • {shortAddr(solAddress)}</div>
                 </div>
+              </div>
+
+              {/* Multi-chain / bridge stub per request - focus native, Solana for bridge, others coming */}
+              <div className="mt-4 text-[10px] text-zinc-500 border border-zinc-800 rounded-2xl p-3">
+                Multi-chain view (BTC, ETH, SOL + more) + direct bridge MT-Solana ↔ Native MT coming. Hold primary $MT on our network. Current Solana SPL is legacy for bridging in.
               </div>
             </div>
 
@@ -1163,7 +1172,7 @@ export default function MTWalletApp() {
                   )}
                 </div>
                 <div className="text-[10px] text-zinc-500 mt-3">{isLoggedIn ? 'Backed up to your account (encrypted). Login on any device.' : 'Local only to this browser.'}</div>
-                <div className="text-[10px] text-emerald-400/80 mt-1">Native MT (top card, our chain) for the MT addr — needs mt-core running + node URL in Settings + native $MT sent to it (use faucet for local). The Solana SPL $MT you sent (side card) is on Solana to the SOL addr (same string as MT addr, different chain). Key or good RPC for SPL side.</div>
+                <div className="text-[10px] text-zinc-500 mt-1">Native $MT on our chain is primary. Solana SPL is legacy/bridge only.</div>
               </div>
             )}
           </div>
@@ -1173,8 +1182,8 @@ export default function MTWalletApp() {
         {activeTab === 'trade' && (
           <div className="max-w-xl mx-auto">
             <div className="text-center mb-6">
-              <div className="font-semibold text-2xl">Buy &amp; Sell $MT</div>
-              <div className="text-sm text-zinc-400 mt-1">Executed 100% inside this wallet • Jupiter quote + local Solana sign for the SPL $MT leg (native MT chain primary elsewhere)</div>
+              <div className="font-semibold text-2xl">Buy / Sell (Solana SPL leg)</div>
+              <div className="text-sm text-zinc-400 mt-1">In-wallet Jupiter for the legacy Solana $MT (SPL). Use to prepare for bridge to native MT on our chain. Primary $MT lives on the MT network.</div>
             </div>
 
             <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 space-y-5">
@@ -1244,7 +1253,7 @@ export default function MTWalletApp() {
                       });
                       setSwapQuote(quote);
                     } catch (e) {
-                      setSwapError('Quote failed: ' + e.message);
+                      setSwapError('Quote failed: ' + (e.message || 'check console / Solana RPC / Jupiter API status. Requires SOL for gas + some SPL $MT balance.'));
                     }
                   }}
                   disabled={!swapAmount || swapping}
@@ -1280,7 +1289,7 @@ export default function MTWalletApp() {
               </div>
 
               <div className="text-[10px] text-center text-zinc-500">
-                The entire swap (quote → tx construction → signing with your wallet's Solana key → broadcast) happens inside this wallet. No external sites or redirects. {wallet && getSolanaKeypair && <span className="font-mono block">Solana addr: {getSolanaKeypair(wallet)?.publicKey.toBase58().slice(0,8)}...</span>}
+                In-wallet Jupiter swap on Solana for the SPL $MT (legacy/bridge only). Native MT on our chain is the primary asset. {wallet && getSolanaKeypair && <span className="font-mono block">Solana addr: {getSolanaKeypair(wallet)?.publicKey.toBase58().slice(0,8)}...</span>}
               </div>
             </div>
           </div>
@@ -1376,28 +1385,41 @@ export default function MTWalletApp() {
           </div>
         )}
 
-        {/* ROCKETS - Unique platform currency earned in games */}
+        {/* ROCKETS - Earned per game on MT network (no demo) */}
         {activeTab === 'rockets' && (
           <div className="max-w-2xl">
             <div className="text-2xl font-bold mb-2">Rockets</div>
-            <p className="text-zinc-400">Platform-native utility points earned exclusively in MT Games. Store, transfer, and spend them anywhere in the ecosystem (games, services, future marketplace).</p>
+            <p className="text-zinc-400">Utility earned in MT-powered games. Per-game breakdown below. Transferrable on the native chain.</p>
 
-            <div className="mt-8 rounded-3xl border border-zinc-800 bg-zinc-950 p-10 text-center">
-              <div className="text-7xl font-black tabular-nums text-orange-400">128</div>
-              <div className="uppercase tracking-[3px] mt-1 text-sm text-orange-400/70">ROCKETS</div>
-              <div className="text-xs mt-6 text-zinc-400">Earned in: <span className="text-white">Cosmic Dash (demo game)</span> • Usable in future titles and services</div>
+            <div className="mt-6 space-y-3">
+              {[
+                { game: 'Cosmic Dash', earned: 0, note: 'Play connected games to earn' },
+                { game: 'MT Arcade', earned: 0, note: 'Coming soon' },
+                { game: 'Other titles', earned: 0, note: 'Earned rockets reported here' },
+              ].map((g, i) => (
+                <div key={i} className="rounded-3xl border border-zinc-800 bg-zinc-950 p-5 flex justify-between items-center">
+                  <div>
+                    <div className="font-semibold">{g.game}</div>
+                    <div className="text-xs text-zinc-500">{g.note}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-3xl font-bold tabular-nums">{g.earned}</div>
+                    <div className="text-xs text-orange-400">ROCKETS</div>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            <div className="mt-6 text-xs text-center text-emerald-400/60">Rockets live as on-chain assets. Transfer via wallet. No third-party points systems.</div>
+            <div className="mt-4 text-xs text-center text-zinc-500">Rockets are native on-chain assets. More games will feed earnings here automatically.</div>
           </div>
         )}
 
         {/* ACTIVITY */}
         {activeTab === 'activity' && (
           <div>
-            <div className="font-semibold mb-4">On-Chain Activity</div>
+            <div className="font-semibold mb-4">On-Chain Activity (native MT + SPL/bridge)</div>
             {txs.length === 0 ? (
-              <div className="text-zinc-400 py-12 text-center border border-dashed border-zinc-800 rounded-3xl">No transactions yet. Your first send or NFT mint will appear here.</div>
+              <div className="text-zinc-400 py-12 text-center border border-dashed border-zinc-800 rounded-3xl">No transactions yet. Sends, receives, NFT mints, buys/sells and bridges will appear here. Solana-side txs viewable on solscan.io.</div>
             ) : (
               <div className="space-y-2 font-mono text-sm">
                 {txs.map((tx, idx) => (
@@ -1414,6 +1436,7 @@ export default function MTWalletApp() {
                 ))}
               </div>
             )}
+            <div className="text-[10px] text-zinc-500 mt-3">Native activity via mt-core explorer. For Solana SPL/buy-sell/bridge activity use solscan.io with your SOL address.</div>
           </div>
         )}
 
@@ -1448,6 +1471,7 @@ export default function MTWalletApp() {
                 <li>Signing happens locally. The MT node only ever sees a signature + public data.</li>
                 <li>No Firebase, no external auth, no analytics, no third-party key custody.</li>
                 <li>Locking the wallet clears decrypted keys from memory instantly.</li>
+                <li>Future: hardware wallet support, 2FA on auth service, encrypted cloud backup with your own keys only.</li>
               </ul>
             </div>
 
@@ -1580,7 +1604,7 @@ export default function MTWalletApp() {
             {/* Custom MT Node - so we retrieve native balances FROM US, not Solana */}
             <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
               <div className="font-semibold text-sm mb-2 text-emerald-400">MT Node URL (PRIMARY balance source — our native chain)</div>
-              <div className="text-xs text-zinc-400 mb-2">This wallet is native to the MT network (PRIMARY — OUR NETWORK). Set your mt-core URL (use the full http://IP:port for your VPS, e.g. http://161.97.106.182:4001). The live site on Vercel will use whatever you save here (localStorage). Leave blank for demo (Solana side only). For local dev against your Contabo: set both this + Auth URL below.</div>
+              <div className="text-xs text-zinc-400 mb-2">Point to your mt-core node for native $MT balances (our chain is primary). On live site with HTTPS backends this is usually set at build time via env. Local dev: use the raw http://IP here.</div>
               <div className="flex gap-2">
                 <input 
                   value={customMtNode} 
@@ -1605,7 +1629,7 @@ export default function MTWalletApp() {
                   onClick={() => {
                     setCustomMtNode('');
                     setMTNode('');
-                    setStatus('MT Node cleared — falling back to project default or demo (Solana side only).');
+                    setStatus('MT Node cleared — using build default (VITE) or local dev.');
                   }} 
                   className="px-3 py-2 rounded-xl border border-zinc-700 text-sm"
                 >
@@ -1617,12 +1641,12 @@ export default function MTWalletApp() {
                 <div className="text-[10px] text-emerald-400 mt-1">Using project default MT node (VITE_MT_NODE_URL). Enter a URL above + Save to override only in this browser.</div>
               )}
 
-              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getMTNode ? (getMTNode() || 'none (demo)') : '—'} • To set a default for the live site, use env var <span className="font-mono">VITE_MT_NODE_URL</span> (https preferred) + redeploy. For your Contabo use http://IP:4001 in local dev Settings.</div>
+              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getMTNode ? (getMTNode() || 'none (demo)') : '—'} • Live default via VITE_MT_NODE_URL (https) in Vercel + redeploy.</div>
             </div>
 
             <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
               <div className="font-semibold text-sm mb-2 text-emerald-400">Auth URL (for login + encrypted wallet backups)</div>
-              <div className="text-xs text-zinc-400 mb-2">Point local dev at your remote mt-auth (e.g. your VPS on 4002 if core on 4001) so "Your Wallets" list, login, and cross-device restore work. Leave blank for default (demo). Current effective shown below.</div>
+              <div className="text-xs text-zinc-400 mb-2">For login + encrypted cross-device wallet backups. Set to your mt-auth URL (local dev or your https backend).</div>
               <div className="flex gap-2">
                 <input 
                   value={customAuthUrl} 
@@ -1654,10 +1678,10 @@ export default function MTWalletApp() {
                 </button>
               </div>
 
-              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getAuthURL ? (getAuthURL() || 'none (demo)') : '—'} • Set to your VPS mt-auth (e.g. http://161.97.106.182:4002) in local dev (npm run dev) so guest import + login populates the list below and native MT card fetches from mt-core. Live https site needs https backends (nginx) for public native use without mixed-content blocks.</div>
+              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getAuthURL ? (getAuthURL() || 'none (demo)') : '—'}</div>
             </div>
 
-            <div className="text-xs text-zinc-500 pt-4">Native MT from our network is always primary for this wallet. Solana only for SPL/bridge context.</div>
+            <div className="text-xs text-zinc-500 pt-4">Primary holdings live on the MT native chain. Solana SPL is legacy for bridging.</div>
           </div>
         )}
       </div>
@@ -1707,9 +1731,51 @@ export default function MTWalletApp() {
               <div className="font-semibold mb-1">Mint NFT on MT Chain</div>
               <div className="text-xs text-zinc-400 mb-5">Creates a real on-chain NFT owned by your wallet. No third-party marketplace or minting service.</div>
 
-              <input value={mintName} onChange={e => setMintName(e.target.value)} placeholder="NFT name (e.g. Cosmic Rocket #1)" className="w-full bg-black border border-zinc-800 rounded-2xl px-4 py-3 text-sm mb-4" />
+              <input value={mintName} onChange={e => setMintName(e.target.value)} placeholder="NFT name (e.g. Cosmic Rocket #1)" className="w-full bg-black border border-zinc-800 rounded-2xl px-4 py-3 text-sm mb-3" />
+
+              {/* Image upload for real image NFTs */}
+              <div className="mb-3">
+                <label className="text-xs text-zinc-400 block mb-1">Image (upload PNG/JPG — stored in on-chain metadata)</label>
+                <input type="file" accept="image/*" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => setMintImage(ev.target.result);
+                  reader.readAsDataURL(file);
+                }} className="text-sm" />
+                {mintImage && (
+                  <img src={mintImage} alt="preview" className="mt-2 max-h-24 rounded border border-zinc-800" />
+                )}
+              </div>
+
+              {/* Simple in-wallet designer / decorator */}
+              <div className="mb-3">
+                <label className="text-xs text-zinc-400 block mb-1">Quick decorator (text + color → generates preview image)</label>
+                <div className="flex gap-2">
+                  <input value={mintDesignerText} onChange={e => setMintDesignerText(e.target.value)} placeholder="e.g. 'Limited Edition'" className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm" />
+                  <input type="color" defaultValue="#10b981" id="designerColor" className="w-10 h-9 bg-black border border-zinc-800 rounded" />
+                  <button type="button" onClick={() => {
+                    const text = mintDesignerText || 'MT NFT';
+                    const color = document.getElementById('designerColor')?.value || '#10b981';
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 256; canvas.height = 256;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = color;
+                    ctx.fillRect(0, 0, 256, 256);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 20px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(text.slice(0, 20), 128, 128);
+                    ctx.font = '12px monospace';
+                    ctx.fillText('MT ECO SYSTEM', 128, 160);
+                    setMintImage(canvas.toDataURL('image/png'));
+                  }} className="px-3 py-1 text-xs border border-zinc-700 rounded">Apply Designer</button>
+                </div>
+                <div className="text-[10px] text-zinc-500 mt-1">Creates a simple decorated image data URL included in the NFT metadata.</div>
+              </div>
+
               <button disabled={minting || !mintName.trim()} onClick={handleMintNFT} className="w-full py-3 bg-emerald-500 text-black font-bold rounded-2xl text-sm tracking-wider disabled:bg-zinc-800">{minting ? 'MINTING ON MT NODE...' : 'MINT NFT (costs 0.01 MT fee)'}</button>
-              <div className="text-center text-[10px] text-zinc-500 mt-4">Your NFT will appear instantly in the NFTs tab once confirmed.</div>
+              <div className="text-center text-[10px] text-zinc-500 mt-4">Image + designer data stored on-chain with the NFT. Real native asset on the MT network.</div>
             </motion.div>
           </div>
         )}

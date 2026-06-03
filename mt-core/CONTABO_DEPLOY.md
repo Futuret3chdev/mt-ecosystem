@@ -266,47 +266,35 @@ journalctl -u mt-core -f
 If it fails to start, the status and logs will tell you exactly why (usually .env issue, permission, or node not found).
 ```
 
-## 5. Expose safely (nginx recommended, since you run many services)
+## 5. Expose safely with HTTPS (nginx + certbot) — REQUIRED for live site to show real native MT
 
 Your VPS likely already has nginx for the games.
 
-Add a server block for mt-core (reverse proxy + SSL).
+**To make the PUBLIC live https://infinite-wallet.vercel.app show real NATIVE MT balances by default (no mixed content, no per-user http IP Settings needed):**
 
-Example `/etc/nginx/sites-available/mt-core`:
+Use the ready-made configs in `mt-core/nginx/`.
 
-```nginx
-server {
-    listen 80;
-    server_name core.yourdomain.com;   # or use IP temporarily
-
-    location / {
-        proxy_pass http://127.0.0.1:4000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-Enable:
+See the full copy-paste guide:
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/mt-core /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
+cat mt-core/nginx/README.md
 ```
 
-Then get SSL:
+It covers:
+- mt-core.conf (for :4001) and mt-auth.conf (for :4002)
+- server_name subdomains (core.yourdomain.com + auth.yourdomain.com — point A records to the VPS IP)
+- Enabling sites
+- certbot for free TLS
+- Updating CORS_ORIGINS in both .env files (include the new https domains + vercel + localhost)
+- Restarting the services
+- Setting VITE_MT_NODE_URL=https://core.yourdomain.com and VITE_AUTH_URL in Vercel project env vars
+- Redeploy
 
-```bash
-sudo certbot --nginx -d core.yourdomain.com
-```
+After that, the live production wallet will use your real mt-core as the default for the NATIVE MT (PRIMARY) card and mt-auth for accounts/backups.
 
-If you don't have a domain yet for it, you can use the VPS IP directly first for testing (but update CORS, and note that the live HTTPS wallet will hit Mixed Content blocks with plain HTTP — see the wallet connection section below for testing workaround using local dev server).
+(For local dev testing you can still override via the in-app Settings using the raw http://IP:4001 etc.)
+
+If you don't have extra subdomains yet, the README has notes. Using the bare VPS IP for HTTPS is not practical for Let's Encrypt + browser trust.
 
 ## 6. Test it
 
@@ -326,36 +314,18 @@ curl -X POST http://core.yourdomain.com/faucet \
 curl http://core.yourdomain.com/account/YOUR_TEST_MT_ADDRESS_HERE
 ```
 
-## 7. Connect from the live wallet
+## 7. After HTTPS setup: live site uses real native MT by default
 
-**Critical for the live HTTPS wallet:** The Vercel site is served over HTTPS. Modern browsers block "mixed content" — i.e., HTTPS page fetching HTTP APIs. You **must** put mt-core behind HTTPS (via nginx + certbot as below) for the live site to work without errors.
+Once you have the nginx + certbot + VITE_ env vars set in Vercel (see the mt-core/nginx/README.md), the public live site will:
 
-On the live wallet (https://infinite-wallet.vercel.app):
+- Default to your https mt-core for the big NATIVE MT (PRIMARY — OUR NETWORK) card.
+- Default to your https mt-auth for login + "Your Wallets" / encrypted backups.
 
-- Go to **Settings** tab
-- Find "MT Node URL (PRIMARY balance source — our native chain)"
-- Paste the **HTTPS** URL once you have nginx + certbot: e.g. `https://core.yourdomain.com` 
-- For quick testing only: you can run the wallet locally with `npm run dev` (HTTP) and point it at `http://YOUR_IP:4001` (mt-core) + Auth URL `http://YOUR_IP:4002`. The live site (https) will still need HTTPS backends (nginx+certbot) or will block mixed content.
+No more "MT node unavailable" or mixed content on the live demo. Users see real on-chain native balances for wallets that have funds on the MT chain.
 
-- Save
+Local developers can still override via Settings (localStorage takes precedence).
 
-The native MT card will now talk to your real mt-core on Contabo (no more mixed content blocks or localhost refused).
-
-Use the faucet button (it appears when a node is configured; we relaxed the "local only" gate for self-hosted nodes). Or manually POST to /faucet as shown.
-
-To fund the wallet address 63NQwG9YbgSQrBM4EqwYagnqc3pzKayTAC5KBtdKGSSX (or the MT addr shown in the list for that wallet):
-
-- The MT address for the wallet is shown in the list as "MT: ..." for Test Account etc. Use that as the "address" for faucet.
-
-To fund the wallet address 63NQwG9YbgSQrBM4EqwYagnqc3pzKayTAC5KBtdKGSSX (or the MT addr shown in the list for that wallet):
-
-- The MT address for the wallet is shown in the list as "MT: ..." for Test Account etc. Use that as the "address" for faucet.
-
-Note: The address string for a wallet's native MT and its Solana SOL addr is the **same** because of how we derive from seed. But they live on different chains.
-
-You sent SPL on Solana → shows in "SOLANA $MT (SPL)" side card.
-
-You will send native MT on your mt-core → shows in big "NATIVE MT" card.
+The Solana SPL side card remains for legacy/bridge context (the $MT token you sent on Solana). Primary holdings and new activity should be on the native MT network.
 
 ## 8. Firewall on Contabo
 

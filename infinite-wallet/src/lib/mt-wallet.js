@@ -40,6 +40,15 @@ export function getDefaultMTNode() {
   return null;
 }
 
+export function getDefaultAuthURL() {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      return import.meta.env.VITE_AUTH_URL || null;
+    }
+  } catch (_) {}
+  return null;
+}
+
 export function getMTNode() {
   if (typeof window === 'undefined') return 'http://localhost:4000';
   let local = localStorage.getItem('mt_custom_mt_node');
@@ -88,7 +97,9 @@ export function getAuthURL() {
     }
     return local;
   }
-  if (window.location.hostname.includes('vercel.app')) return null; // demo on live
+  const fromEnv = getDefaultAuthURL();
+  if (fromEnv) return fromEnv;
+  if (window.location.hostname.includes('vercel.app')) return null; // demo only if no VITE_AUTH_URL
   return 'http://localhost:4001';
 }
 
