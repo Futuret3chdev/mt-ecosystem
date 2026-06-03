@@ -34,6 +34,8 @@ import {
   getCustomSolanaRpc,
   setCustomSolanaRpc,
   clearSolanaBalanceCache,
+  getMoralisApiKey,
+  setMoralisApiKey,
 
   // new auth + multi
   AUTH_URL,
@@ -97,6 +99,7 @@ export default function MTWalletApp() {
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('#10b981'); // default emerald
   const [customSolRpc, setCustomSolRpc] = useState(getCustomSolanaRpc() || '');
+  const [moralisKey, setMoralisKey] = useState(getMoralisApiKey() || '');
 
   // Ref to always have the latest wallet for refreshAll (avoids stale closure when switching wallets)
   const latestWalletRef = useRef(null);
@@ -987,6 +990,27 @@ export default function MTWalletApp() {
                                 className="ml-1 text-[9px] underline text-emerald-300">force sync</button>
                             </div>
                           )}
+                          {!solAddr && activeWalletId === w.id && solAddress && (
+                            <div className="text-[10px] font-mono text-blue-400 truncate">
+                              SOL (active): {solAddress.slice(0,8)}...
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); copy(solAddress, 'Solana address'); }} 
+                                className="ml-1 text-[9px] underline text-blue-300">copy</button>
+                              <button 
+                                onClick={async (e) => { 
+                                  e.stopPropagation(); 
+                                  try {
+                                    clearSolanaBalanceCache();
+                                    const bal = await fetchSolanaMTBalance(solAddress);
+                                    setSolMTBalance(bal);
+                                    setStatus(`Queried on-chain Solana $MT: ${bal}`);
+                                  } catch(err) {
+                                    setStatus('Query failed: ' + err.message);
+                                  }
+                                }} 
+                                className="ml-1 text-[9px] underline text-emerald-300">force sync</button>
+                            </div>
+                          )}
                         </div>
                         <div className="flex gap-1 items-center flex-shrink-0" onClick={e => e.stopPropagation()}>
                           <button onClick={() => activateWalletEntry(w)} className="text-xs px-2.5 py-0.5 rounded bg-emerald-500 text-black">ACTIVATE</button>
@@ -1342,6 +1366,42 @@ export default function MTWalletApp() {
                   Reset
                 </button>
               </div>
+            </div>
+
+            <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
+              <div className="font-semibold text-sm mb-2">Moralis API Key (for reliable $MT balances &amp; price)</div>
+              <div className="text-xs text-zinc-400 mb-2">Your bot key works great for this. Paste it here — used for per-wallet SPL balances (better than public RPCs for mainnet reads).</div>
+              <div className="flex gap-2">
+                <input 
+                  type="password"
+                  value={moralisKey} 
+                  onChange={e => setMoralisKey(e.target.value)} 
+                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." 
+                  className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono" 
+                />
+                <button 
+                  onClick={() => {
+                    setMoralisApiKey(moralisKey);
+                    clearSolanaBalanceCache();
+                    setStatus('Moralis key saved. Use force sync to refresh balances.');
+                  }} 
+                  className="px-4 py-2 rounded-xl bg-emerald-500 text-black text-sm font-bold"
+                >
+                  Save
+                </button>
+                <button 
+                  onClick={() => {
+                    setMoralisKey('');
+                    setMoralisApiKey('');
+                    clearSolanaBalanceCache();
+                    setStatus('Moralis key cleared. Falling back to public RPCs.');
+                  }} 
+                  className="px-3 py-2 rounded-xl border border-zinc-700 text-sm"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="text-[10px] text-orange-400/70 mt-1">Note: Key is stored only in your browser localStorage. For production, proxy through your own backend.</div>
             </div>
 
             <div className="text-xs text-zinc-500 pt-4">MT Node: {MT_NODE || 'demo (Solana only)'} • All fees ultra-low and fixed. Future developer APIs + social connect endpoints will be self-hosted.</div>

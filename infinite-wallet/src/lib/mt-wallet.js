@@ -344,11 +344,89 @@ export function setCustomSolanaRpc(url) {
   _currentRpcIndex = 0;
 }
 
+// Moralis integration for reliable Solana $MT balances and price (user's bot key works well)
+// WARNING: exposing API key in client is not ideal for prod (rate limits, security). 
+// For live demo it's useful. Prefer backend proxy for real deployment.
+export function getMoralisApiKey() {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('mt_moralis_api_key') || null;
+}
+
+export function setMoralisApiKey(key) {
+  if (typeof window === 'undefined') return;
+  const trimmed = (key || '').trim();
+  if (trimmed) {
+    localStorage.setItem('mt_moralis_api_key', trimmed);
+  } else {
+    localStorage.removeItem('mt_moralis_api_key');
+  }
+}
+
+const MORALIS_SOLANA_GATEWAY = 'https://solana-gateway.moralis.io';
+const MORALIS_DEEP_INDEX = 'https://deep-index.moralis.io/api/v2.2';
+
+export async function fetchSolanaMTBalanceMoralis(solanaPublicKeyStr, moralisKey) {
+  if (!moralisKey) return null;
+  try {
+    const url = `${MORALIS_SOLANA_GATEWAY}/account/mainnet/${solanaPublicKeyStr}/tokens?tokenAddresses=${SOL_MT_MINT.toBase58()}`;
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/json', 'X-Api-Key': moralisKey }
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.warn('Moralis balance error', res.status, text);
+      return null;
+    }
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      const token = data[0];
+      // Moralis returns balance as string in smallest units, with decimals info
+      const raw = token.balance || '0';
+      const dec = token.decimals || 6;
+      return Number(raw) / Math.pow(10, dec);
+    }
+    return 0;
+  } catch (e) {
+    console.warn('Moralis balance fetch failed', e.message);
+    return null;
+  }
+}
+
+export async function fetchTokenPriceMoralis(moralisKey) {
+  if (!moralisKey) return null;
+  try {
+    const url = `${MORALIS_SOLANA_GATEWAY}/token/mainnet/${SOL_MT_MINT.toBase58()}/price`;
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/json', 'X-Api-Key': moralisKey }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      price: parseFloat(data.usdPrice || 0),
+      name: data.name,
+      symbol: data.symbol,
+    };
+  } catch (e) {
+    console.warn('Moralis price fetch failed', e.message);
+    return null;
+  }
+}
+
 export async function fetchSolanaMTBalance(solanaPublicKeyStr) {
   // Check cache first
   const cached = _solBalanceCache.get(solanaPublicKeyStr);
   if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS) {
     return cached.balance;
+  }
+
+  const moralisKey = getMoralisApiKey();
+  if (moralisKey) {
+    const bal = await fetchSolanaMTBalanceMoralis(solanaPublicKeyStr, moralisKey);
+    if (bal !== null) {
+      _solBalanceCache.set(solanaPublicKeyStr, { balance: bal, ts: Date.now() });
+      return bal;
+    }
+    // fall through to RPC if Moralis failed
   }
 
   // Try all RPCs on 403/key errors
