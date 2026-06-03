@@ -271,7 +271,10 @@ export async function sendMT(fromWallet, toAddress, amount, currentNonce) {
 /**
  * Solana $MT (SPL) helpers - for current holdings + future bridge
  */
-import { Connection, PublicKey, LAMPORTS_PER_SOL, Keypair } from '@solana/web3.js';
+import { 
+  Connection, PublicKey, LAMPORTS_PER_SOL, Keypair, 
+  VersionedTransaction, Transaction 
+} from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 
 const SOLANA_RPC = 'https://api.mainnet-beta.solana.com'; // or devnet for test
@@ -535,4 +538,95 @@ export async function importWalletAsEntry(mnemonic, name = 'Imported Wallet', pa
     encryptedPayload,
     createdAt: Date.now(),
   };
+}
+
+/**
+ * Solana $MT Buy/Sell using Jupiter (executed inside the wallet)
+ * We use Jupiter API for quotes and tx construction, but signing and sending
+ * happens 100% inside this wallet with the user's Solana keypair.
+ * This keeps the UX "within the wallet" without redirecting the user.
+ */
+export const JUPITER_QUOTE_API = 'https://quote-api.jup.ag/v6/quote';
+export const JUPITER_SWAP_API = 'https://quote-api.jup.ag/v6/swap';
+
+export const SOL_MINT = 'So11111111111111111111111111111111111111112';
+export const MT_SOLANA_MINT = 'ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump';
+
+export async function fetchJupiterQuote({ inputMint, outputMint, amount, slippageBps = 100 }) {
+  const params = new URLSearchParams({
+    inputMint,
+    outputMint,
+    amount: amount.toString(),
+    slippageBps: slippageBps.toString(),
+    onlyDirectRoutes: 'false',
+  });
+  const res = await fetch(`${JUPITER_QUOTE_API}?${params}`);
+  if (!res.ok) throw new Error('Failed to get quote from Jupiter');
+  return res.json();
+}
+
+export async function fetchJupiterSwapTransaction(quoteResponse, userPublicKey) {
+  const res = await fetch(JUPITER_SWAP_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      quoteResponse,
+      userPublicKey: userPublicKey.toString(),
+      wrapAndUnwrapSol: true,
+      dynamicComputeUnitLimit: true,
+      prioritizationFeeLamports: 'auto',
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to get swap transaction');
+  }
+  return res.json();
+}
+
+export async function executeJupiterSwap(quoteResponse, wallet, connection = null) {
+  if (!wallet || !wallet.solanaSeed) {
+    throw new Error('No Solana key available in active wallet');
+  }
+
+  const solKeypair = Keypair.fromSeed(wallet.solanaSeed);
+  const userPublicKey = solKeypair.publicKey;
+
+  const swapResponse = await fetchJupiterSwapTransaction(quoteResponse, userPublicKey);
+
+  const { swapTransaction } = swapResponse;
+
+  const txBuffer = Buffer.from(swapTransaction, 'base64');
+
+  let transaction;
+  try {
+    transaction = VersionedTransaction.deserialize(txBuffer);
+  } catch (e) {
+    // fallback for legacy
+    transaction = Transaction.from(txBuffer);
+  }
+
+  // Sign the transaction
+  if (transaction instanceof VersionedTransaction) {
+    transaction.sign([solKeypair]);
+  } else {
+    transaction.sign(solKeypair);
+  }
+
+  const conn = connection || getSolConnection();
+
+  // Send and confirm
+  const signature = await conn.sendRawTransaction(transaction.serialize(), {
+    skipPreflight: false,
+    preflightCommitment: 'confirmed',
+  });
+
+  await conn.confirmTransaction(signature, 'confirmed');
+
+  return { signature, swapResponse };
+}
+
+export function getSolanaKeypair(wallet) {
+  if (!wallet || !wallet.solanaSeed) return null;
+  return Keypair.fromSeed(wallet.solanaSeed);
 }

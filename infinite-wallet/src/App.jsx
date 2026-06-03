@@ -26,6 +26,11 @@ import {
   fetchSolanaMTBalance,
   fetchSolanaSOLBalance,
   deriveSolanaKeypairFromSeed,
+  SOL_MINT,
+  MT_SOLANA_MINT,
+  fetchJupiterQuote,
+  executeJupiterSwap,
+  getSolanaKeypair,
 
   // new auth + multi
   AUTH_URL,
@@ -103,6 +108,14 @@ export default function MTWalletApp() {
   const [sendTo, setSendTo] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [sending, setSending] = useState(false);
+
+  // Trade / Swap states (in-wallet Jupiter swap for Solana $MT)
+  const [swapFrom, setSwapFrom] = useState('SOL');
+  const [swapTo, setSwapTo] = useState('MT');
+  const [swapAmount, setSwapAmount] = useState('');
+  const [swapQuote, setSwapQuote] = useState(null);
+  const [swapping, setSwapping] = useState(false);
+  const [swapError, setSwapError] = useState('');
 
   // Receive QR
   const [qrDataUrl, setQrDataUrl] = useState('');
@@ -729,28 +742,120 @@ export default function MTWalletApp() {
           </div>
         )}
 
-        {/* BUY / SELL / TRADE - real live DEX links, nothing fake */}
+        {/* BUY / SELL - fully in-wallet (Jupiter powered but executed inside MT Wallet) */}
         {activeTab === 'trade' && (
-          <div className="max-w-2xl mx-auto space-y-6">
-            <div className="text-center">
+          <div className="max-w-xl mx-auto">
+            <div className="text-center mb-6">
               <div className="font-semibold text-2xl">Buy &amp; Sell $MT</div>
-              <div className="text-sm text-zinc-400 mt-1">Live on Solana • Real liquidity via Jupiter &amp; Raydium</div>
+              <div className="text-sm text-zinc-400 mt-1">Executed 100% inside this wallet • Powered by Jupiter for best rates on Solana</div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <a href="https://jup.ag/swap/SOL-ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump" target="_blank" rel="noreferrer" className="block rounded-3xl border border-emerald-800 bg-zinc-950 p-6 hover:border-emerald-500 transition">
-                <div className="font-semibold text-lg">Buy $MT</div>
-                <div className="text-sm text-zinc-400 mt-2">Swap SOL for $MT on Jupiter (best rates, live order books)</div>
-                <div className="mt-4 text-emerald-400 text-sm">Open Jupiter →</div>
-              </a>
-              <a href="https://raydium.io/swap/?inputMint=sol&outputMint=ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump" target="_blank" rel="noreferrer" className="block rounded-3xl border border-zinc-700 bg-zinc-950 p-6 hover:border-zinc-500 transition">
-                <div className="font-semibold text-lg">Sell $MT</div>
-                <div className="text-sm text-zinc-400 mt-2">Swap $MT back to SOL on Raydium</div>
-                <div className="mt-4 text-emerald-400 text-sm">Open Raydium →</div>
-              </a>
-            </div>
+            <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 space-y-5">
+              {/* From */}
+              <div>
+                <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                  <span>From</span>
+                  <span>Balance: {swapFrom === 'SOL' ? solSOLBalance.toFixed(4) : solMTBalance.toFixed(2)}</span>
+                </div>
+                <div className="flex gap-2">
+                  <select value={swapFrom} onChange={e => { setSwapFrom(e.target.value); setSwapQuote(null); }} className="bg-black border border-zinc-700 rounded-xl px-3 py-2 text-sm">
+                    <option value="SOL">SOL</option>
+                    <option value="MT">$MT (Solana)</option>
+                  </select>
+                  <input 
+                    type="number" 
+                    value={swapAmount} 
+                    onChange={e => { setSwapAmount(e.target.value); setSwapQuote(null); }} 
+                    placeholder="0.00" 
+                    className="flex-1 bg-black border border-zinc-700 rounded-xl px-3 py-2 text-xl font-mono" 
+                  />
+                </div>
+              </div>
 
-            <div className="text-xs text-center text-zinc-500">All trades are real on-chain Solana transactions. Use the address from your active wallet in Portfolio.</div>
+              {/* To */}
+              <div>
+                <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                  <span>To (estimated)</span>
+                </div>
+                <div className="flex gap-2">
+                  <select value={swapTo} onChange={e => { setSwapTo(e.target.value); setSwapQuote(null); }} className="bg-black border border-zinc-700 rounded-xl px-3 py-2 text-sm">
+                    <option value="MT">$MT (Solana)</option>
+                    <option value="SOL">SOL</option>
+                  </select>
+                  <div className="flex-1 bg-black border border-zinc-700 rounded-xl px-3 py-2 text-xl font-mono text-emerald-400">
+                    {swapQuote ? (Number(swapQuote.outAmount) / 1e6).toFixed(4) : '—'}
+                  </div>
+                </div>
+              </div>
+
+              {swapQuote && (
+                <div className="text-xs bg-black/60 p-3 rounded-xl font-mono space-y-1 text-zinc-400">
+                  <div>Price Impact: {swapQuote.priceImpactPct || '0'}%</div>
+                  <div>Route: {swapQuote.routePlan?.length || 1} hop(s)</div>
+                  <div>Slippage: 1%</div>
+                </div>
+              )}
+
+              {swapError && <div className="text-red-400 text-xs">{swapError}</div>}
+
+              <div className="flex gap-3">
+                <button 
+                  onClick={async () => {
+                    setSwapError('');
+                    setSwapQuote(null);
+                    if (!swapAmount || !wallet) {
+                      setSwapError('Enter amount and activate a wallet with Solana keys');
+                      return;
+                    }
+                    try {
+                      const inputMint = swapFrom === 'SOL' ? SOL_MINT : MT_SOLANA_MINT;
+                      const outputMint = swapTo === 'MT' ? MT_SOLANA_MINT : SOL_MINT;
+                      const amount = Math.floor(Number(swapAmount) * (swapFrom === 'SOL' ? 1e9 : 1e6));
+
+                      const quote = await fetchJupiterQuote({
+                        inputMint, outputMint, amount, slippageBps: 100
+                      });
+                      setSwapQuote(quote);
+                    } catch (e) {
+                      setSwapError('Quote failed: ' + e.message);
+                    }
+                  }}
+                  disabled={!swapAmount || swapping}
+                  className="flex-1 py-3 rounded-2xl border border-zinc-700 hover:bg-zinc-900 text-sm font-semibold disabled:opacity-50"
+                >
+                  Get Quote
+                </button>
+
+                <button 
+                  onClick={async () => {
+                    setSwapError('');
+                    if (!swapQuote || !wallet) return;
+
+                    setSwapping(true);
+                    try {
+                      const result = await executeJupiterSwap(swapQuote, wallet);
+
+                      setStatus(`Swap successful! Tx: ${result.signature.slice(0,8)}...`);
+                      setSwapQuote(null);
+                      setSwapAmount('');
+                      setTimeout(refreshAll, 1500);
+                    } catch (e) {
+                      setSwapError('Swap failed: ' + e.message);
+                    } finally {
+                      setSwapping(false);
+                    }
+                  }}
+                  disabled={!swapQuote || swapping}
+                  className="flex-1 py-3 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider disabled:opacity-50"
+                >
+                  {swapping ? 'Swapping...' : 'Confirm Swap (in-wallet)'}
+                </button>
+              </div>
+
+              <div className="text-[10px] text-center text-zinc-500">
+                The entire swap (quote → tx construction → signing → send) happens inside this wallet using your Solana keys. No redirects.
+              </div>
+            </div>
           </div>
         )}
 
