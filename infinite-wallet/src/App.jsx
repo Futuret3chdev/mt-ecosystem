@@ -554,7 +554,9 @@ export default function MTWalletApp() {
         if (idx >= 0) {
           list[idx] = { ...list[idx], solanaPublicKey: derivedSol };
           setMyWallets(list);
-          saveLocalWallets(list);
+          if (!isLoggedIn) {
+            saveLocalWallets(list);
+          }
         }
       }
 
@@ -614,28 +616,17 @@ export default function MTWalletApp() {
       return;
     }
     try {
+      // When logged in, ONLY use the server-backed wallets for THIS account.
+      // Do not merge localList -- local_wallets_v2 is global on device and would leak wallets from other accounts/guests.
+      // This enforces isolation: each logged-in account only sees its own backed-up wallets from mt-auth.
       const serverList = await (await import('./lib/mt-wallet')).fetchBackedUpWallets() || [];
-      const localList = getLocalWallets();
-      // Merge server (authoritative for this account) + any local caches, dedup by address.
-      // This ensures "old wallets" the user created under this account (or imported locally) are visible.
-      const byPk = new Map();
-      [...serverList, ...localList].forEach(w => {
-        const pk = w.publicKey || w.address;
-        if (pk && !byPk.has(pk)) {
-          byPk.set(pk, w);
-        } else if (pk) {
-          // prefer server version if duplicate
-          if (serverList.some(s => (s.publicKey || s.address) === pk)) {
-            byPk.set(pk, w); // will be overwritten by server if present
-          }
-        }
-      });
-      const merged = Array.from(byPk.values());
-      setMyWallets(merged);
+      setMyWallets(serverList);
     } catch (e) {
-      // On fetch error (e.g. mixed content on live before https), fall back to local so user still sees their wallets
-      // (the strict "no other accounts" is mainly enforced by server list when fetch succeeds)
-      setMyWallets(getLocalWallets());
+      // Fetch failed (e.g. auth server unreachable, mixed content, bad token) -- show empty for this account.
+      // Do NOT fall back to local (which may contain other accounts' wallets).
+      // User can logout to see local/guest wallets, or fix connection.
+      console.warn('loadMyWallets: failed to fetch from auth server for current account, showing empty list', e);
+      setMyWallets([]);
     }
   }
 
@@ -648,7 +639,9 @@ export default function MTWalletApp() {
     list[idx] = updated;
 
     setMyWallets(list);
-    saveLocalWallets(list); // for guest or local cache
+    if (!isLoggedIn) {
+      saveLocalWallets(list); // only for pure guest/local -- do not pollute with account wallets
+    }
 
     if (isLoggedIn && getAuthToken() && getAuthURL()) {
       try {
@@ -689,9 +682,12 @@ export default function MTWalletApp() {
         !!getAuthToken()
       );
       const fullEntry = { ...entry, encryptedData: encryptedPayload };
-      addOrUpdateLocalWallet(fullEntry);
+      // Do NOT add to global local_wallets_v2 when backing up to account -- that would leak to other logins on same device.
+      // The server list (fetched on loadMyWallets) is the source of truth for this account.
       setMyWallets(prev => [...prev, fullEntry]);
       await activateWalletEntry(fullEntry, pwd);
+      // Refresh from server to get authoritative ids (server uses uuid, client create uses 'w_') and confirm backup.
+      await loadMyWallets();
     } catch (e) {
       setStatus('Create wallet failed: ' + e.message);
     }
