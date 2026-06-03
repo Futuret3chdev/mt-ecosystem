@@ -749,9 +749,16 @@ export function saveLocalWallets(wallets) {
 
 export function addOrUpdateLocalWallet(walletEntry) {
   const list = getLocalWallets();
-  const idx = list.findIndex(w => w.id === walletEntry.id);
-  if (idx >= 0) list[idx] = walletEntry;
-  else list.push(walletEntry);
+  let idx = list.findIndex(w => w.id === walletEntry.id);
+  if (idx < 0 && walletEntry.publicKey) {
+    // Dedup by address too (prevents duplicate entries when re-importing the same seed/account)
+    idx = list.findIndex(w => w.publicKey === walletEntry.publicKey || w.address === walletEntry.publicKey);
+  }
+  if (idx >= 0) {
+    list[idx] = { ...list[idx], ...walletEntry };
+  } else {
+    list.push(walletEntry);
+  }
   saveLocalWallets(list);
   return list;
 }

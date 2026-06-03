@@ -380,8 +380,12 @@ export default function MTWalletApp() {
         createdAt: Date.now(),
       };
       addOrUpdateLocalWallet(localEntry);
-      setMyWallets(prev => [...prev.filter(x => x.id !== localEntry.id), localEntry]);
-      setActiveWalletId(localEntry.id);
+      // Use the (deduped) local list so re-importing same seed doesn't create second entry
+      const updated = getLocalWallets();
+      setMyWallets(updated);
+      // activate the (possibly pre-existing) entry for this pk
+      const target = updated.find(x => x.publicKey === localEntry.publicKey) || localEntry;
+      setActiveWalletId(target.id);
 
       setWallet(w);
       setIsUnlocked(true);
@@ -642,10 +646,10 @@ export default function MTWalletApp() {
     }
     try {
       const list = await (await import('./lib/mt-wallet')).fetchBackedUpWallets();
-      setMyWallets(list);
+      setMyWallets(list || []);
     } catch (e) {
-      // no server or not logged - use local
-      setMyWallets(getLocalWallets());
+      // Logged in but couldn't reach auth server: show empty (do NOT fall back to local/guest wallets from other accounts)
+      setMyWallets([]);
     }
   }
 
@@ -1097,78 +1101,84 @@ export default function MTWalletApp() {
                   </button>
                 </div>
                 <div className="space-y-2 mt-2">
-                  {(myWallets.length ? myWallets : getLocalWallets()).map(w => {
-                    const accent = w.color || '#10b981';
-                    const mtAddr = w.publicKey || w.address;
-                    const solAddr = w.solanaPublicKey;
-                    return (
-                      <div 
-                        key={w.id} 
-                        onClick={() => activateWalletEntry(w)}
-                        className={`flex justify-between items-center p-3 rounded-2xl border cursor-pointer hover:bg-zinc-900/50 ${activeWalletId === w.id ? 'border-emerald-500 bg-emerald-950/20' : 'border-zinc-800'}`}
-                        style={{ borderLeft: `4px solid ${accent}` }}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium flex items-center gap-2">
-                            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{background: accent}} />
-                            {w.name}
+                  {(() => {
+                    const walletsToShow = isLoggedIn ? myWallets : (myWallets.length ? myWallets : getLocalWallets());
+                    return walletsToShow.map((w) => {
+                      const accent = w.color || '#10b981';
+                      const mtAddr = w.publicKey || w.address;
+                      const solAddr = w.solanaPublicKey;
+                      return (
+                        <div 
+                          key={w.id} 
+                          onClick={() => activateWalletEntry(w)}
+                          className={`flex justify-between items-center p-3 rounded-2xl border cursor-pointer hover:bg-zinc-900/50 ${activeWalletId === w.id ? 'border-emerald-500 bg-emerald-950/20' : 'border-zinc-800'}`}
+                          style={{ borderLeft: `4px solid ${accent}` }}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium flex items-center gap-2">
+                              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{background: accent}} />
+                              {w.name}
+                            </div>
+                            <div className="text-[10px] font-mono text-zinc-500 mt-0.5 truncate">
+                              MT: {mtAddr ? mtAddr.slice(0,8) + '...' : '—'}
+                              <button 
+                                onClick={async (e) => { 
+                                  e.stopPropagation(); 
+                                  await forceSyncNativeForEntry(w.id, mtAddr); 
+                                }} 
+                                className="ml-1 text-[9px] underline text-emerald-300">force sync native</button>
+                            </div>
+                            {(() => {
+                              // For the active wallet, always make the Solana force sync visible,
+                              // even if the persisted entry is old and missing solanaPublicKey.
+                              // Use persisted if present, else the currently derived one for the active wallet.
+                              const isActive = activeWalletId === w.id;
+                              const displaySol = solAddr || (isActive ? solAddress : null);
+                              if (!displaySol) return null;
+                              const label = solAddr ? 'SOL:' : (isActive ? 'SOL (active):' : null);
+                              if (!label) return null;
+                              return (
+                                <div className="text-[10px] font-mono text-blue-400 truncate">
+                                  {label} {displaySol.slice(0,8)}...
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); copy(displaySol, 'Solana address'); }} 
+                                    className="ml-1 text-[9px] underline text-blue-300">copy</button>
+                                  <button 
+                                    onClick={async (e) => { 
+                                      e.stopPropagation(); 
+                                      try {
+                                        clearSolanaBalanceCache();
+                                        const bal = await fetchSolanaMTBalance(displaySol);
+                                        setSolMTBalance(bal);
+                                        setStatus(`Queried on-chain Solana $MT (SPL) for this addr: ${bal}`);
+                                      } catch(err) {
+                                        setStatus('Query failed: ' + err.message);
+                                      }
+                                    }} 
+                                    className="ml-1 text-[9px] underline text-emerald-300">force sync SPL</button>
+                                </div>
+                              );
+                            })()}
                           </div>
-                          <div className="text-[10px] font-mono text-zinc-500 mt-0.5 truncate">
-                            MT: {mtAddr ? mtAddr.slice(0,8) + '...' : '—'}
+                          <div className="flex gap-1 items-center flex-shrink-0" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => activateWalletEntry(w)} className="text-xs px-2.5 py-0.5 rounded bg-emerald-500 text-black">ACTIVATE</button>
                             <button 
-                              onClick={async (e) => { 
-                                e.stopPropagation(); 
-                                await forceSyncNativeForEntry(w.id, mtAddr); 
+                              onClick={() => {
+                                setEditingWalletId(w.id);
+                                setEditName(w.name || 'Wallet');
+                                setEditColor(w.color || '#10b981');
                               }} 
-                              className="ml-1 text-[9px] underline text-emerald-300">force sync native</button>
+                              className="text-xs px-1.5 py-0.5 rounded border border-zinc-700 hover:bg-zinc-900">✎</button>
+                            {isLoggedIn && getAuthToken() && getAuthURL() && <button onClick={async () => { await (await import('./lib/mt-wallet')).deleteBackedUpWallet(w.id); await loadMyWallets(); }} className="text-xs px-1 text-red-400">×</button>}
                           </div>
-                          {(() => {
-                            // For the active wallet, always make the Solana force sync visible,
-                            // even if the persisted entry is old and missing solanaPublicKey.
-                            // Use persisted if present, else the currently derived one for the active wallet.
-                            const isActive = activeWalletId === w.id;
-                            const displaySol = solAddr || (isActive ? solAddress : null);
-                            if (!displaySol) return null;
-                            const label = solAddr ? 'SOL:' : (isActive ? 'SOL (active):' : null);
-                            if (!label) return null;
-                            return (
-                              <div className="text-[10px] font-mono text-blue-400 truncate">
-                                {label} {displaySol.slice(0,8)}...
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); copy(displaySol, 'Solana address'); }} 
-                                  className="ml-1 text-[9px] underline text-blue-300">copy</button>
-                                <button 
-                                  onClick={async (e) => { 
-                                    e.stopPropagation(); 
-                                    try {
-                                      clearSolanaBalanceCache();
-                                      const bal = await fetchSolanaMTBalance(displaySol);
-                                      setSolMTBalance(bal);
-                                      setStatus(`Queried on-chain Solana $MT (SPL) for this addr: ${bal}`);
-                                    } catch(err) {
-                                      setStatus('Query failed: ' + err.message);
-                                    }
-                                  }} 
-                                  className="ml-1 text-[9px] underline text-emerald-300">force sync SPL</button>
-                              </div>
-                            );
-                          })()}
                         </div>
-                        <div className="flex gap-1 items-center flex-shrink-0" onClick={e => e.stopPropagation()}>
-                          <button onClick={() => activateWalletEntry(w)} className="text-xs px-2.5 py-0.5 rounded bg-emerald-500 text-black">ACTIVATE</button>
-                          <button 
-                            onClick={() => {
-                              setEditingWalletId(w.id);
-                              setEditName(w.name || 'Wallet');
-                              setEditColor(w.color || '#10b981');
-                            }} 
-                            className="text-xs px-1.5 py-0.5 rounded border border-zinc-700 hover:bg-zinc-900">✎</button>
-                          {isLoggedIn && getAuthToken() && getAuthURL() && <button onClick={async () => { await (await import('./lib/mt-wallet')).deleteBackedUpWallet(w.id); await loadMyWallets(); }} className="text-xs px-1 text-red-400">×</button>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {myWallets.length === 0 && getLocalWallets().length === 0 && (
+                      );
+                    });
+                  })()}
+                  {(() => {
+                    const count = isLoggedIn ? myWallets.length : (myWallets.length ? myWallets.length : getLocalWallets().length);
+                    return count === 0;
+                  })() && (
                     <div className="text-xs text-zinc-500">No wallets yet. Use the + button (or restart app for guest create flow).</div>
                   )}
                 </div>
