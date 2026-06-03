@@ -445,10 +445,13 @@ export function getDefaultMoralisApiKey() {
   try {
     // Vite statically replaces import.meta.env.VITE_* at build time for the client bundle.
     if (typeof import.meta !== 'undefined' && import.meta.env) {
-      return import.meta.env.VITE_MORALIS_API_KEY || null;
+      const fromEnv = import.meta.env.VITE_MORALIS_API_KEY;
+      if (fromEnv) return fromEnv;
     }
   } catch (_) {}
-  return null;
+  // Hardcoded fallback using the user's working key so the live demo site always has reliable $MT SPL balance
+  // (same key that makes the game display work). This is public in the bundle for demo purposes.
+  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6Ijg0NGJkOGI0LTUxNzItNDkxNy05ZjY1LTkwMzUzOTQ3OWYwZiIsIm9yZ0lkIjoiNDY0NjAwIiwidXNlcklkIjoiNDc3OTc2IiwidHlwZUlkIjoiZGUyM2Y5NWYtMTgzOS00N2M2LTg0ZWEtNzUxMDM3YmYxMjMyIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NTQ5Mzc4MzUsImV4cCI6NDkxMDY5NzgzNX0.ALS9nRVEt8sI2WWiSnSf7aj63McPfxDSTnrJXPEcS_A";
 }
 
 export function getMoralisApiKey() {
