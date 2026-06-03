@@ -359,17 +359,27 @@ sudo ufw allow 4000/tcp   # only if not behind nginx
 
 Since you have nginx, 4000 can be localhost only.
 
-## 9. Updates later
+## 9. Updates later (now recommended via git)
 
-On VPS:
+Since the full project is on GitHub:
+
+On VPS (as root or after sudo -u mtcore):
 
 ```bash
 cd /opt/mt-ecosystem
 git pull
 cd mt-core
-npm install --production
+chown -R mtcore:mtcore .
+npm install --production   # if package.json changed
 sudo systemctl restart mt-core
+sudo systemctl status mt-core --no-pager
+journalctl -u mt-core -n 10 --no-pager
 ```
+
+This replaces manual scp for code changes. Keep your .env and data/ (they are gitignored).
+```
+
+Also update the initial clone note.
 
 ## 10. Also consider moving mt-auth
 
