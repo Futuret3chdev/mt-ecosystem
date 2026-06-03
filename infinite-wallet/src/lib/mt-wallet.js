@@ -286,17 +286,35 @@ import {
 } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 
-const SOLANA_RPC = 'https://rpc.ankr.com/solana'; // more reliable public endpoint than public mainnet-beta (avoids frequent 403s)
+// List of public Solana mainnet RPCs. We try them in order on 403/rate limit.
+const SOLANA_RPCS = [
+  'https://api.mainnet-beta.solana.com',
+  'https://solana-api.projectserum.com',
+  'https://rpc.ankr.com/solana',
+];
+
 const SOL_MT_MINT = new PublicKey('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump');
 
 let _solConnection = null;
+let _currentRpcIndex = 0;
+
 export function getSolConnection() {
-  if (!_solConnection) _solConnection = new Connection(SOLANA_RPC, 'confirmed');
+  const rpc = SOLANA_RPCS[_currentRpcIndex] || SOLANA_RPCS[0];
+  if (!_solConnection || _solConnection.rpcEndpoint !== rpc) {
+    _solConnection = new Connection(rpc, 'confirmed');
+  }
   return _solConnection;
 }
 
-export async function fetchSolanaMTBalance(solanaPublicKeyStr, retries = 2) {
-  for (let attempt = 0; attempt <= retries; attempt++) {
+function switchToNextSolanaRpc() {
+  _currentRpcIndex = (_currentRpcIndex + 1) % SOLANA_RPCS.length;
+  _solConnection = null; // force recreate
+  console.warn('Switched Solana RPC due to error, now using', SOLANA_RPCS[_currentRpcIndex]);
+}
+
+export async function fetchSolanaMTBalance(solanaPublicKeyStr) {
+  // Try all RPCs once on 403/key errors
+  for (let rpcAttempt = 0; rpcAttempt < SOLANA_RPCS.length; rpcAttempt++) {
     try {
       const conn = getSolConnection();
       const owner = new PublicKey(solanaPublicKeyStr);
@@ -306,39 +324,48 @@ export async function fetchSolanaMTBalance(solanaPublicKeyStr, retries = 2) {
       const balance = Number(account.amount) / 10 ** decimals;
       return balance;
     } catch (e) {
-      if (attempt === retries) {
-        // Final attempt: fallback to getTokenAccountsByOwner
-        try {
-          const conn = getSolConnection();
-          const owner = new PublicKey(solanaPublicKeyStr);
-          const res = await conn.getTokenAccountsByOwner(owner, { mint: SOL_MT_MINT });
-          if (res.value.length > 0) {
-            const pubkey = res.value[0].pubkey;
-            const account = await getAccount(conn, pubkey);
-            const decimals = 6;
-            return Number(account.amount) / 10 ** decimals;
-          }
-          return 0;
-        } catch (e2) {
-          console.warn('Solana $MT balance fetch failed for', solanaPublicKeyStr, e2.message || e.message);
-          return 0;
-        }
+      const msg = (e.message || '').toLowerCase();
+      if (msg.includes('403') || msg.includes('forbidden') || msg.includes('api key')) {
+        switchToNextSolanaRpc();
+        continue;
       }
-      // Wait a bit before retry (exponential backoff for rate limits/403s)
-      await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+      // other error, try fallback for this RPC
+      try {
+        const conn = getSolConnection();
+        const owner = new PublicKey(solanaPublicKeyStr);
+        const res = await conn.getTokenAccountsByOwner(owner, { mint: SOL_MT_MINT });
+        if (res.value.length > 0) {
+          const pubkey = res.value[0].pubkey;
+          const account = await getAccount(conn, pubkey);
+          const decimals = 6;
+          return Number(account.amount) / 10 ** decimals;
+        }
+        return 0;
+      } catch (e2) {
+        console.warn('Solana $MT balance fetch failed for', solanaPublicKeyStr, e2.message || e.message);
+        return 0;
+      }
     }
   }
   return 0;
 }
 
 export async function fetchSolanaSOLBalance(solanaPublicKeyStr) {
-  try {
-    const conn = getSolConnection();
-    const lamports = await conn.getBalance(new PublicKey(solanaPublicKeyStr));
-    return lamports / LAMPORTS_PER_SOL;
-  } catch {
-    return 0;
+  for (let rpcAttempt = 0; rpcAttempt < SOLANA_RPCS.length; rpcAttempt++) {
+    try {
+      const conn = getSolConnection();
+      const lamports = await conn.getBalance(new PublicKey(solanaPublicKeyStr));
+      return lamports / LAMPORTS_PER_SOL;
+    } catch (e) {
+      const msg = (e.message || '').toLowerCase();
+      if (msg.includes('403') || msg.includes('forbidden') || msg.includes('api key')) {
+        switchToNextSolanaRpc();
+        continue;
+      }
+      return 0;
+    }
   }
+  return 0;
 }
 
 // Derive Solana Keypair (and address) from the same seed used for MT
@@ -432,38 +459,51 @@ async function authFetch(path, options = {}) {
     ...(options.headers || {}),
   };
 
+  // On production (Vercel) we have no public auth backend yet -> go straight to demo fallback
+  if (!AUTH_URL) {
+    return getDemoAuthResponse(path, options);
+  }
+
   try {
     const res = await fetch(`${AUTH_URL}${path}`, { ...options, headers });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Auth request failed');
     return data;
   } catch (e) {
-    // DEMO FALLBACK for live Vercel previews (no localhost auth server)
-    // Simulates real email+phone account + multi-wallet without real backend.
-    if (path === '/signup') {
-      const { email, phone } = JSON.parse(options.body || '{}');
-      const demoCode = '123456'; // always works in demo
-      return { ok: true, message: 'Demo account created', demoVerificationCode: demoCode, needsVerification: true };
-    }
-    if (path === '/verify') {
-      const demoToken = 'demo_' + Date.now();
-      const demoUser = { id: 'demo', email: 'demo@mt', phone: '+10000000000' };
-      return { ok: true, token: demoToken, user: demoUser };
-    }
-    if (path === '/login') {
-      const demoToken = 'demo_' + Date.now();
-      const demoUser = { id: 'demo', email: 'demo@mt', phone: '+10000000000' };
-      return { ok: true, token: demoToken, user: demoUser };
-    }
-    if (path === '/me') {
-      return { id: 'demo', email: 'demo@mt.local', phone: '+10000000000' };
-    }
-    if (path === '/wallets' || path.startsWith('/wallets/')) {
-      // local only in demo
-      return [];
-    }
-    throw e;
+    return getDemoAuthResponse(path, options);
   }
+}
+
+function getDemoAuthResponse(path, options) {
+  // DEMO FALLBACK for live Vercel previews (no public auth server)
+  // Simulates real email+phone account + multi-wallet without real backend.
+  if (path === '/signup') {
+    const { email, phone } = JSON.parse(options.body || '{}');
+    const demoCode = '123456'; // always works in demo
+    return { ok: true, message: 'Demo account created', demoVerificationCode: demoCode, needsVerification: true };
+  }
+  if (path === '/verify') {
+    const demoToken = 'demo_' + Date.now();
+    const demoUser = { id: 'demo', email: 'demo@mt', phone: '+10000000000' };
+    return { ok: true, token: demoToken, user: demoUser };
+  }
+  if (path === '/login') {
+    const demoToken = 'demo_' + Date.now();
+    const demoUser = { id: 'demo', email: 'demo@mt', phone: '+10000000000' };
+    return { ok: true, token: demoToken, user: demoUser };
+  }
+  if (path === '/me') {
+    return { id: 'demo', email: 'demo@mt.local', phone: '+10000000000' };
+  }
+  if (path === '/wallets') {
+    return [];
+  }
+  if (path.startsWith('/wallets/')) {
+    // backup or delete - succeed silently in demo
+    return { ok: true };
+  }
+  // For backup etc in demo, just succeed silently
+  return { ok: true };
 }
 
 export async function signup(email, phone, password) {

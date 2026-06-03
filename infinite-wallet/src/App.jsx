@@ -978,7 +978,7 @@ export default function MTWalletApp() {
                               setEditColor(w.color || '#10b981');
                             }} 
                             className="text-xs px-1.5 py-0.5 rounded border border-zinc-700 hover:bg-zinc-900">✎</button>
-                          {isLoggedIn && getAuthToken() && <button onClick={async () => { await (await import('./lib/mt-wallet')).deleteBackedUpWallet(w.id); await loadMyWallets(); }} className="text-xs px-1 text-red-400">×</button>}
+                          {isLoggedIn && getAuthToken() && AUTH_URL && <button onClick={async () => { await (await import('./lib/mt-wallet')).deleteBackedUpWallet(w.id); await loadMyWallets(); }} className="text-xs px-1 text-red-400">×</button>}
                         </div>
                       </div>
                     );
