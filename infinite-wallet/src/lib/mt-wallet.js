@@ -831,13 +831,44 @@ function getDemoAuthResponse(path, options) {
     return { id: 'demo', email: 'demo@mt.local', phone: '+10000000000' };
   }
   if (path === '/wallets') {
-    return [];
+    const key = 'demo_wallets_v2';
+    try {
+      return JSON.parse(localStorage.getItem(key) || '[]');
+    } catch (e) { return []; }
   }
-  if (path.startsWith('/wallets/')) {
-    // backup or delete - succeed silently in demo
+  if (path === '/wallets/backup') {
+    const body = JSON.parse(options.body || '{}');
+    const key = 'demo_wallets_v2';
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem(key) || '[]'); } catch {}
+    const existingIdx = list.findIndex(w => w.name === body.name && w.address === body.address);
+    const entry = {
+      id: 'demo_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+      name: body.name,
+      encryptedData: body.encryptedData,
+      address: body.address || null,
+      solanaPublicKey: body.solanaPublicKey || null,
+      color: body.color || '#10b981',
+      createdAt: Date.now(),
+    };
+    if (existingIdx >= 0) {
+      list[existingIdx] = entry;
+    } else {
+      list.push(entry);
+    }
+    localStorage.setItem(key, JSON.stringify(list));
+    return { ok: true, wallet: entry };
+  }
+  if (path.startsWith('/wallets/') && options.method === 'DELETE') {
+    const id = path.split('/').pop();
+    const key = 'demo_wallets_v2';
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem(key) || '[]'); } catch {}
+    const filtered = list.filter(w => w.id !== id);
+    localStorage.setItem(key, JSON.stringify(filtered));
     return { ok: true };
   }
-  // For backup etc in demo, just succeed silently
+  // For other in demo, succeed
   return { ok: true };
 }
 
@@ -923,15 +954,18 @@ export async function createNewWalletForAccount(name = 'Main Wallet', password, 
 
   if (backupToCloud && getAuthToken()) {
     try {
-      await backupWallet({
+      const backupRes = await backupWallet({
         name,
         encryptedData: encryptedPayload,
         address: w.publicKey,  // MT address
         solanaPublicKey,       // important for real $MT balance display and queries
         color: '#10b981'
       });
+      if (backupRes && backupRes.wallet && backupRes.wallet.id) {
+        entry.id = backupRes.wallet.id; // use the canonical server id (uuid) so lists match after loadMyWallets
+      }
     } catch (e) {
-      console.warn('Cloud backup failed (will retry later)', e);
+      console.warn('Cloud backup failed (will retry later or on refresh)', e);
     }
   }
 
