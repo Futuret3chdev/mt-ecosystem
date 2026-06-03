@@ -75,16 +75,26 @@ body {
     var(--background);
 }
 
-/* Marquee for bridge chains (slow, readable, pause on hover) */
+/* Marquee for bridge chains - pure floating logos, very slow, gentle dancing bobs ("side to side going past happy") */
 @keyframes marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
 }
 
 .marquee-scroll {
-  animation: marquee 120s linear infinite;
+  animation: marquee 240s linear infinite;
 }
 
 .marquee-scroll:hover {
   animation-play-state: paused;
+}
+
+@keyframes logo-dance {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3.5px); }
+}
+
+.logo-dance {
+  animation: logo-dance 2.8s ease-in-out infinite;
+  will-change: transform;
 }

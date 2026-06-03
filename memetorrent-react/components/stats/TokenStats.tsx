@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { getTokenStats, getTopHolders, MTStatsRaw, Holder } from '@/lib/api';
+import { motion } from 'framer-motion';
+import { getTokenStats, MTStatsRaw } from '@/lib/api';
 
 // 100+ chains we plan to bridge with. Binance prominently included. Real images (not just names).
 const BRIDGE_CHAINS: string[] = [
@@ -79,14 +79,12 @@ function getChainLogo(chain: string): string {
 
 export default function TokenStats() {
   const [stats, setStats] = useState<MTStatsRaw | null>(null);
-  const [holders, setHolders] = useState<Holder[]>([]);
-  const [showHolders, setShowHolders] = useState(false);
-  const [loadingHolders, setLoadingHolders] = useState(false);
 
-  // Filter out the trailing note from the scrolling marquee list
+  // Only chains that have actual logo images (no names at all in the UI)
   const displayChains = BRIDGE_CHAINS.filter(
     (c) => !c.toLowerCase().includes('more') && !c.toLowerCase().includes('dozens')
   );
+  const logoChains = displayChains.filter((c) => !!getChainLogo(c));
 
   useEffect(() => {
     getTokenStats().then(setStats).catch(console.error);
@@ -96,23 +94,6 @@ export default function TokenStats() {
 
     return () => clearInterval(i);
   }, []);
-
-  const loadHolders = async () => {
-    if (holders.length > 0) {
-      setShowHolders(!showHolders);
-      return;
-    }
-    setLoadingHolders(true);
-    try {
-      const h = await getTopHolders();
-      setHolders(h);
-      setShowHolders(true);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingHolders(false);
-    }
-  };
 
   if (!stats) return null;
 
@@ -128,8 +109,7 @@ export default function TokenStats() {
         className="max-w-6xl mx-auto px-6"
       >
         <div
-          className="rounded-3xl p-8 border border-white/10 bg-white/[0.015] cursor-pointer"
-          onClick={loadHolders}
+          className="rounded-3xl p-8 border border-white/10 bg-white/[0.015]"
           style={{
             background: 'var(--card)',
             border: '1px solid var(--border)',
@@ -139,7 +119,7 @@ export default function TokenStats() {
             <div>
               <div className="text-emerald-400 text-xs tracking-[3px] mb-1">LIVE ON SOLANA • PUMP.FUN</div>
               <div className="text-4xl font-semibold tracking-tight">MT Token Stats</div>
-              <div className="text-xs opacity-60 mt-1">Tap for top holders • Auto-refreshes every 15s</div>
+              <div className="text-xs opacity-60 mt-1">Live from DexScreener • Auto-refreshes every 15s</div>
             </div>
             <div className="text-right text-xs opacity-60">
               {stats.name} ({stats.symbol})<br />
@@ -156,62 +136,27 @@ export default function TokenStats() {
           <div className="mt-6 pt-6 border-t border-white/10 flex flex-wrap gap-4 text-xs opacity-70">
             <div>24h Buy Vol: {stats.total_buy_volume}</div>
             <div>24h Sell Vol: {stats.total_sell_volume}</div>
-            <div className="text-emerald-400">Click box for live top 10 holders →</div>
           </div>
 
-          <AnimatePresence>
-            {showHolders && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="mt-6 overflow-hidden"
-              >
-                <div className="text-xs uppercase tracking-widest mb-3 opacity-60">Top 10 Holders (on-chain)</div>
-                {loadingHolders ? (
-                  <div className="text-sm opacity-60">Loading holders from Solana RPC...</div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
-                    {holders.length > 0 ? holders.map((h, i) => (
-                      <div key={i} className="flex justify-between bg-black/40 px-3 py-2 rounded-xl border border-white/5">
-                        <span className="truncate text-emerald-300/80">{h.address.slice(0, 6)}...{h.address.slice(-4)}</span>
-                        <span className="tabular-nums text-right">{h.uiAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                      </div>
-                    )) : <div className="opacity-60">No holder data (RPC fallback used)</div>}
-                  </div>
-                )}
-                <div className="text-[10px] mt-2 opacity-50">Data via Helius + public Solana RPCs (server-proxied) + DexScreener. Not financial advice.</div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Marquee of 100+ bridge chains - infinite possibilities (slowed way down, with real logos) */}
+          {/* Pure icon logos marquee - only actual logos, no names. Very slow floating + gentle dancing bobs */}
           <div className="mt-8 pt-6 border-t border-white/10 overflow-hidden">
             <div className="text-xs uppercase tracking-[3px] opacity-60 mb-3">COMING SOON: SELF-BUILT BRIDGES TO 100+ CHAINS</div>
-            <div className="relative flex overflow-hidden [mask-image:linear-gradient(to_right,transparent,white_10%,white_90%,transparent)]">
-              <div className="flex gap-6 text-sm opacity-80 whitespace-nowrap marquee-scroll">
-                {[...displayChains, ...displayChains].map((chain, idx) => {
+            <div className="relative flex overflow-hidden [mask-image:linear-gradient(to_right,transparent,white_10%,white_90%,transparent)] py-2">
+              <div className="flex gap-10 text-sm opacity-75 whitespace-nowrap marquee-scroll">
+                {[...logoChains, ...logoChains].map((chain, idx) => {
                   const logo = getChainLogo(chain);
+                  if (!logo) return null;
                   return (
-                    <span
+                    <img
                       key={idx}
-                      className="flex items-center gap-2 px-4 py-1 rounded-full border border-white/10 bg-white/5"
-                    >
-                      {logo ? (
-                        <img
-                          src={logo}
-                          alt=""
-                          className="w-4 h-4 rounded-full object-contain"
-                          onError={(e) => {
-                            // graceful fallback if CDN image 404s
-                            (e.currentTarget as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <span className="text-[10px] opacity-70">🔗</span>
-                      )}
-                      {chain}
-                    </span>
+                      src={logo}
+                      alt={chain}
+                      className="w-7 h-7 md:w-8 md:h-8 object-contain logo-dance"
+                      style={{ animationDelay: `-${((idx % 9) * 0.35)}s` }}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
                   );
                 })}
               </div>

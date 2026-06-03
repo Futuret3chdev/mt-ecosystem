@@ -46,23 +46,13 @@ export async function getTokenStats(): Promise<MTStatsRaw> {
   };
 }
 
+// Holders feature removed from the marketing UI (was causing public RPC 403/DNS errors in browser for some visitors).
+// Kept as empty for any legacy references; no more fake data or live RPC attempts from here.
 export type Holder = {
   address: string;
   uiAmount: number;
 };
 
 export async function getTopHolders(): Promise<Holder[]> {
-  // Delegate to our internal Next.js API route (/app/api/holders/route.ts).
-  // This keeps the Helius key + RPC logic server-side only (never in client bundle),
-  // avoids browser CORS/403 issues entirely, and still gets real on-chain top holders.
-  // Falls back to mocks inside the route if needed.
-  const res = await fetch('/api/holders', { cache: 'no-store' });
-  if (!res.ok) {
-    // last resort mock
-    return Array.from({ length: 5 }, (_, i) => ({
-      address: `DemoHolder${i + 1}...${Math.random().toString(36).slice(2, 6)}`,
-      uiAmount: 1000000 + Math.random() * 50000000,
-    }));
-  }
-  return res.json();
+  return [];
 }
