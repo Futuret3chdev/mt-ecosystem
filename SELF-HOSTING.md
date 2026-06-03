@@ -5,7 +5,7 @@ This is the recommended path for "our network" ownership.
 ## Recommended Architecture
 - **Backend services on Contabo VPS**:
   - mt-core (port 4000) - native chain
-  - mt-auth (port 4001) - accounts + encrypted wallet backups
+  - mt-auth (port 4002) - accounts + encrypted wallet backups (use 4001/4002 or free ports that don't collide)
 - **Frontend**:
   - Keep `infinite-wallet` on Vercel (easy) and point it at your VPS via env vars.
   - Or serve static build from VPS with nginx.
@@ -34,6 +34,8 @@ mkdir -p data
 cd ../mt-auth
 npm install
 mkdir -p data
+cp .env.example .env  # edit PORT=4002, CORS, DATA_DIR
+
 ```
 
 ## 3. Run with systemd (recommended over PM2 for simplicity)
@@ -60,7 +62,7 @@ RestartSec=10
 WantedBy=multi-user.target
 ```
 
-Similar for `mt-auth.service` (PORT=4001, same DATA_DIR pattern).
+Similar for `mt-auth.service` (PORT=4002 recommended, DATA_DIR=/opt/mt-ecosystem/mt-auth/data, WorkingDirectory for mt-auth, ExecStart node server.js).
 
 ```bash
 systemctl daemon-reload
@@ -75,7 +77,8 @@ server {
     server_name core.yourdomain.com auth.yourdomain.com;
 
     location / {
-        proxy_pass http://localhost:4000;  # or 4001 for auth
+        proxy_pass http://localhost:4001;  # mt-core; use 4002 for auth block / separate server_name
+
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -91,12 +94,16 @@ certbot --nginx -d core.yourdomain.com -d auth.yourdomain.com
 ```
 
 ## 5. Point the Wallet (Vercel)
-In your Vercel project for `infinite-wallet` set these Environment Variables (Production + Preview):
+In your Vercel project for `infinite-wallet` set these Environment Variables (Production + Preview) **only after** you have HTTPS endpoints (nginx+certbot):
 
 - `VITE_MT_NODE_URL=https://core.yourdomain.com`
 - `VITE_AUTH_URL=https://auth.yourdomain.com`
 
-Redeploy the wallet.
+Redeploy the wallet (or use the in-app Settings on the deployed site for per-browser override).
+
+For local dev testing against your VPS (no mixed content issue on http://localhost:5173):
+- Run `npm run dev` inside `infinite-wallet/`
+- In the app Settings tab set the http://IP:4001 and :4002 values (they persist in localStorage for that browser).
 
 Users can also manually set them in the in-app **Settings** (MT Node URL + it will persist in their browser).
 
@@ -118,9 +125,10 @@ cd mt-core && npm start
 # Terminal 2
 cd mt-auth && npm start
 
-# In browser wallet Settings:
-# MT Node URL: http://localhost:4000
-# (Auth is optional for basic use)
+# In browser wallet Settings (after `npm run dev` in infinite-wallet/):
+# MT Node URL: http://localhost:4000   (or 4001 if you set that for core)
+# Auth URL: http://localhost:4001      (or 4002)
+# (Auth is optional for basic use; required for login + backups + "Your Wallets" sync)
 ```
 
 Then use the faucet button or POST to /faucet.

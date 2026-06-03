@@ -1,0 +1,55 @@
+[Unit]
+Description=MT Auth - Account & Encrypted Wallet Backup Service
+After=network.target
+
+[Service]
+Type=simple
+# Use a dedicated low-privilege user (create with: useradd -m -s /bin/bash mtcore)
+User=mtcore
+Group=mtcore
+
+WorkingDirectory=/opt/mt-ecosystem/mt-auth
+
+# Best: use .env file (create from .env.example on VPS)
+EnvironmentFile=-/opt/mt-ecosystem/mt-auth/.env
+
+# Fallback direct env (uncomment and customize if not using .env file)
+# Environment=PORT=4002
+# Environment=CORS_ORIGINS=https://infinite-wallet.vercel.app,https://yourdomain.com
+# Environment=DATA_DIR=/opt/mt-ecosystem/mt-auth/data
+# Environment=NODE_ENV=production
+
+# === IMPORTANT: NODE PATH ===
+# Run these on your VPS FIRST to find the correct path:
+#   which node
+#   command -v node
+#   node --version
+#
+# Then replace the line below with the FULL PATH.
+# Common on plain Ubuntu: /usr/bin/node
+#
+# ExecStart=/usr/bin/node server.js
+#
+# Do NOT use "node" without full path in systemd.
+ExecStart=/usr/bin/node server.js
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# Security hardening (good practice on shared VPS)
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Resource limits (adjust based on your VPS)
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

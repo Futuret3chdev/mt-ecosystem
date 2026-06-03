@@ -335,7 +335,7 @@ On the live wallet (https://infinite-wallet.vercel.app):
 - Go to **Settings** tab
 - Find "MT Node URL (PRIMARY balance source — our native chain)"
 - Paste the **HTTPS** URL once you have nginx + certbot: e.g. `https://core.yourdomain.com` 
-- For quick testing only: you can run the wallet locally with `npm run dev` (HTTP) and point it at `http://YOUR_IP:4001`. The live site will still need HTTPS.
+- For quick testing only: you can run the wallet locally with `npm run dev` (HTTP) and point it at `http://YOUR_IP:4001` (mt-core) + Auth URL `http://YOUR_IP:4002`. The live site (https) will still need HTTPS backends (nginx+certbot) or will block mixed content.
 
 - Save
 
@@ -361,7 +361,8 @@ You will send native MT on your mt-core → shows in big "NATIVE MT" card.
 
 ```bash
 # If using ufw
-sudo ufw allow 4001/tcp   # only if not behind nginx
+sudo ufw allow 4001/tcp   # mt-core
+sudo ufw allow 4002/tcp   # mt-auth (adjust if you chose different ports)
 # Better: only allow from your IP for now, or rely on nginx
 ```
 
@@ -389,20 +390,138 @@ This replaces manual scp for code changes. Keep your .env and data/ (they are gi
 
 Also update the initial clone note.
 
-## 10. Also consider moving mt-auth
+## 10. Set up mt-auth (for "Backed up to your account", cross-device restore, "Your Wallets" list)
 
-For full cross-device + multiple wallets, do the same for mt-auth (port 4001, similar service file).
+mt-auth provides email/phone login + encrypted wallet backups (client-side encrypted, server never sees seeds).
 
-See the root SELF-HOSTING.md for more.
+Recommended: run it on a different port from mt-core, e.g. 4002 when core is on 4001.
 
-Once mt-core is running and wallet points to it, native balances will appear when you faucet or transfer on the native chain.
+### On VPS (after git clone or pull):
 
-Test with the specific wallet that has 63NQwG9Y... as its address.
+```bash
+cd /opt/mt-ecosystem/mt-auth
 
-Let me know the output of the health check or faucet, and we can iterate (e.g. if you want me to add rate limiting to faucet, better logging, etc.).
+# Install
+npm install --production
 
-You can also keep running other 200 games on the same VPS — just use different ports/domains.
+# Data dir
+mkdir -p data
+sudo chown -R mtcore:mtcore /opt/mt-ecosystem/mt-auth
 
-Good luck, this will make the native MT real on your infrastructure. 
+# Env (important for CORS + port)
+cp .env.example .env
+nano .env
+```
 
-Run the commands above on your VPS and report back any errors. I'll help debug with more tool-guided fixes if needed.
+Minimal .env:
+
+```
+PORT=4002
+CORS_ORIGINS=https://infinite-wallet.vercel.app,http://localhost:5173
+DATA_DIR=/opt/mt-ecosystem/mt-auth/data
+```
+
+### Install as systemd (persistent, Restart=always like mt-core)
+
+From inside `/opt/mt-ecosystem/mt-auth`:
+
+```bash
+# Copy the template (or create dir if missing after git)
+sudo cp systemd/mt-auth.service /etc/systemd/system/mt-auth.service || true
+```
+
+If cp fails (subfolder not present), use the tee block:
+
+```bash
+sudo tee /etc/systemd/system/mt-auth.service > /dev/null << 'EOL'
+[Unit]
+Description=MT Auth - Account & Encrypted Wallet Backup Service
+After=network.target
+
+[Service]
+Type=simple
+User=mtcore
+Group=mtcore
+
+WorkingDirectory=/opt/mt-ecosystem/mt-auth
+
+EnvironmentFile=-/opt/mt-ecosystem/mt-auth/.env
+
+# Fallbacks if no .env:
+# Environment=PORT=4002
+# Environment=CORS_ORIGINS=https://infinite-wallet.vercel.app
+# Environment=DATA_DIR=/opt/mt-ecosystem/mt-auth/data
+
+ExecStart=/usr/bin/node server.js
+
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+EOL
+```
+
+Then:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable mt-auth
+sudo systemctl start mt-auth
+
+sudo systemctl status mt-auth --no-pager
+journalctl -u mt-auth -n 20 --no-pager
+```
+
+### Firewall
+
+```bash
+sudo ufw allow 4002/tcp
+sudo ufw reload
+```
+
+### Test from your Windows machine (like you did for core)
+
+```powershell
+curl.exe -v --max-time 8 http://161.97.106.182:4002/health
+```
+
+Expect JSON with "service": "MT Auth", ok: true.
+
+Also test login flow from the wallet once you set the Auth URL.
+
+### Later updates for mt-auth (git workflow)
+
+```bash
+cd /opt/mt-ecosystem
+git pull
+cd mt-auth
+chown -R mtcore:mtcore .
+npm install --production
+sudo systemctl restart mt-auth
+sudo systemctl status mt-auth --no-pager
+```
+
+### Connect in wallet (local dev recommended for http://IP)
+
+In Settings (local `npm run dev` so no mixed-content):
+
+- Auth URL: http://161.97.106.182:4002
+- Save
+- Then login or use Guest + import seed — after login it will call loadMyWallets from your VPS mt-auth and populate "Your Wallets".
+- Same for create/import: they now call addOrUpdateLocalWallet so list shows immediately + native MT refresh works.
+
+For the **public live Vercel site** (https), http://IP calls will be blocked by browser. To make native MT + auth work on the public demo URL you need nginx + certbot for https front for both services, then set VITE_MT_NODE_URL and VITE_AUTH_URL in Vercel env (or user can try custom https in Settings on live). See nginx examples earlier in this doc.
+
+Now with both services under systemd + git pull friendly, your "NATIVE MT (PRIMARY — OUR NETWORK)" is fully self-hosted.

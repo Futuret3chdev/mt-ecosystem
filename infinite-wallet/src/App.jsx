@@ -1580,7 +1580,7 @@ export default function MTWalletApp() {
             {/* Custom MT Node - so we retrieve native balances FROM US, not Solana */}
             <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
               <div className="font-semibold text-sm mb-2 text-emerald-400">MT Node URL (PRIMARY balance source — our native chain)</div>
-              <div className="text-xs text-zinc-400 mb-2">This wallet is native to the MT network. Set your mt-core URL (use the full http://IP:port for your VPS, e.g. http://161.97.106.182:4001). The live site on Vercel will use whatever you save here. Leave blank for demo (Solana side only).</div>
+              <div className="text-xs text-zinc-400 mb-2">This wallet is native to the MT network (PRIMARY — OUR NETWORK). Set your mt-core URL (use the full http://IP:port for your VPS, e.g. http://161.97.106.182:4001). The live site on Vercel will use whatever you save here (localStorage). Leave blank for demo (Solana side only). For local dev against your Contabo: set both this + Auth URL below.</div>
               <div className="flex gap-2">
                 <input 
                   value={customMtNode} 
@@ -1617,12 +1617,12 @@ export default function MTWalletApp() {
                 <div className="text-[10px] text-emerald-400 mt-1">Using project default MT node (VITE_MT_NODE_URL). Enter a URL above + Save to override only in this browser.</div>
               )}
 
-              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getMTNode ? (getMTNode() || 'none (demo)') : '—'} • To set a default for the live site, use env var <span className="font-mono">VITE_MT_NODE_URL</span> + redeploy.</div>
+              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getMTNode ? (getMTNode() || 'none (demo)') : '—'} • To set a default for the live site, use env var <span className="font-mono">VITE_MT_NODE_URL</span> (https preferred) + redeploy. For your Contabo use http://IP:4001 in local dev Settings.</div>
             </div>
 
             <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
               <div className="font-semibold text-sm mb-2 text-emerald-400">Auth URL (for login + encrypted wallet backups)</div>
-              <div className="text-xs text-zinc-400 mb-2">Point local dev at your remote mt-auth (e.g. your VPS) so "Your Wallets" list and cross-device restore work the same as the live site. Leave blank for default.</div>
+              <div className="text-xs text-zinc-400 mb-2">Point local dev at your remote mt-auth (e.g. your VPS on 4002 if core on 4001) so "Your Wallets" list, login, and cross-device restore work. Leave blank for default (demo). Current effective shown below.</div>
               <div className="flex gap-2">
                 <input 
                   value={customAuthUrl} 
@@ -1654,7 +1654,7 @@ export default function MTWalletApp() {
                 </button>
               </div>
 
-              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getAuthURL ? (getAuthURL() || 'none (demo)') : '—'} • Set this to your VPS mt-auth URL (e.g. http://161.97.106.182:400X) in local dev to see the same backed-up "Your Wallets" as the live site after logging in.</div>
+              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getAuthURL ? (getAuthURL() || 'none (demo)') : '—'} • Set to your VPS mt-auth (e.g. http://161.97.106.182:4002) in local dev (npm run dev) so guest import + login populates the list below and native MT card fetches from mt-core. Live https site needs https backends (nginx) for public native use without mixed-content blocks.</div>
             </div>
 
             <div className="text-xs text-zinc-500 pt-4">Native MT from our network is always primary for this wallet. Solana only for SPL/bridge context.</div>
