@@ -538,7 +538,7 @@ export default function MTWalletApp() {
                         <QrCode className="w-4 h-4" /> RECEIVE
                       </button>
                     </div>
-                    {MT_NODE.includes('localhost') && (
+                    { (MT_NODE.includes('localhost') || (typeof window !== 'undefined' && window.location.hostname === 'localhost')) && (
                       <button
                         onClick={async () => {
                           try {
