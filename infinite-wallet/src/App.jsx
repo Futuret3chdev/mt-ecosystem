@@ -787,7 +787,7 @@ export default function MTWalletApp() {
           <div className="flex items-center gap-3 text-sm">
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-2xl text-xs font-mono text-zinc-400">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              {MT_NODE.replace('http://', '')}
+              {MT_NODE ? MT_NODE.replace('http://', '') : 'demo (Solana only)'}
             </div>
 
             {mtAddress && (
@@ -869,7 +869,7 @@ export default function MTWalletApp() {
                         <QrCode className="w-4 h-4" /> RECEIVE
                       </button>
                     </div>
-                    { (MT_NODE.includes('localhost') || (typeof window !== 'undefined' && window.location.hostname === 'localhost')) && (
+                    { (MT_NODE && MT_NODE.includes('localhost') || (typeof window !== 'undefined' && window.location.hostname === 'localhost')) && (
                       <button
                         onClick={async () => {
                           try {
@@ -1293,7 +1293,7 @@ export default function MTWalletApp() {
 
             <button onClick={handleDeleteVault} className="text-red-400 text-sm underline underline-offset-4">Permanently delete vault from this browser</button>
 
-            <div className="text-xs text-zinc-500 pt-4">MT Node: {MT_NODE} • All fees ultra-low and fixed. Future developer APIs + social connect endpoints will be self-hosted.</div>
+            <div className="text-xs text-zinc-500 pt-4">MT Node: {MT_NODE || 'demo (Solana only)'} • All fees ultra-low and fixed. Future developer APIs + social connect endpoints will be self-hosted.</div>
           </div>
         )}
       </div>
