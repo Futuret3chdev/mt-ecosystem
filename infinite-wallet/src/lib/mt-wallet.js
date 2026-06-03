@@ -286,8 +286,10 @@ import {
 } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 
-// List of public Solana mainnet RPCs. We try them in order on 403/rate limit.
+// List of public Solana mainnet RPCs (tried in order on errors like 403).
+// These are public and can be rate limited; for production use your own (e.g. Helius, QuickNode, Alchemy free tier).
 const SOLANA_RPCS = [
+  'https://solana.public-rpc.com',
   'https://api.mainnet-beta.solana.com',
   'https://solana-api.projectserum.com',
   'https://rpc.ankr.com/solana',
@@ -297,6 +299,10 @@ const SOL_MT_MINT = new PublicKey('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump'
 
 let _solConnection = null;
 let _currentRpcIndex = 0;
+
+// Simple in-memory cache for Solana balances to avoid hammering RPCs (keyed by address)
+const _solBalanceCache = new Map(); // addr -> {balance, ts}
+const CACHE_TTL_MS = 15000; // 15s cache for balances
 
 export function getSolConnection() {
   const rpc = SOLANA_RPCS[_currentRpcIndex] || SOLANA_RPCS[0];
@@ -313,7 +319,13 @@ function switchToNextSolanaRpc() {
 }
 
 export async function fetchSolanaMTBalance(solanaPublicKeyStr) {
-  // Try all RPCs once on 403/key errors
+  // Check cache first
+  const cached = _solBalanceCache.get(solanaPublicKeyStr);
+  if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS) {
+    return cached.balance;
+  }
+
+  // Try all RPCs on 403/key errors
   for (let rpcAttempt = 0; rpcAttempt < SOLANA_RPCS.length; rpcAttempt++) {
     try {
       const conn = getSolConnection();
@@ -322,6 +334,7 @@ export async function fetchSolanaMTBalance(solanaPublicKeyStr) {
       const account = await getAccount(conn, ata);
       const decimals = 6;
       const balance = Number(account.amount) / 10 ** decimals;
+      _solBalanceCache.set(solanaPublicKeyStr, { balance, ts: Date.now() });
       return balance;
     } catch (e) {
       const msg = (e.message || '').toLowerCase();
@@ -329,7 +342,7 @@ export async function fetchSolanaMTBalance(solanaPublicKeyStr) {
         switchToNextSolanaRpc();
         continue;
       }
-      // other error, try fallback for this RPC
+      // other error, try fallback getTokenAccountsByOwner for this RPC
       try {
         const conn = getSolConnection();
         const owner = new PublicKey(solanaPublicKeyStr);
@@ -338,12 +351,14 @@ export async function fetchSolanaMTBalance(solanaPublicKeyStr) {
           const pubkey = res.value[0].pubkey;
           const account = await getAccount(conn, pubkey);
           const decimals = 6;
-          return Number(account.amount) / 10 ** decimals;
+          const balance = Number(account.amount) / 10 ** decimals;
+          _solBalanceCache.set(solanaPublicKeyStr, { balance, ts: Date.now() });
+          return balance;
         }
         return 0;
       } catch (e2) {
         console.warn('Solana $MT balance fetch failed for', solanaPublicKeyStr, e2.message || e.message);
-        return 0;
+        // continue to next RPC or return 0 at end
       }
     }
   }
@@ -351,11 +366,19 @@ export async function fetchSolanaMTBalance(solanaPublicKeyStr) {
 }
 
 export async function fetchSolanaSOLBalance(solanaPublicKeyStr) {
+  const cacheKey = 'sol:' + solanaPublicKeyStr;
+  const cached = _solBalanceCache.get(cacheKey);
+  if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS) {
+    return cached.balance;
+  }
+
   for (let rpcAttempt = 0; rpcAttempt < SOLANA_RPCS.length; rpcAttempt++) {
     try {
       const conn = getSolConnection();
       const lamports = await conn.getBalance(new PublicKey(solanaPublicKeyStr));
-      return lamports / LAMPORTS_PER_SOL;
+      const bal = lamports / LAMPORTS_PER_SOL;
+      _solBalanceCache.set(cacheKey, { balance: bal, ts: Date.now() });
+      return bal;
     } catch (e) {
       const msg = (e.message || '').toLowerCase();
       if (msg.includes('403') || msg.includes('forbidden') || msg.includes('api key')) {

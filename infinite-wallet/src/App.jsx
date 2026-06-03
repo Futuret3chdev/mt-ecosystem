@@ -489,13 +489,27 @@ export default function MTWalletApp() {
       setMasterPassword(passwordToUse);
       setAccountPassword(''); // clear form
       setStatus(`Activated wallet: ${entry.name}`);
-      // refresh will be triggered by the useEffect on [wallet]
       generateQR(w.publicKey);
-      // Extra: directly query the stored solana addr for real $MT to ensure it shows even if main refresh has issues
+
+      // Backfill solanaPublicKey for this entry so the list shows SOL addr + force sync permanently (for old wallets created before the field was added)
+      const derivedSol = deriveSolanaKeypairFromSeed(w.solanaSeed).publicKey;
+      if (!entry.solanaPublicKey || entry.solanaPublicKey !== derivedSol) {
+        entry.solanaPublicKey = derivedSol;
+        const list = myWallets.length ? [...myWallets] : getLocalWallets();
+        const idx = list.findIndex(x => x.id === entry.id);
+        if (idx >= 0) {
+          list[idx] = { ...list[idx], solanaPublicKey: derivedSol };
+          setMyWallets(list);
+          saveLocalWallets(list);
+        }
+      }
+
+      // Directly query using the (now guaranteed) solana addr
       if (entry.solanaPublicKey) {
         try {
           const bal = await fetchSolanaMTBalance(entry.solanaPublicKey);
           setSolMTBalance(bal);
+          setStatus(`Activated. Solana $MT balance for this wallet: ${bal}`);
         } catch (e) { /* ignore */ }
       }
     } catch (e) {
