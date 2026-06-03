@@ -90,6 +90,9 @@ export default function MTWalletApp() {
   const [activeWalletId, setActiveWalletId] = useState(null);
   const [masterPassword, setMasterPassword] = useState(''); // in-memory only after login
   const [guestMode, setGuestMode] = useState(false); // for pure local use without account
+  const [editingWalletId, setEditingWalletId] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState('#10b981'); // default emerald
 
   // App state
   const [activeTab, setActiveTab] = useState('portfolio');
@@ -244,11 +247,13 @@ export default function MTWalletApp() {
       setConfirmPassword('');
       setShowCreate(false);
       // Add to local multi-wallets list for guest mode
+      const solKp = (await import('./lib/mt-wallet')).getSolanaKeypair ? (await import('./lib/mt-wallet')).getSolanaKeypair(w) : null;
       const localEntry = {
         id: 'local_' + Date.now().toString(36),
         name: 'Local Wallet',
         publicKey: w.publicKey,
-        encryptedData: localStorage.getItem('mt_vault_v1') || '', // the old single vault
+        solanaPublicKey: solKp ? solKp.publicKey.toBase58() : null,
+        encryptedData: localStorage.getItem('mt_vault_v1') || '',
         createdAt: Date.now(),
       };
       addOrUpdateLocalWallet(localEntry);
@@ -465,19 +470,55 @@ export default function MTWalletApp() {
   }
 
   async function loadMyWallets() {
-    if (!getAuthToken()) return;
+    if (!getAuthToken()) {
+      setMyWallets(getLocalWallets());
+      return;
+    }
     try {
       const list = await (await import('./lib/mt-wallet')).fetchBackedUpWallets();
       setMyWallets(list);
-      if (list.length > 0 && !activeWalletId) {
-        // auto activate first
-        // but we need the password - ask user or use master
-      }
     } catch (e) {
       // no server or not logged - use local
       setMyWallets(getLocalWallets());
     }
   }
+
+  async function saveWalletCustomization(id, newName, newColor) {
+    const list = myWallets.length ? [...myWallets] : [...getLocalWallets()];
+    const idx = list.findIndex(w => w.id === id);
+    if (idx === -1) return;
+
+    const updated = { ...list[idx], name: newName, color: newColor };
+    list[idx] = updated;
+
+    setMyWallets(list);
+    saveLocalWallets(list); // for guest or local cache
+
+    if (isLoggedIn && getAuthToken()) {
+      try {
+        const { backupWallet } = await import('./lib/mt-wallet');
+        await backupWallet({
+          name: newName,
+          encryptedData: updated.encryptedData,
+          address: updated.address || updated.publicKey,
+          color: newColor,
+        });
+      } catch (e) {
+        console.warn('Failed to sync customization to cloud', e);
+      }
+    }
+
+    setEditingWalletId(null);
+    setEditName('');
+    setEditColor('#10b981');
+    setStatus(`Updated ${newName}`);
+  }
+
+  const closeEdit = () => {
+    setEditingWalletId(null);
+    setEditName('');
+    setEditColor('#10b981');
+  };
 
   async function handleCreateAccountWallet() {
     if (!accountPassword) {
@@ -773,6 +814,12 @@ export default function MTWalletApp() {
               <div className="col-span-1 md:col-span-2 rounded-3xl bg-zinc-950 border border-zinc-800 p-8">
                 <div className="flex justify-between">
                   <div>
+                    {activeWalletId && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="inline-block w-2.5 h-2.5 rounded-full" style={{background: (myWallets.find(x=>x.id===activeWalletId)?.color) || '#10b981'}} />
+                        <span className="text-xs text-zinc-400">Active: {(myWallets.find(x=>x.id===activeWalletId)?.name) || 'Wallet'}</span>
+                      </div>
+                    )}
                     <div className="uppercase tracking-[2px] text-xs text-emerald-400 font-semibold">Native MT • On MT Chain</div>
                     <div className="mt-3 text-6xl font-black tabular-nums tracking-[-2.5px]">{mtBalance.toFixed(2)}</div>
                     <div className="text-emerald-400 text-xl font-semibold -mt-1">$MT</div>
@@ -847,23 +894,54 @@ export default function MTWalletApp() {
                   </button>
                 </div>
                 <div className="space-y-2 mt-2">
-                  {(myWallets.length ? myWallets : getLocalWallets()).map(w => (
-                    <div key={w.id} className={`flex justify-between items-center p-3 rounded-2xl border ${activeWalletId === w.id ? 'border-emerald-500 bg-emerald-950/20' : 'border-zinc-800'}`}>
-                      <div>
-                        <div className="font-medium">{w.name}</div>
-                        <div className="text-[10px] font-mono text-zinc-500">{(w.publicKey || '').slice(0,10)}...</div>
+                  {(myWallets.length ? myWallets : getLocalWallets()).map(w => {
+                    const accent = w.color || '#10b981';
+                    const mtAddr = w.publicKey || w.address;
+                    const solAddr = w.solanaPublicKey;
+                    return (
+                      <div 
+                        key={w.id} 
+                        onClick={() => activateWalletEntry(w)}
+                        className={`flex justify-between items-center p-3 rounded-2xl border cursor-pointer hover:bg-zinc-900/50 ${activeWalletId === w.id ? 'border-emerald-500 bg-emerald-950/20' : 'border-zinc-800'}`}
+                        style={{ borderLeft: `4px solid ${accent}` }}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium flex items-center gap-2">
+                            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{background: accent}} />
+                            {w.name}
+                          </div>
+                          <div className="text-[10px] font-mono text-zinc-500 mt-0.5 truncate">
+                            MT: {mtAddr ? mtAddr.slice(0,8) + '...' : '—'}
+                          </div>
+                          {solAddr && (
+                            <div className="text-[10px] font-mono text-blue-400 truncate">
+                              SOL: {solAddr.slice(0,8)}...
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); copy(solAddr, 'Solana address'); }} 
+                                className="ml-1 text-[9px] underline text-blue-300">copy</button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-1 items-center flex-shrink-0" onClick={e => e.stopPropagation()}>
+                          <button onClick={() => activateWalletEntry(w)} className="text-xs px-2.5 py-0.5 rounded bg-emerald-500 text-black">ACTIVATE</button>
+                          <button 
+                            onClick={() => {
+                              setEditingWalletId(w.id);
+                              setEditName(w.name || 'Wallet');
+                              setEditColor(w.color || '#10b981');
+                            }} 
+                            className="text-xs px-1.5 py-0.5 rounded border border-zinc-700 hover:bg-zinc-900">✎</button>
+                          {isLoggedIn && getAuthToken() && <button onClick={async () => { await (await import('./lib/mt-wallet')).deleteBackedUpWallet(w.id); await loadMyWallets(); }} className="text-xs px-1 text-red-400">×</button>}
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => activateWalletEntry(w)} className="text-xs px-3 py-1 rounded bg-emerald-500 text-black">ACTIVATE</button>
-                        {isLoggedIn && getAuthToken() && <button onClick={async () => { await (await import('./lib/mt-wallet')).deleteBackedUpWallet(w.id); await loadMyWallets(); }} className="text-xs px-2 text-red-400">Delete</button>}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {myWallets.length === 0 && getLocalWallets().length === 0 && (
                     <div className="text-xs text-zinc-500">No wallets yet. Use the + button (or restart app for guest create flow).</div>
                   )}
                 </div>
                 <div className="text-[10px] text-zinc-500 mt-3">{isLoggedIn ? 'Backed up to your account (encrypted). Login on any device.' : 'Local only to this browser.'}</div>
+                <div className="text-[10px] text-amber-400/80 mt-1">For real $MT or SOL: send to the SOL address of the specific wallet (copy from list). Native MT is for the custom chain (use faucet when running local node).</div>
               </div>
             )}
           </div>
@@ -1221,6 +1299,52 @@ export default function MTWalletApp() {
               <input value={mintName} onChange={e => setMintName(e.target.value)} placeholder="NFT name (e.g. Cosmic Rocket #1)" className="w-full bg-black border border-zinc-800 rounded-2xl px-4 py-3 text-sm mb-4" />
               <button disabled={minting || !mintName.trim()} onClick={handleMintNFT} className="w-full py-3 bg-emerald-500 text-black font-bold rounded-2xl text-sm tracking-wider disabled:bg-zinc-800">{minting ? 'MINTING ON MT NODE...' : 'MINT NFT (costs 0.01 MT fee)'}</button>
               <div className="text-center text-[10px] text-zinc-500 mt-4">Your NFT will appear instantly in the NFTs tab once confirmed.</div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Per-wallet customization modal: name, color, etc. */}
+      <AnimatePresence>
+        {editingWalletId && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" onClick={closeEdit}>
+            <motion.div initial={{ scale: 0.97, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} onClick={e => e.stopPropagation()} className="bg-zinc-950 border border-zinc-700 w-full max-w-sm rounded-3xl p-6">
+              <div className="font-semibold mb-4">Customize Wallet</div>
+
+              <label className="text-xs text-zinc-400 block mb-1">Name</label>
+              <input 
+                value={editName} 
+                onChange={e => setEditName(e.target.value)} 
+                className="w-full bg-black border border-zinc-800 rounded-2xl px-4 py-2 text-sm mb-4" 
+              />
+
+              <label className="text-xs text-zinc-400 block mb-1">Color</label>
+              <div className="flex items-center gap-3 mb-4">
+                <input 
+                  type="color" 
+                  value={editColor} 
+                  onChange={e => setEditColor(e.target.value)} 
+                  className="w-12 h-10 p-0 bg-transparent border border-zinc-800 rounded overflow-hidden" 
+                />
+                <div className="text-xs font-mono">{editColor}</div>
+                <div className="flex gap-1">
+                  {['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#14b8a6'].map(c => (
+                    <button key={c} onClick={() => setEditColor(c)} className="w-6 h-6 rounded border border-zinc-700" style={{background: c}} />
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-4">
+                <button onClick={closeEdit} className="flex-1 py-2 rounded-2xl border border-zinc-700 text-sm">Cancel</button>
+                <button 
+                  onClick={() => saveWalletCustomization(editingWalletId, editName.trim() || 'Wallet', editColor)} 
+                  className="flex-1 py-2 rounded-2xl bg-emerald-500 text-black font-bold text-sm"
+                >
+                  Save
+                </button>
+              </div>
+
+              <div className="text-[10px] text-zinc-500 mt-3 text-center">Customization is saved locally and synced to your account if logged in.</div>
             </motion.div>
           </div>
         )}

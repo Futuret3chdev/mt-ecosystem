@@ -475,12 +475,12 @@ export async function getMe() {
 
 /**
  * Backup current encrypted wallet data to the server (cross-device)
- * encryptedData = the full encrypted vault payload from encryptMnemonic
+ * Supports extra metadata like color for customization.
  */
-export async function backupWallet(name, encryptedData, address) {
+export async function backupWallet({ name, encryptedData, address, color }) {
   return authFetch('/wallets/backup', {
     method: 'POST',
-    body: JSON.stringify({ name, encryptedData, address }),
+    body: JSON.stringify({ name, encryptedData, address, color }),
   });
 }
 
@@ -507,10 +507,14 @@ export async function createNewWalletForAccount(name = 'Main Wallet', password, 
   const w = generateMTWallet();
   const encryptedPayload = await encryptMnemonic(w.mnemonic, password);
 
+  const solKp = Keypair.fromSeed(w.solanaSeed);
+  const solanaPublicKey = solKp.publicKey.toBase58();
+
   const entry = {
     id: 'w_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
     name,
-    publicKey: w.publicKey,
+    publicKey: w.publicKey,           // MT native address
+    solanaPublicKey,                  // Solana address for real $MT / SOL
     createdAt: Date.now(),
   };
 
@@ -531,10 +535,15 @@ export async function importWalletAsEntry(mnemonic, name = 'Imported Wallet', pa
   if (!bip39.validateMnemonic(mnemonic)) throw new Error('Invalid recovery phrase');
   const w = importMTWalletFromMnemonic(mnemonic);
   const encryptedPayload = await encryptMnemonic(mnemonic, password);
+
+  const solKp = Keypair.fromSeed(w.solanaSeed);
+  const solanaPublicKey = solKp.publicKey.toBase58();
+
   return {
     id: 'w_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
     name,
     publicKey: w.publicKey,
+    solanaPublicKey,
     encryptedPayload,
     createdAt: Date.now(),
   };
