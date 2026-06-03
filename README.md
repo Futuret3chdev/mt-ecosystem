@@ -68,22 +68,29 @@ This repo is set up to be easily deployed on Vercel for live previews and produc
 
 **Option A — Two separate Vercel projects (cleanest for custom domains)**
 
-1. Go to [vercel.com/new](https://vercel.com/new) and import this GitHub repository (`mt-ecosystem`).
+The projects were already created and deployed via Vercel CLI during setup.
+
+Current live previews (auto-updating from GitHub `main`):
+- **Marketing site**: https://memetorrent-react.vercel.app (or the project-specific one)
+- **MT Wallet**: https://infinite-wallet.vercel.app
+
+**Manual / re-deploy steps if needed:**
+
+1. Go to [vercel.com/new](https://vercel.com/new) → Import Git Repository → select `Futuret3chdev/mt-ecosystem`.
 
 2. **For the main site** (`memetorrent.futuret3ch.com.au`):
    - **Root Directory**: `memetorrent-react`
-   - Framework Preset: **Next.js** (auto-detected)
-   - Build Command: `npm run build`
-   - Output Directory: `.next` (default)
+   - Framework Preset: **Next.js**
    - Deploy.
 
 3. **For the wallet** (`wallet.futuret3ch.com.au`):
-   - Import the **same** GitHub repo again (create second project).
+   - Import the **same** repo as a second project.
    - **Root Directory**: `infinite-wallet`
-   - Framework Preset: **Vite** (auto-detected)
-   - Build Command: `npm run build`
+   - Framework Preset: **Vite**
    - Output Directory: `dist`
    - Deploy.
+
+Then in Vercel project settings, add your custom domains and configure DNS (CNAME records).
 
 4. In each Vercel project → Settings → Domains:
    - Add your custom domains (`memetorrent.futuret3ch.com.au` and `wallet.futuret3ch.com.au`)
