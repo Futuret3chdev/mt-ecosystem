@@ -51,6 +51,15 @@ export function getDefaultAuthURL() {
 
 export function getMTNode() {
   if (typeof window === 'undefined') return 'http://localhost:4000';
+  const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+  // On production live site (Vercel), force the official MT node (from VITE or the known ecosystem node).
+  // This prevents users from accidentally pointing to a wrong node and "losing" access to their native wallets/assets.
+  // Custom overrides only for local dev or licensed users (future).
+  if (isVercel) {
+    const fromEnv = getDefaultMTNode();
+    if (fromEnv) return fromEnv;
+    return 'http://161.97.106.182:4001'; // official ecosystem node (update when https is live)
+  }
   let local = localStorage.getItem('mt_custom_mt_node');
   if (local) {
     local = local.trim().replace(/\.+$/, '');
@@ -65,7 +74,6 @@ export function getMTNode() {
   }
   const fromEnv = getDefaultMTNode();
   if (fromEnv) return fromEnv;
-  if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) return null;
   return 'http://localhost:4000';
 }
 
@@ -86,6 +94,12 @@ export function setMTNode(url) {
 // Supports custom URL via localStorage 'mt_custom_auth_url' (for local dev pointing to remote mt-auth)
 export function getAuthURL() {
   if (typeof window === 'undefined') return 'http://localhost:4001';
+  const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+  if (isVercel) {
+    const fromEnv = getDefaultAuthURL();
+    if (fromEnv) return fromEnv;
+    return 'http://161.97.106.182:4002'; // official ecosystem auth (update when https is live)
+  }
   let local = localStorage.getItem('mt_custom_auth_url');
   if (local) {
     local = local.trim().replace(/\.+$/, '');
@@ -99,7 +113,6 @@ export function getAuthURL() {
   }
   const fromEnv = getDefaultAuthURL();
   if (fromEnv) return fromEnv;
-  if (window.location.hostname.includes('vercel.app')) return null; // demo only if no VITE_AUTH_URL
   return 'http://localhost:4001';
 }
 

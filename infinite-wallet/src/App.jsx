@@ -645,11 +645,28 @@ export default function MTWalletApp() {
       return;
     }
     try {
-      const list = await (await import('./lib/mt-wallet')).fetchBackedUpWallets();
-      setMyWallets(list || []);
+      const serverList = await (await import('./lib/mt-wallet')).fetchBackedUpWallets() || [];
+      const localList = getLocalWallets();
+      // Merge server (authoritative for this account) + any local caches, dedup by address.
+      // This ensures "old wallets" the user created under this account (or imported locally) are visible.
+      const byPk = new Map();
+      [...serverList, ...localList].forEach(w => {
+        const pk = w.publicKey || w.address;
+        if (pk && !byPk.has(pk)) {
+          byPk.set(pk, w);
+        } else if (pk) {
+          // prefer server version if duplicate
+          if (serverList.some(s => (s.publicKey || s.address) === pk)) {
+            byPk.set(pk, w); // will be overwritten by server if present
+          }
+        }
+      });
+      const merged = Array.from(byPk.values());
+      setMyWallets(merged);
     } catch (e) {
-      // Logged in but couldn't reach auth server: show empty (do NOT fall back to local/guest wallets from other accounts)
-      setMyWallets([]);
+      // On fetch error (e.g. mixed content on live before https), fall back to local so user still sees their wallets
+      // (the strict "no other accounts" is mainly enforced by server list when fetch succeeds)
+      setMyWallets(getLocalWallets());
     }
   }
 
@@ -691,20 +708,21 @@ export default function MTWalletApp() {
   };
 
   async function handleCreateAccountWallet() {
-    if (!accountPassword) {
+    const pwd = accountPassword || masterPassword;
+    if (!pwd) {
       setAuthError('Set your account password first');
       return;
     }
     try {
       const { wallet: entry, encryptedPayload } = await (await import('./lib/mt-wallet')).createNewWalletForAccount(
         'Wallet ' + (myWallets.length + 1),
-        accountPassword,
+        pwd,
         !!getAuthToken()
       );
       const fullEntry = { ...entry, encryptedData: encryptedPayload };
       addOrUpdateLocalWallet(fullEntry);
       setMyWallets(prev => [...prev, fullEntry]);
-      await activateWalletEntry(fullEntry, accountPassword);
+      await activateWalletEntry(fullEntry, pwd);
     } catch (e) {
       setStatus('Create wallet failed: ' + e.message);
     }
@@ -1615,81 +1633,54 @@ export default function MTWalletApp() {
             {/* Custom MT Node - so we retrieve native balances FROM US, not Solana */}
             <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
               <div className="font-semibold text-sm mb-2 text-emerald-400">MT Node URL (PRIMARY balance source — our native chain)</div>
-              <div className="text-xs text-zinc-400 mb-2">Point to your mt-core node for native $MT balances (our chain is primary). On live site with HTTPS backends this is usually set at build time via env. Local dev: use the raw http://IP here.</div>
+              <div className="text-xs text-zinc-400 mb-2">Official MT node for the ecosystem (primary native $MT). This is locked for reliability — users cannot change it to avoid misconfiguration and loss of wallet data. Custom nodes and advanced perks available with license.</div>
               <div className="flex gap-2">
                 <input 
-                  value={customMtNode} 
+                  value={customMtNode || getMTNode ? getMTNode() : 'http://161.97.106.182:4001'} 
                   onChange={e => setCustomMtNode(e.target.value)} 
-                  placeholder="http://161.97.106.182:4001 or http://localhost:4000 (for local testing)"
-                  className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono" 
+                  placeholder="http://161.97.106.182:4001 (official - locked)"
+                  className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono opacity-70" 
+                  disabled
+                  readOnly
                 />
                 <button 
                   onClick={() => {
-                    let url = (customMtNode || '').trim();
-                    setCustomMtNode(url);
-                    setMTNode(url);  // setMTNode now handles protocol + sanitizes trailing dots
-                    setStatus('MT Node updated — native balances will now retrieve from our network.');
-                    // re-sync if we have a wallet
-                    if (wallet) setTimeout(refreshAll, 50);
+                    alert('Custom MT Node URL is locked for all users. Official node is http://161.97.106.182:4001. Licensed custom nodes coming soon.');
                   }} 
-                  className="px-4 py-2 rounded-xl bg-emerald-500 text-black text-sm font-bold"
+                  className="px-4 py-2 rounded-xl bg-zinc-700 text-sm font-bold cursor-not-allowed"
+                  disabled
                 >
-                  Save
-                </button>
-                <button 
-                  onClick={() => {
-                    setCustomMtNode('');
-                    setMTNode('');
-                    setStatus('MT Node cleared — using build default (VITE) or local dev.');
-                  }} 
-                  className="px-3 py-2 rounded-xl border border-zinc-700 text-sm"
-                >
-                  Clear
+                  Locked
                 </button>
               </div>
 
-              {!customMtNode && getDefaultMTNode && getDefaultMTNode() && (
-                <div className="text-[10px] text-emerald-400 mt-1">Using project default MT node (VITE_MT_NODE_URL). Enter a URL above + Save to override only in this browser.</div>
-              )}
-
-              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getMTNode ? (getMTNode() || 'none (demo)') : '—'} • Live default via VITE_MT_NODE_URL (https) in Vercel + redeploy.</div>
+              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective (locked): {getMTNode ? (getMTNode() || 'http://161.97.106.182:4001') : 'http://161.97.106.182:4001'} — Official ecosystem node. Changes via Settings disabled (license required for overrides).</div>
             </div>
 
             <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
               <div className="font-semibold text-sm mb-2 text-emerald-400">Auth URL (for login + encrypted wallet backups)</div>
-              <div className="text-xs text-zinc-400 mb-2">For login + encrypted cross-device wallet backups. Set to your mt-auth URL (local dev or your https backend).</div>
+              <div className="text-xs text-zinc-400 mb-2">Official MT Auth for logins and encrypted backups. Locked for security and reliability. Users cannot change — custom auth requires a license.</div>
               <div className="flex gap-2">
                 <input 
-                  value={customAuthUrl} 
+                  value={customAuthUrl || getAuthURL ? getAuthURL() : 'http://161.97.106.182:4002'} 
                   onChange={e => setCustomAuthUrl(e.target.value)} 
-                  placeholder="http://161.97.106.182:4002 or http://localhost:4001"
-                  className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono" 
+                  placeholder="http://161.97.106.182:4002 (official - locked)"
+                  className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono opacity-70" 
+                  disabled
+                  readOnly
                 />
                 <button 
                   onClick={() => {
-                    let url = (customAuthUrl || '').trim();
-                    setCustomAuthUrl(url);
-                    setAuthURL(url);  // setAuthURL handles sanitization
-                    setStatus('Auth URL updated — login/restore will use this backend.');
-                    if (getAuthToken()) setTimeout(loadMyWallets, 50);
+                    alert('Custom Auth URL is locked for all users. Official is http://161.97.106.182:4002. Licensed custom backends coming soon.');
                   }} 
-                  className="px-4 py-2 rounded-xl bg-emerald-500 text-black text-sm font-bold"
+                  className="px-4 py-2 rounded-xl bg-zinc-700 text-sm font-bold cursor-not-allowed"
+                  disabled
                 >
-                  Save
-                </button>
-                <button 
-                  onClick={() => {
-                    setCustomAuthUrl('');
-                    setAuthURL('');
-                    setStatus('Auth URL cleared — using default.');
-                  }} 
-                  className="px-3 py-2 rounded-xl border border-zinc-700 text-sm"
-                >
-                  Clear
+                  Locked
                 </button>
               </div>
 
-              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getAuthURL ? (getAuthURL() || 'none (demo)') : '—'}</div>
+              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective (locked): {getAuthURL ? (getAuthURL() || 'http://161.97.106.182:4002') : 'http://161.97.106.182:4002'} — Official ecosystem auth service.</div>
               {!customAuthUrl && getDefaultAuthURL && getDefaultAuthURL() && (
                 <div className="text-[10px] text-emerald-400 mt-1">Using project default Auth URL (VITE_AUTH_URL). Enter above + Save to override only in this browser.</div>
               )}
