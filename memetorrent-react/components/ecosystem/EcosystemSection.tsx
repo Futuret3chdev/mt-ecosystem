@@ -6,7 +6,7 @@ export default function EcosystemSection() {
     },
     {
       title: 'INFINITE WALLET',
-      desc: 'Phantom-grade self-custodial INFINITE WALLET. Seed encrypted locally. Mint NFTs, hold Rockets, bridge assets. 100% ours.',
+      desc: 'Self-custodial INFINITE WALLET. Seed encrypted locally. Mint NFTs, hold Rockets, bridge assets. 100% ours.',
     },
     {
       title: 'NFTs + Rockets',

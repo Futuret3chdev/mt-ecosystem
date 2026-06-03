@@ -4,7 +4,7 @@ import Footer from '@/components/footer/Footer';
 
 export const metadata = {
   title: 'MT ECO SYSTEM | $MT • INFINITE WALLET • 1¢ Fees',
-  description: 'Next-generation decentralized on-chain network. Native $MT token. Phantom-grade self-built INFINITE WALLET. NFTs, Rockets, self-built bridges. No third parties. Infinite possibilities.',
+  description: 'Next-generation decentralized on-chain network. Native $MT token. Self-built INFINITE WALLET. NFTs, Rockets, self-built bridges. No third parties. Infinite possibilities.',
   icons: { icon: '/favicon.ico' },
 };
 

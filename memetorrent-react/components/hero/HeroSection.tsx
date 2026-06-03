@@ -42,7 +42,7 @@ export default function HeroSection() {
         <div className="md:col-span-5 mt-12 md:mt-0">
           <div className="rounded-3xl p-8 border border-white/10 bg-white/5 backdrop-blur-xl">
             <div className="text-xs tracking-[2px] text-emerald-400 mb-3">THE WALLET IS THE GATEWAY</div>
-            <div className="text-4xl font-semibold tracking-tight leading-none">INFINITE WALLET<br />like Phantom.<br />But ours.</div>
+            <div className="text-4xl font-semibold tracking-tight leading-none">INFINITE WALLET<br />For infinite possibilities.<br />Truly ours.</div>
 
             <ul className="mt-8 space-y-3 text-sm opacity-80">
               <li className="flex gap-3">• 100% self-built. No injected providers.</li>
