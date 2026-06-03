@@ -89,6 +89,7 @@ export default function MTWalletApp() {
   const [myWallets, setMyWallets] = useState([]); // [{id, name, publicKey, encryptedData}]
   const [activeWalletId, setActiveWalletId] = useState(null);
   const [masterPassword, setMasterPassword] = useState(''); // in-memory only after login
+  const [guestMode, setGuestMode] = useState(false); // for pure local use without account
 
   // App state
   const [activeTab, setActiveTab] = useState('portfolio');
@@ -296,7 +297,23 @@ export default function MTWalletApp() {
     setTxs([]);
     setQrDataUrl('');
     setActiveTab('portfolio');
-    setStatus('Wallet locked. All keys cleared from memory.');
+    setMasterPassword('');
+    setActiveWalletId(null);
+    setStatus('Wallet locked. Re-enter password to activate a wallet.');
+  };
+
+  const handleLogout = () => {
+    clearAuth();
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+    setMyWallets([]);
+    handleLock();
+    setAccountEmail('');
+    setAccountPhone('');
+    setAccountPassword('');
+    setVerifyCode('');
+    setAuthMode('login');
+    setStatus('Logged out.');
   };
 
   const handleDeleteVault = () => {
@@ -381,6 +398,19 @@ export default function MTWalletApp() {
     if (mtAddress) generateQR(mtAddress);
   }, [mtAddress]);
 
+  // Load local wallets for guest mode when unlocked
+  useEffect(() => {
+    if (isUnlocked && !isLoggedIn) {
+      const locals = getLocalWallets();
+      if (locals.length > 0) {
+        setMyWallets(locals);
+        if (!activeWalletId) {
+          // auto activate first if password known? for now let user click
+        }
+      }
+    }
+  }, [isUnlocked, isLoggedIn]);
+
   // Keyboard escape for modals
   useEffect(() => {
     const onKey = (e) => {
@@ -396,15 +426,23 @@ export default function MTWalletApp() {
 
   // === NEW HELPERS for multi-wallet + account auth ===
   async function activateWalletEntry(entry, pwd) {
-    if (!entry || !entry.encryptedData || !pwd) return;
+    let passwordToUse = pwd;
+    if (!entry || !entry.encryptedData) return;
+
+    if (!passwordToUse) {
+      passwordToUse = window.prompt('Enter your account password to unlock this wallet:');
+      if (!passwordToUse) return;
+    }
+
     try {
-      const mnemonic = await (await import('./lib/mt-wallet')).decryptMnemonic(entry.encryptedData, pwd);
-      const w = (await import('./lib/mt-wallet')).importMTWalletFromMnemonic(mnemonic);
+      const { decryptMnemonic, importMTWalletFromMnemonic } = await import('./lib/mt-wallet');
+      const mnemonic = await decryptMnemonic(entry.encryptedData, passwordToUse);
+      const w = importMTWalletFromMnemonic(mnemonic);
       setWallet(w);
       setIsUnlocked(true);
       setActiveWalletId(entry.id);
-      setMasterPassword(pwd);
-      setAccountPassword(pwd); // keep in sync for new creations
+      setMasterPassword(passwordToUse);
+      setAccountPassword(''); // clear form
       setStatus(`Activated wallet: ${entry.name}`);
       setTimeout(() => {
         generateQR(w.publicKey);
@@ -412,6 +450,7 @@ export default function MTWalletApp() {
       }, 80);
     } catch (e) {
       setStatus('Failed to unlock wallet with this password: ' + e.message);
+      alert('Wrong password or corrupted data for this wallet.');
     }
   }
 
@@ -450,7 +489,7 @@ export default function MTWalletApp() {
     }
   }
 
-  // ========== NEW LOCKED / ACCOUNT SCREEN (email + phone + multi-wallet) ==========
+  // ========== LOCKED / ACCOUNT + GUEST SCREEN ==========
   if (!isLoggedIn && !isUnlocked) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center p-6 selection:bg-emerald-500 selection:text-black">
@@ -461,111 +500,178 @@ export default function MTWalletApp() {
             </div>
             <div className="text-3xl font-black tracking-[-1.5px]">MT Wallet</div>
             <div className="text-emerald-400 text-sm tracking-[3px] mt-1 font-mono">MT ECO SYSTEM</div>
-            <div className="text-[10px] text-zinc-500 mt-2 text-center">Email + Phone accounts • Multiple wallets • Access anywhere • Self-custodial keys</div>
           </div>
 
           <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-8 shadow-xl">
-            {/* LOGIN */}
-            {authMode === 'login' && (
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                setAuthError('');
-                try {
-                  const res = await login(accountEmail || accountPhone, accountPassword);
-                  setIsLoggedIn(true);
-                  setCurrentUser(res.user || getUserProfile());
-                  setMasterPassword(accountPassword);
-                  setStatus('Logged in • Loading your wallets...');
-                  await loadMyWallets();
-                  setAccountPassword('');
-                } catch (err) {
-                  setAuthError(err.message || 'Login failed');
-                }
-              }} className="space-y-4">
-                <div className="text-center mb-2">
-                  <div className="font-semibold text-xl">Sign in to your MT Account</div>
-                  <div className="text-xs text-zinc-500">Access all your wallets from any device</div>
+            {!guestMode ? (
+              <>
+                {/* ACCOUNT MODE (email + phone for cross device) */}
+                <div className="text-center mb-4">
+                  <div className="font-semibold text-xl">Sign in or create account</div>
+                  <div className="text-xs text-zinc-500">Email + phone for access from any device + multiple wallets</div>
                 </div>
-                <input type="text" placeholder="Email or Phone" value={accountEmail || accountPhone} onChange={(e) => { const v = e.target.value; if (v.includes('@')) setAccountEmail(v); else setAccountPhone(v); }} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
-                <input type="password" placeholder="Password" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" required />
-                {authError && <div className="text-red-400 text-xs">{authError}</div>}
-                <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider mt-2">SIGN IN</button>
-                <div className="text-center text-xs">
-                  No account? <button type="button" onClick={() => { setAuthMode('signup'); setAuthError(''); }} className="text-emerald-400 underline">Create one with email + phone</button>
-                </div>
-              </form>
-            )}
 
-            {/* SIGNUP */}
-            {authMode === 'signup' && (
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                setAuthError('');
-                if (!accountEmail || !accountPhone || accountPassword.length < 6) {
-                  setAuthError('Email, phone and password (6+ chars) required');
-                  return;
-                }
-                try {
-                  const res = await signup(accountEmail, accountPhone, accountPassword);
-                  setAuthMode('verify');
-                  // For live demo the backend returns the code
-                  if (res.demoVerificationCode) {
-                    setVerifyCode(res.demoVerificationCode);
-                  }
-                  setStatus('Account created. Enter the verification code (demo: shown below).');
-                } catch (err) {
-                  setAuthError(err.message || 'Signup failed');
-                }
-              }} className="space-y-4">
-                <div className="text-center mb-1">
-                  <div className="font-semibold text-lg">Create MT Account</div>
-                  <div className="text-xs text-zinc-500">Email + Phone for recovery &amp; access on any device</div>
-                </div>
-                <input type="email" placeholder="Email address" value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
-                <input type="tel" placeholder="Phone number (e.g. +1 555 123 4567)" value={accountPhone} onChange={(e) => setAccountPhone(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
-                <input type="password" placeholder="Password (min 6 chars)" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" required />
-                {authError && <div className="text-red-400 text-xs">{authError}</div>}
-                <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider">CREATE ACCOUNT</button>
-                <div className="text-center text-xs">
-                  Already have an account? <button type="button" onClick={() => { setAuthMode('login'); setAuthError(''); }} className="text-emerald-400 underline">Sign in</button>
-                </div>
-                <div className="text-[10px] text-center text-zinc-500 pt-2">We will never see your private keys. Only encrypted backups.</div>
-              </form>
-            )}
+                {/* LOGIN */}
+                {authMode === 'login' && (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    setAuthError('');
+                    try {
+                      const res = await login(accountEmail || accountPhone, accountPassword);
+                      setIsLoggedIn(true);
+                      setCurrentUser(res.user || getUserProfile());
+                      setMasterPassword(accountPassword);
+                      setStatus('Logged in • Loading your wallets...');
+                      await loadMyWallets();
+                      setAccountPassword('');
+                    } catch (err) {
+                      setAuthError(err.message || 'Login failed');
+                    }
+                  }} className="space-y-4">
+                    <input type="text" placeholder="Email or Phone" value={accountEmail || accountPhone} onChange={(e) => { const v = e.target.value; if (v.includes('@')) setAccountEmail(v); else setAccountPhone(v); }} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
+                    <input type="password" placeholder="Password" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" required />
+                    {authError && <div className="text-red-400 text-xs">{authError}</div>}
+                    <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider mt-2">SIGN IN</button>
+                    <div className="text-center text-xs">
+                      No account? <button type="button" onClick={() => { setAuthMode('signup'); setAuthError(''); }} className="text-emerald-400 underline">Create with email + phone</button>
+                    </div>
+                  </form>
+                )}
 
-            {/* VERIFY */}
-            {authMode === 'verify' && (
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                setAuthError('');
-                try {
-                  const res = await verifyAccount(accountEmail, verifyCode);
-                  setIsLoggedIn(true);
-                  setCurrentUser(res.user);
-                  setMasterPassword(accountPassword);
-                  setStatus('Account verified! Creating your first wallet...');
-                  await loadMyWallets();
-                  // Auto create first wallet if none
-                  if ((await (await import('./lib/mt-wallet')).fetchBackedUpWallets()).length === 0) {
-                    await handleCreateAccountWallet();
-                  }
-                } catch (err) {
-                  setAuthError(err.message || 'Verification failed');
-                }
-              }} className="space-y-4">
-                <div className="text-center">
-                  <div className="font-semibold">Verify your account</div>
-                  <div className="text-xs text-zinc-500 mt-1">Enter the code sent to {accountEmail} / {accountPhone}</div>
+                {/* SIGNUP */}
+                {authMode === 'signup' && (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    setAuthError('');
+                    if (!accountEmail || !accountPhone || accountPassword.length < 6) {
+                      setAuthError('Email, phone and password (6+ chars) required');
+                      return;
+                    }
+                    try {
+                      const res = await signup(accountEmail, accountPhone, accountPassword);
+                      setAuthMode('verify');
+                      if (res.demoVerificationCode) setVerifyCode(res.demoVerificationCode);
+                      setStatus('Account created. Enter the verification code.');
+                    } catch (err) {
+                      setAuthError(err.message || 'Signup failed');
+                    }
+                  }} className="space-y-4">
+                    <input type="email" placeholder="Email address" value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
+                    <input type="tel" placeholder="Phone number" value={accountPhone} onChange={(e) => setAccountPhone(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
+                    <input type="password" placeholder="Password (min 6)" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" required />
+                    {authError && <div className="text-red-400 text-xs">{authError}</div>}
+                    <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider">CREATE ACCOUNT</button>
+                    <div className="text-center text-xs">
+                      Already have an account? <button type="button" onClick={() => { setAuthMode('login'); setAuthError(''); }} className="text-emerald-400 underline">Sign in</button>
+                    </div>
+                  </form>
+                )}
+
+                {/* VERIFY */}
+                {authMode === 'verify' && (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    setAuthError('');
+                    try {
+                      const res = await verifyAccount(accountEmail, verifyCode);
+                      setIsLoggedIn(true);
+                      setCurrentUser(res.user);
+                      setMasterPassword(accountPassword);
+                      setStatus('Verified! You can now create wallets.');
+                      await loadMyWallets();
+                    } catch (err) {
+                      setAuthError(err.message || 'Verification failed');
+                    }
+                  }} className="space-y-4">
+                    <div className="text-center text-sm">Enter verification code for {accountEmail}</div>
+                    <input type="text" placeholder="123456" value={verifyCode} onChange={(e) => setVerifyCode(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-center font-mono text-lg tracking-[4px]" maxLength={6} />
+                    {authError && <div className="text-red-400 text-xs text-center">{authError}</div>}
+                    <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider">VERIFY</button>
+                    <div className="text-[10px] text-center text-emerald-400/70">Demo: use the code shown after signup</div>
+                  </form>
+                )}
+
+                <div className="mt-6 pt-4 border-t border-zinc-800 text-center">
+                  <button onClick={() => setGuestMode(true)} className="text-xs text-zinc-400 hover:text-white underline">
+                    Or continue as guest (local only, no account, no sync)
+                  </button>
                 </div>
-                <input type="text" placeholder="123456" value={verifyCode} onChange={(e) => setVerifyCode(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-center font-mono text-lg tracking-[4px]" maxLength={6} />
-                {authError && <div className="text-red-400 text-xs text-center">{authError}</div>}
-                <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider">VERIFY &amp; ACTIVATE</button>
-                <div className="text-[10px] text-center text-emerald-400/70">DEMO: The code was shown in the previous step (in real it would be emailed/SMSed by our self-built service)</div>
-              </form>
+              </>
+            ) : (
+              <>
+                {/* GUEST / LOCAL ONLY MODE - restored old flows */}
+                <div className="text-center mb-4">
+                  <div className="font-semibold text-lg">Local only (this device)</div>
+                  <div className="text-xs text-zinc-500">No email, no sync. Pure self-custodial on this browser.</div>
+                </div>
+
+                <div className="space-y-3">
+                  <button onClick={() => { setShowCreate(true); setShowImport(false); setAuthError(''); }} className="w-full py-3 rounded-2xl bg-emerald-500 text-black font-bold text-sm">Create new local wallet</button>
+                  <button onClick={() => { setShowImport(true); setShowCreate(false); setAuthError(''); }} className="w-full py-3 rounded-2xl border border-zinc-700 text-sm">Import recovery phrase</button>
+                </div>
+
+                {/* CREATE LOCAL */}
+                {showCreate && (
+                  <form onSubmit={handleCreateWallet} className="mt-4 space-y-4">
+                    <input type="password" required minLength={6} placeholder="Password to encrypt this wallet" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
+                    <input type="password" required placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
+                    {authError && <div className="text-red-400 text-xs">{authError}</div>}
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setShowCreate(false)} className="flex-1 py-2 border border-zinc-700 rounded-xl text-sm">Cancel</button>
+                      <button type="submit" className="flex-1 py-2 bg-emerald-500 text-black font-bold rounded-xl text-sm">Create &amp; Encrypt</button>
+                    </div>
+                  </form>
+                )}
+
+                {/* IMPORT LOCAL */}
+                {showImport && (
+                  <form onSubmit={handleImportWallet} className="mt-4 space-y-4">
+                    <textarea value={importMnemonic} onChange={(e) => setImportMnemonic(e.target.value)} placeholder="12 or 24 word recovery phrase" className="w-full h-20 bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-2 text-sm font-mono" />
+                    <input type="password" required minLength={6} placeholder="New password for this wallet" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
+                    <input type="password" required placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
+                    {authError && <div className="text-red-400 text-xs">{authError}</div>}
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setShowImport(false)} className="flex-1 py-2 border border-zinc-700 rounded-xl text-sm">Cancel</button>
+                      <button type="submit" className="flex-1 py-2 bg-emerald-500 text-black font-bold rounded-xl text-sm">Import</button>
+                    </div>
+                  </form>
+                )}
+
+                {/* If there are local vaults, offer unlock */}
+                {typeof window !== 'undefined' && localStorage.getItem(LOCAL_WALLETS_KEY) && !showCreate && !showImport && (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    setAuthError('');
+                    // For guest, we can unlock by setting a temp password and loading local wallets
+                    // Simple: just set isUnlocked and load from local
+                    if (password) {
+                      // Try to decrypt first wallet as test
+                      const locals = getLocalWallets();
+                      if (locals.length > 0) {
+                        try {
+                          await activateWalletEntry(locals[0], password);
+                          setIsUnlocked(true); // ensure
+                        } catch (err) {
+                          setAuthError('Wrong password for local wallet');
+                        }
+                      }
+                    }
+                  }} className="mt-4 space-y-3">
+                    <div className="text-xs text-center">Existing local wallets detected on this device</div>
+                    <input type="password" placeholder="Password for local wallets" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
+                    {authError && <div className="text-red-400 text-xs text-center">{authError}</div>}
+                    <button type="submit" className="w-full py-2.5 bg-white text-black font-bold text-sm rounded-2xl">Unlock local wallets</button>
+                  </form>
+                )}
+
+                <div className="mt-4 text-center">
+                  <button onClick={() => { setGuestMode(false); setShowCreate(false); setShowImport(false); setAuthError(''); }} className="text-xs text-emerald-400 underline">Back to account login</button>
+                </div>
+              </>
             )}
           </div>
 
-          <div className="text-center mt-6 text-[10px] text-zinc-500 font-mono tracking-widest">BUILT IN-HOUSE • EMAIL + PHONE RECOVERY • MULTIPLE WALLETS • NO THIRD PARTIES</div>
+          <div className="text-center mt-6 text-[10px] text-zinc-500 font-mono tracking-widest">NO THIRD PARTIES • KEYS STAY LOCAL OR ENCRYPTED ON OUR SERVERS</div>
         </div>
       </div>
     );
@@ -608,6 +714,12 @@ export default function MTWalletApp() {
             <button onClick={handleLock} className="flex items-center gap-2 px-4 py-1.5 text-xs rounded-2xl border border-zinc-700 hover:bg-zinc-950 transition">
               <Lock className="w-3.5 h-3.5" /> LOCK
             </button>
+
+            {isLoggedIn && (
+              <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-1.5 text-xs rounded-2xl border border-red-800 text-red-400 hover:bg-red-950 transition">
+                LOGOUT
+              </button>
+            )}
           </div>
         </div>
 
@@ -714,29 +826,34 @@ export default function MTWalletApp() {
               <button onClick={refreshAll} className="px-5 py-3 text-sm border border-zinc-800 rounded-2xl flex items-center gap-2 hover:bg-zinc-950"><RefreshCw className="w-4 h-4" /> SYNC ALL</button>
             </div>
 
-            {/* Multi-wallet manager (email/phone accounts) */}
-            {isLoggedIn && (
+            {/* Wallets manager - supports both logged in (with cloud) and guest local */}
+            {(isLoggedIn || isUnlocked) && (
               <div className="mt-6 bg-zinc-950 border border-zinc-800 rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="font-semibold">Your Wallets ({myWallets.length})</div>
-                  <button onClick={handleCreateAccountWallet} className="text-xs px-3 py-1.5 rounded-xl border border-emerald-800 text-emerald-400">+ New Wallet</button>
+                  <div className="font-semibold">Your Wallets</div>
+                  <button 
+                    onClick={isLoggedIn ? handleCreateAccountWallet : () => { /* for guest, user can use initial guest create */ setStatus('For additional local wallets, lock and use guest create, or activate one first.'); }} 
+                    className="text-xs px-3 py-1.5 rounded-xl border border-emerald-800 text-emerald-400">+ New Wallet
+                  </button>
                 </div>
-                {myWallets.length === 0 && <div className="text-xs text-zinc-500">No wallets yet. Create one above — it will be backed up to your account for access on any device.</div>}
                 <div className="space-y-2 mt-2">
-                  {myWallets.map(w => (
+                  {(myWallets.length ? myWallets : getLocalWallets()).map(w => (
                     <div key={w.id} className={`flex justify-between items-center p-3 rounded-2xl border ${activeWalletId === w.id ? 'border-emerald-500 bg-emerald-950/20' : 'border-zinc-800'}`}>
                       <div>
                         <div className="font-medium">{w.name}</div>
-                        <div className="text-[10px] font-mono text-zinc-500">{w.publicKey?.slice(0,10)}...</div>
+                        <div className="text-[10px] font-mono text-zinc-500">{(w.publicKey || '').slice(0,10)}...</div>
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={() => activateWalletEntry(w, masterPassword || accountPassword)} className="text-xs px-3 py-1 rounded bg-emerald-500 text-black">ACTIVATE</button>
-                        {getAuthToken() && <button onClick={async () => { await (await import('./lib/mt-wallet')).deleteBackedUpWallet(w.id); await loadMyWallets(); }} className="text-xs px-2 text-red-400">Delete</button>}
+                        <button onClick={() => activateWalletEntry(w)} className="text-xs px-3 py-1 rounded bg-emerald-500 text-black">ACTIVATE</button>
+                        {isLoggedIn && getAuthToken() && <button onClick={async () => { await (await import('./lib/mt-wallet')).deleteBackedUpWallet(w.id); await loadMyWallets(); }} className="text-xs px-2 text-red-400">Delete</button>}
                       </div>
                     </div>
                   ))}
+                  {myWallets.length === 0 && getLocalWallets().length === 0 && (
+                    <div className="text-xs text-zinc-500">No wallets yet. Use the + button (or restart app for guest create flow).</div>
+                  )}
                 </div>
-                <div className="text-[10px] text-zinc-500 mt-3">Wallets are encrypted with your account password. Login on any device to restore them.</div>
+                <div className="text-[10px] text-zinc-500 mt-3">{isLoggedIn ? 'Backed up to your account (encrypted). Login on any device.' : 'Local only to this browser.'}</div>
               </div>
             )}
           </div>
