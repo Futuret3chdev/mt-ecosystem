@@ -19,7 +19,7 @@ Native token: **$MT** (`ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump`)
 ```
 mt-ecosystem/
 ├── infinite-wallet/      # The official MT Wallet (Vite + React)
-│   └── Deploy to Vercel as static site (wallet.futuret3ch.com.au)
+│   └── Deploy to Vercel as static site (https://infinite-wallet.vercel.app)
 ├── memetorrent-react/    # Marketing + Web3 site (Next.js 16 + TS + Tailwind)
 │   └── Deploy to Vercel (memetorrent.futuret3ch.com.au)
 ├── mt-core/              # MT Node / Protocol (Express + custom ledger, crypto, NFTs)
@@ -84,7 +84,7 @@ The projects were already created and deployed via Vercel CLI during setup.
 
 Current live previews (auto-updating from GitHub `main`):
 - **Marketing site**: https://memetorrent-react.vercel.app (or the project-specific one)
-- **MT Wallet**: https://infinite-wallet.vercel.app
+- **MT Wallet**: https://infinite-wallet.vercel.app (the production wallet)
 
 **Manual / re-deploy steps if needed:**
 
@@ -95,7 +95,7 @@ Current live previews (auto-updating from GitHub `main`):
    - Framework Preset: **Next.js**
    - Deploy.
 
-3. **For the wallet** (`wallet.futuret3ch.com.au`):
+3. **For the wallet** (https://infinite-wallet.vercel.app):
    - Import the **same** repo as a second project.
    - **Root Directory**: `infinite-wallet`
    - Framework Preset: **Vite**
@@ -105,7 +105,7 @@ Current live previews (auto-updating from GitHub `main`):
 Then in Vercel project settings, add your custom domains and configure DNS (CNAME records).
 
 4. In each Vercel project → Settings → Domains:
-   - Add your custom domains (`memetorrent.futuret3ch.com.au` and `wallet.futuret3ch.com.au`)
+   - Add your custom domains for memetorrent-react and the wallet if using custom domains instead of vercel.app subdomains
    - Update DNS (CNAME to the Vercel target).
 
 **Option B — Single repo with vercel.json (advanced)**
