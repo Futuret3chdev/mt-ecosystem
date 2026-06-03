@@ -47,6 +47,8 @@ import {
 
   // new auth + multi
   AUTH_URL,
+  getAuthURL,
+  setAuthURL,
   signup,
   verifyAccount,
   login,
@@ -118,7 +120,13 @@ export default function MTWalletApp() {
   });
   const [customMtNode, setCustomMtNode] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return localStorage.getItem('mt_custom_mt_node') || '';
+    let v = localStorage.getItem('mt_custom_mt_node') || '';
+    return v.trim().replace(/\.+$/, '');
+  });
+  const [customAuthUrl, setCustomAuthUrl] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    let v = localStorage.getItem('mt_custom_auth_url') || '';
+    return v.trim().replace(/\.+$/, '');
   });
 
   // Ref to always have the latest wallet for refreshAll (avoids stale closure when switching wallets)
@@ -126,6 +134,23 @@ export default function MTWalletApp() {
   useEffect(() => {
     latestWalletRef.current = wallet;
   }, [wallet]);
+
+  // One-time cleanup for any previously stored bad MT node URLs (e.g. trailing dot from copy-paste)
+  useEffect(() => {
+    const key = 'mt_custom_mt_node';
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const cleaned = raw.trim().replace(/\.+$/, '');
+      let final = cleaned;
+      if (final && !/^https?:\/\//i.test(final)) {
+        final = 'http://' + final;
+      }
+      if (final !== raw) {
+        localStorage.setItem(key, final);
+        // also update the input state if settings is open, but since state is local, next open will be clean
+      }
+    }
+  }, []);
 
   // App state
   const [activeTab, setActiveTab] = useState('portfolio');
@@ -339,6 +364,22 @@ export default function MTWalletApp() {
     try {
       const w = importMTWalletFromMnemonic(clean);
       await saveVault(w.mnemonic, password);
+
+      // Add to local multi-wallets list for guest mode (so it shows in "Your Wallets" below)
+      const { getSolanaKeypair } = await import('./lib/mt-wallet');
+      const solKp = getSolanaKeypair ? getSolanaKeypair(w) : null;
+      const localEntry = {
+        id: 'local_' + Date.now().toString(36),
+        name: 'Imported Wallet',
+        publicKey: w.publicKey,
+        solanaPublicKey: solKp ? solKp.publicKey.toBase58() : null,
+        encryptedData: localStorage.getItem('mt_vault_v1') || '',
+        createdAt: Date.now(),
+      };
+      addOrUpdateLocalWallet(localEntry);
+      setMyWallets(prev => [...prev.filter(x => x.id !== localEntry.id), localEntry]);
+      setActiveWalletId(localEntry.id);
+
       setWallet(w);
       setIsUnlocked(true);
       setImportMnemonic('');
@@ -346,6 +387,7 @@ export default function MTWalletApp() {
       setConfirmPassword('');
       setShowImport(false);
       setStatus('Wallet imported and encrypted. Verify your seed phrase is correct.');
+
       setTimeout(() => {
         generateQR(w.publicKey);
         refreshAll();
@@ -610,7 +652,7 @@ export default function MTWalletApp() {
     setMyWallets(list);
     saveLocalWallets(list); // for guest or local cache
 
-    if (isLoggedIn && getAuthToken() && AUTH_URL) {
+    if (isLoggedIn && getAuthToken() && getAuthURL()) {
       try {
         const { backupWallet } = await import('./lib/mt-wallet');
         await backupWallet({
@@ -804,8 +846,8 @@ export default function MTWalletApp() {
                   </form>
                 )}
 
-                {/* If there are local vaults, offer unlock */}
-                {typeof window !== 'undefined' && localStorage.getItem(LOCAL_WALLETS_KEY) && !showCreate && !showImport && (
+                {/* If there are local vaults, offer unlock for guest mode */}
+                {getLocalWallets().length > 0 && !showCreate && !showImport && (
                   <form onSubmit={async (e) => {
                     e.preventDefault();
                     setAuthError('');
@@ -1111,7 +1153,7 @@ export default function MTWalletApp() {
                               setEditColor(w.color || '#10b981');
                             }} 
                             className="text-xs px-1.5 py-0.5 rounded border border-zinc-700 hover:bg-zinc-900">✎</button>
-                          {isLoggedIn && getAuthToken() && AUTH_URL && <button onClick={async () => { await (await import('./lib/mt-wallet')).deleteBackedUpWallet(w.id); await loadMyWallets(); }} className="text-xs px-1 text-red-400">×</button>}
+                          {isLoggedIn && getAuthToken() && getAuthURL() && <button onClick={async () => { await (await import('./lib/mt-wallet')).deleteBackedUpWallet(w.id); await loadMyWallets(); }} className="text-xs px-1 text-red-400">×</button>}
                         </div>
                       </div>
                     );
@@ -1413,7 +1455,9 @@ export default function MTWalletApp() {
               <div className="font-semibold mb-3">Recovery Phrase (SEED)</div>
               <div className="text-xs text-orange-400 mb-3">Write this down on paper. Never screenshot. Never share.</div>
 
-              {!seedRevealed ? (
+              {!wallet ? (
+                <div className="text-xs text-zinc-500">No active wallet to reveal seed for. Activate or import one first.</div>
+              ) : !seedRevealed ? (
                 <button onClick={() => setSeedRevealed(true)} className="px-5 py-2 rounded-2xl border border-orange-900 text-orange-400 text-sm flex items-center gap-2"><Eye className="w-4 h-4" /> REVEAL SEED PHRASE</button>
               ) : (
                 <div>
@@ -1547,11 +1591,8 @@ export default function MTWalletApp() {
                 <button 
                   onClick={() => {
                     let url = (customMtNode || '').trim();
-                    if (url && !/^https?:\/\//i.test(url)) {
-                      url = 'http://' + url;
-                    }
                     setCustomMtNode(url);
-                    setMTNode(url);
+                    setMTNode(url);  // setMTNode now handles protocol + sanitizes trailing dots
                     setStatus('MT Node updated — native balances will now retrieve from our network.');
                     // re-sync if we have a wallet
                     if (wallet) setTimeout(refreshAll, 50);
@@ -1577,6 +1618,43 @@ export default function MTWalletApp() {
               )}
 
               <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getMTNode ? (getMTNode() || 'none (demo)') : '—'} • To set a default for the live site, use env var <span className="font-mono">VITE_MT_NODE_URL</span> + redeploy.</div>
+            </div>
+
+            <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
+              <div className="font-semibold text-sm mb-2 text-emerald-400">Auth URL (for login + encrypted wallet backups)</div>
+              <div className="text-xs text-zinc-400 mb-2">Point local dev at your remote mt-auth (e.g. your VPS) so "Your Wallets" list and cross-device restore work the same as the live site. Leave blank for default.</div>
+              <div className="flex gap-2">
+                <input 
+                  value={customAuthUrl} 
+                  onChange={e => setCustomAuthUrl(e.target.value)} 
+                  placeholder="http://161.97.106.182:4002 or http://localhost:4001"
+                  className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono" 
+                />
+                <button 
+                  onClick={() => {
+                    let url = (customAuthUrl || '').trim();
+                    setCustomAuthUrl(url);
+                    setAuthURL(url);  // setAuthURL handles sanitization
+                    setStatus('Auth URL updated — login/restore will use this backend.');
+                    if (getAuthToken()) setTimeout(loadMyWallets, 50);
+                  }} 
+                  className="px-4 py-2 rounded-xl bg-emerald-500 text-black text-sm font-bold"
+                >
+                  Save
+                </button>
+                <button 
+                  onClick={() => {
+                    setCustomAuthUrl('');
+                    setAuthURL('');
+                    setStatus('Auth URL cleared — using default.');
+                  }} 
+                  className="px-3 py-2 rounded-xl border border-zinc-700 text-sm"
+                >
+                  Clear
+                </button>
+              </div>
+
+              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective: {getAuthURL ? (getAuthURL() || 'none (demo)') : '—'} • Set this to your VPS mt-auth URL (e.g. http://161.97.106.182:400X) in local dev to see the same backed-up "Your Wallets" as the live site after logging in.</div>
             </div>
 
             <div className="text-xs text-zinc-500 pt-4">Native MT from our network is always primary for this wallet. Solana only for SPL/bridge context.</div>

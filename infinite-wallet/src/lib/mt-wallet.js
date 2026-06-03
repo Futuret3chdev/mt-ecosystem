@@ -42,8 +42,18 @@ export function getDefaultMTNode() {
 
 export function getMTNode() {
   if (typeof window === 'undefined') return 'http://localhost:4000';
-  const local = localStorage.getItem('mt_custom_mt_node');
-  if (local) return local;
+  let local = localStorage.getItem('mt_custom_mt_node');
+  if (local) {
+    local = local.trim().replace(/\.+$/, '');
+    if (local && !/^https?:\/\//i.test(local)) {
+      local = 'http://' + local;
+    }
+    if (local !== localStorage.getItem('mt_custom_mt_node')) {
+      // clean up storage
+      localStorage.setItem('mt_custom_mt_node', local);
+    }
+    return local;
+  }
   const fromEnv = getDefaultMTNode();
   if (fromEnv) return fromEnv;
   if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) return null;
@@ -52,7 +62,7 @@ export function getMTNode() {
 
 export function setMTNode(url) {
   if (typeof window === 'undefined') return;
-  let trimmed = (url || '').trim();
+  let trimmed = (url || '').trim().replace(/\.+$/, ''); // strip trailing dots (common copy-paste error)
   if (trimmed && !/^https?:\/\//i.test(trimmed)) {
     trimmed = 'http://' + trimmed;
   }
@@ -64,9 +74,36 @@ export function setMTNode(url) {
 }
 
 // Auth service (for email/phone accounts + cross-device encrypted wallet backup)
-export const AUTH_URL = (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app'))
-  ? null // demo mode falls back to localStorage-only
-  : 'http://localhost:4001';
+// Supports custom URL via localStorage 'mt_custom_auth_url' (for local dev pointing to remote mt-auth)
+export function getAuthURL() {
+  if (typeof window === 'undefined') return 'http://localhost:4001';
+  let local = localStorage.getItem('mt_custom_auth_url');
+  if (local) {
+    local = local.trim().replace(/\.+$/, '');
+    if (local) {
+      if (!/^https?:\/\//i.test(local)) local = 'http://' + local;
+      if (local !== localStorage.getItem('mt_custom_auth_url')) {
+        localStorage.setItem('mt_custom_auth_url', local);
+      }
+    }
+    return local;
+  }
+  if (window.location.hostname.includes('vercel.app')) return null; // demo on live
+  return 'http://localhost:4001';
+}
+
+export function setAuthURL(url) {
+  if (typeof window === 'undefined') return;
+  let trimmed = (url || '').trim().replace(/\.+$/, ''); // strip trailing dots
+  if (trimmed) {
+    localStorage.setItem('mt_custom_auth_url', trimmed);
+  } else {
+    localStorage.removeItem('mt_custom_auth_url');
+  }
+}
+
+// Legacy const for any old references (uses getter)
+export const AUTH_URL = getAuthURL();
 
 // Fixed ultra-low fee (marketed as ~1 cent SOL equivalent)
 export const MT_TX_FEE = 0.01;
@@ -227,8 +264,10 @@ export function deleteVault() {
  * Node API helpers (MT native chain)
  */
 export async function fetchMTBalance(address) {
-  const node = getMTNode();
+  let node = getMTNode();
   if (!node) return { balance: 0, nonce: 0 };
+  // ensure clean URL (defensive)
+  node = node.replace(/\.+$/, '').replace(/\/+$/, '');
   try {
     const res = await fetch(`${node}/account/${address}`);
     if (!res.ok) return { balance: 0, nonce: 0 };
@@ -241,8 +280,9 @@ export async function fetchMTBalance(address) {
 }
 
 export async function fetchMTNFTs(owner) {
-  const node = getMTNode();
+  let node = getMTNode();
   if (!node) return [];
+  node = node.replace(/\.+$/, '').replace(/\/+$/, '');
   try {
     const res = await fetch(`${node}/nfts/${owner}`);
     if (!res.ok) return [];
@@ -253,8 +293,9 @@ export async function fetchMTNFTs(owner) {
 }
 
 export async function fetchMTTxs(address) {
-  const node = getMTNode();
+  let node = getMTNode();
   if (!node) return [];
+  node = node.replace(/\.+$/, '').replace(/\/+$/, '');
   try {
     const res = await fetch(`${node}/explorer/txs/${address}`);
     if (!res.ok) return [];
@@ -268,8 +309,9 @@ export async function fetchMTTxs(address) {
  * Submit signed MT transaction
  */
 export async function submitMTTx(unsignedTx, signature) {
-  const node = getMTNode();
+  let node = getMTNode();
   if (!node) throw new Error('Native MT node not configured (demo mode)');
+  node = node.replace(/\.+$/, '').replace(/\/+$/, '');
   const body = { ...unsignedTx, signature };
   const res = await fetch(`${node}/tx`, {
     method: 'POST',
@@ -289,8 +331,9 @@ export async function submitMTTx(unsignedTx, signature) {
  */
 export async function requestTestFunds(address) {
   if (!address) throw new Error('No address');
-  const node = getMTNode();
+  let node = getMTNode();
   if (!node) throw new Error('Faucet only available when a MT node is configured in Settings');
+  node = node.replace(/\.+$/, '').replace(/\/+$/, '');
   const res = await fetch(`${node}/faucet`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -719,13 +762,14 @@ async function authFetch(path, options = {}) {
     ...(options.headers || {}),
   };
 
+  const authBase = getAuthURL();
   // On production (Vercel) we have no public auth backend yet -> go straight to demo fallback
-  if (!AUTH_URL) {
+  if (!authBase) {
     return getDemoAuthResponse(path, options);
   }
 
   try {
-    const res = await fetch(`${AUTH_URL}${path}`, { ...options, headers });
+    const res = await fetch(`${authBase}${path}`, { ...options, headers });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Auth request failed');
     return data;

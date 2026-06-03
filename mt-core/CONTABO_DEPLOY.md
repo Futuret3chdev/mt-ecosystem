@@ -306,7 +306,7 @@ Then get SSL:
 sudo certbot --nginx -d core.yourdomain.com
 ```
 
-If you don't have a domain yet for it, you can use the VPS IP directly first for testing (but update CORS).
+If you don't have a domain yet for it, you can use the VPS IP directly first for testing (but update CORS, and note that the live HTTPS wallet will hit Mixed Content blocks with plain HTTP — see the wallet connection section below for testing workaround using local dev server).
 
 ## 6. Test it
 
@@ -328,16 +328,24 @@ curl http://core.yourdomain.com/account/YOUR_TEST_MT_ADDRESS_HERE
 
 ## 7. Connect from the live wallet
 
+**Critical for the live HTTPS wallet:** The Vercel site is served over HTTPS. Modern browsers block "mixed content" — i.e., HTTPS page fetching HTTP APIs. You **must** put mt-core behind HTTPS (via nginx + certbot as below) for the live site to work without errors.
+
 On the live wallet (https://infinite-wallet.vercel.app):
 
 - Go to **Settings** tab
 - Find "MT Node URL (PRIMARY balance source — our native chain)"
-- Paste: `https://core.yourdomain.com`   (or http://YOUR_IP:4000 for quick test)
+- Paste the **HTTPS** URL once you have nginx + certbot: e.g. `https://core.yourdomain.com` 
+- For quick testing only: you can run the wallet locally with `npm run dev` (HTTP) and point it at `http://YOUR_IP:4001`. The live site will still need HTTPS.
+
 - Save
 
-The native MT card will now talk to your real mt-core on Contabo.
+The native MT card will now talk to your real mt-core on Contabo (no more mixed content blocks or localhost refused).
 
-Use the faucet button (it appears when node looks local or you can manually POST to /faucet).
+Use the faucet button (it appears when a node is configured; we relaxed the "local only" gate for self-hosted nodes). Or manually POST to /faucet as shown.
+
+To fund the wallet address 63NQwG9YbgSQrBM4EqwYagnqc3pzKayTAC5KBtdKGSSX (or the MT addr shown in the list for that wallet):
+
+- The MT address for the wallet is shown in the list as "MT: ..." for Test Account etc. Use that as the "address" for faucet.
 
 To fund the wallet address 63NQwG9YbgSQrBM4EqwYagnqc3pzKayTAC5KBtdKGSSX (or the MT addr shown in the list for that wallet):
 
@@ -353,7 +361,7 @@ You will send native MT on your mt-core → shows in big "NATIVE MT" card.
 
 ```bash
 # If using ufw
-sudo ufw allow 4000/tcp   # only if not behind nginx
+sudo ufw allow 4001/tcp   # only if not behind nginx
 # Better: only allow from your IP for now, or rely on nginx
 ```
 
