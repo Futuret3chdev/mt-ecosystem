@@ -30,26 +30,15 @@ import {
   fetchJupiterQuote,
   executeJupiterSwap,
   getSolanaKeypair,
-  getCustomSolanaRpc,
-  setCustomSolanaRpc,
   clearSolanaBalanceCache,
   getMoralisApiKey,
-  setMoralisApiKey,
-  getDefaultMoralisApiKey,
 
-  // MT node (native primary source)
+  // MT node (native primary source) - locked official
   getMTNode,
-  setMTNode,
-  getDefaultMTNode,
-  getDefaultAuthURL,
-
-  // Solana RPC default support
-  getDefaultSolanaRpc,
 
   // new auth + multi
   AUTH_URL,
   getAuthURL,
-  setAuthURL,
   signup,
   verifyAccount,
   login,
@@ -109,26 +98,6 @@ export default function MTWalletApp() {
   const [editingWalletId, setEditingWalletId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('#10b981'); // default emerald
-  // These *_input states hold only the *localStorage override* value (for the form fields).
-  // The effective value used by the app (getCustom..., getMTNode, getMoralisApiKey) falls back to VITE_* env defaults.
-  const [customSolRpc, setCustomSolRpc] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    return localStorage.getItem('mt_custom_solana_rpc') || '';
-  });
-  const [moralisKey, setMoralisKey] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    return localStorage.getItem('mt_moralis_api_key') || '';
-  });
-  const [customMtNode, setCustomMtNode] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    let v = localStorage.getItem('mt_custom_mt_node') || '';
-    return v.trim().replace(/\.+$/, '');
-  });
-  const [customAuthUrl, setCustomAuthUrl] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    let v = localStorage.getItem('mt_custom_auth_url') || '';
-    return v.trim().replace(/\.+$/, '');
-  });
 
   // Ref to always have the latest wallet for refreshAll (avoids stale closure when switching wallets)
   const latestWalletRef = useRef(null);
@@ -137,6 +106,7 @@ export default function MTWalletApp() {
   }, [wallet]);
 
   // One-time cleanup for any previously stored bad MT node URLs (e.g. trailing dot from copy-paste)
+  // (kept for robustness even with locked nodes)
   useEffect(() => {
     const key = 'mt_custom_mt_node';
     const raw = localStorage.getItem(key);
@@ -148,7 +118,6 @@ export default function MTWalletApp() {
       }
       if (final !== raw) {
         localStorage.setItem(key, final);
-        // also update the input state if settings is open, but since state is local, next open will be clean
       }
     }
   }, []);
@@ -940,7 +909,7 @@ export default function MTWalletApp() {
           <div className="flex items-center gap-3 text-sm">
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-2xl text-xs font-mono text-zinc-400">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              {(() => { const n = getMTNode ? getMTNode() : null; return n ? n.replace('http://', '') : 'native MT via build env (or set in Settings)'; })()}
+              {(() => { const n = getMTNode ? getMTNode() : null; return n ? n.replace('http://', '') : 'official MT node'; })()}
             </div>
 
             {mtAddress && (
@@ -1504,186 +1473,18 @@ export default function MTWalletApp() {
               </ul>
             </div>
 
-            <div className="border border-zinc-800 rounded-3xl p-6 bg-zinc-950">
-              <div className="font-semibold mb-3">Recovery Phrase (SEED)</div>
-              <div className="text-xs text-orange-400 mb-3">Write this down on paper. Never screenshot. Never share.</div>
+            {/* Seed reveal removed for customer view - internal recovery only. Users should have backed up at creation. */}
 
-              {!wallet ? (
-                <div className="text-xs text-zinc-500">No active wallet to reveal seed for. Activate or import one first.</div>
-              ) : !seedRevealed ? (
-                <button onClick={() => setSeedRevealed(true)} className="px-5 py-2 rounded-2xl border border-orange-900 text-orange-400 text-sm flex items-center gap-2"><Eye className="w-4 h-4" /> REVEAL SEED PHRASE</button>
-              ) : (
-                <div>
-                  <div className="p-4 bg-black font-mono text-sm rounded-2xl border border-orange-900/50 break-words select-all">{wallet.mnemonic}</div>
-                  <button onClick={() => copy(wallet.mnemonic, 'seed')} className="mt-2 text-xs flex items-center gap-1 text-orange-400"><Copy className="w-3 h-3" /> COPY TO CLIPBOARD (clear after)</button>
-                  <div className="text-[10px] text-orange-400/60 mt-3">Hide again after use. Consider deleting the vault after you have safely backed it up.</div>
-                </div>
-              )}
-            </div>
+            {/* Solana RPC override removed from customer Settings - managed internally */}
 
-            <button onClick={handleDeleteVault} className="text-red-400 text-sm underline underline-offset-4">Permanently delete vault from this browser</button>
+            {/* Moralis key override removed from customer Settings - internal config */}
 
-            <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-4">
-              <div className="font-semibold text-sm mb-2">Solana RPC (for real $MT balances + swaps)</div>
-              <div className="text-xs text-zinc-400 mb-2">Good defaults now included (Helius + your QuickNode first, then public). Paste a custom URL here to override for this browser only.</div>
-              <div className="flex gap-2">
-                <input 
-                  value={customSolRpc} 
-                  onChange={e => setCustomSolRpc(e.target.value)} 
-                  placeholder="https://your-rpc-url (leave blank for project default)" 
-                  className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono" 
-                />
-                <button 
-                  onClick={async () => {
-                    setCustomSolanaRpc(customSolRpc);
-                    setStatus('Solana RPC updated. Refreshing Solana balances with new RPC...');
-                    if (solAddress) {
-                      clearSolanaBalanceCache();
-                      try {
-                        const [mtBal, solBal] = await Promise.all([
-                          fetchSolanaMTBalance(solAddress),
-                          fetchSolanaSOLBalance(solAddress)
-                        ]);
-                        setSolMTBalance(mtBal);
-                        setSolSOLBalance(solBal);
-                        setStatus(`RPC updated. Solana $MT: ${mtBal} SOL: ${solBal}`);
-                      } catch (e) {
-                        setStatus('RPC updated. Click REFRESH or force sync to use it.');
-                      }
-                    }
-                  }} 
-                  className="px-4 py-2 rounded-xl bg-emerald-500 text-black text-sm font-bold"
-                >
-                  Save
-                </button>
-                <button 
-                  onClick={() => {
-                    setCustomSolRpc('');
-                    setCustomSolanaRpc('');
-                    setStatus('Reverted to project default / public RPC list.');
-                  }} 
-                  className="px-3 py-2 rounded-xl border border-zinc-700 text-sm"
-                >
-                  Reset
-                </button>
-              </div>
-
-              {!customSolRpc && getDefaultSolanaRpc && getDefaultSolanaRpc() && (
-                <div className="text-[10px] text-emerald-400 mt-1">Using project default RPC (VITE_SOLANA_RPC_URL). Enter a URL above + Save to override only in this browser.</div>
-              )}
-
-              <div className="text-[10px] text-zinc-400 mt-1">To set a default for all visitors: add env var <span className="font-mono">VITE_SOLANA_RPC_URL</span> on the hosting platform and redeploy.</div>
-            </div>
-
+            {/* Official locked nodes - no customer-editable fields */}
             <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
-              <div className="font-semibold text-sm mb-2">Moralis API Key (for reliable $MT balances &amp; price)</div>
-              <div className="text-xs text-zinc-400 mb-2">Your bot key works great. Paste a value here to override the project default just for this browser. Leave blank to use the build-time default.</div>
-              <div className="flex gap-2">
-                <input 
-                  type="password"
-                  value={moralisKey} 
-                  onChange={e => setMoralisKey(e.target.value)} 
-                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." 
-                  className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono" 
-                />
-                <button 
-                  onClick={async () => {
-                    setMoralisApiKey(moralisKey);
-                    clearSolanaBalanceCache();
-                    setStatus('Moralis key saved. Updating Solana $MT from key...');
-                    if (solAddress) {
-                      try {
-                        const bal = await fetchSolanaMTBalance(solAddress);
-                        setSolMTBalance(bal);
-                        setStatus(`Moralis key saved. Solana $MT for active wallet: ${bal}`);
-                      } catch (e) {
-                        setStatus('Moralis key saved. Use force sync SPL or REFRESH to update.');
-                      }
-                    } else {
-                      setStatus('Moralis key saved. Activate a wallet then REFRESH or use force sync in list.');
-                    }
-                  }} 
-                  className="px-4 py-2 rounded-xl bg-emerald-500 text-black text-sm font-bold"
-                >
-                  Save
-                </button>
-                <button 
-                  onClick={() => {
-                    setMoralisKey('');
-                    setMoralisApiKey('');
-                    clearSolanaBalanceCache();
-                    setStatus('Moralis key cleared (now using project default if configured).');
-                  }} 
-                  className="px-3 py-2 rounded-xl border border-zinc-700 text-sm"
-                >
-                  Clear
-                </button>
-              </div>
-
-              {!moralisKey && getDefaultMoralisApiKey && getDefaultMoralisApiKey() && (
-                <div className="text-[10px] text-emerald-400 mt-1">Using project-wide default key from build (VITE_MORALIS_API_KEY). Any value you Save + the key above will override it only in this browser.</div>
-              )}
-
-              <div className="text-[10px] text-orange-400/70 mt-1">
-                To set the default for everyone on the live site: add an Environment Variable on your hosting platform (Vercel etc) with key <span className="font-mono">VITE_MORALIS_API_KEY</span> and your full token as the value. Then redeploy. 
-                Local overrides (this browser) always win. For real prod, use a backend proxy instead of shipping the key in the JS bundle.
-              </div>
-            </div>
-
-            {/* Custom MT Node - so we retrieve native balances FROM US, not Solana */}
-            <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
-              <div className="font-semibold text-sm mb-2 text-emerald-400">MT Node URL (PRIMARY balance source — our native chain)</div>
-              <div className="text-xs text-zinc-400 mb-2">Official MT node for the ecosystem (primary native $MT). This is locked for reliability — users cannot change it to avoid misconfiguration and loss of wallet data. Custom nodes and advanced perks available with license.</div>
-              <div className="flex gap-2">
-                <input 
-                  value={customMtNode || getMTNode ? getMTNode() : 'http://161.97.106.182:4001'} 
-                  onChange={e => setCustomMtNode(e.target.value)} 
-                  placeholder="http://161.97.106.182:4001 (official - locked)"
-                  className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono opacity-70" 
-                  disabled
-                  readOnly
-                />
-                <button 
-                  onClick={() => {
-                    alert('Custom MT Node URL is locked for all users. Official node is http://161.97.106.182:4001. Licensed custom nodes coming soon.');
-                  }} 
-                  className="px-4 py-2 rounded-xl bg-zinc-700 text-sm font-bold cursor-not-allowed"
-                  disabled
-                >
-                  Locked
-                </button>
-              </div>
-
-              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective (locked): {getMTNode ? (getMTNode() || 'http://161.97.106.182:4001') : 'http://161.97.106.182:4001'} — Official ecosystem node. Changes via Settings disabled (license required for overrides).</div>
-            </div>
-
-            <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
-              <div className="font-semibold text-sm mb-2 text-emerald-400">Auth URL (for login + encrypted wallet backups)</div>
-              <div className="text-xs text-zinc-400 mb-2">Official MT Auth for logins and encrypted backups. Locked for security and reliability. Users cannot change — custom auth requires a license.</div>
-              <div className="flex gap-2">
-                <input 
-                  value={customAuthUrl || getAuthURL ? getAuthURL() : 'http://161.97.106.182:4002'} 
-                  onChange={e => setCustomAuthUrl(e.target.value)} 
-                  placeholder="http://161.97.106.182:4002 (official - locked)"
-                  className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono opacity-70" 
-                  disabled
-                  readOnly
-                />
-                <button 
-                  onClick={() => {
-                    alert('Custom Auth URL is locked for all users. Official is http://161.97.106.182:4002. Licensed custom backends coming soon.');
-                  }} 
-                  className="px-4 py-2 rounded-xl bg-zinc-700 text-sm font-bold cursor-not-allowed"
-                  disabled
-                >
-                  Locked
-                </button>
-              </div>
-
-              <div className="text-[10px] text-emerald-400/70 mt-1">Current effective (locked): {getAuthURL ? (getAuthURL() || 'http://161.97.106.182:4002') : 'http://161.97.106.182:4002'} — Official ecosystem auth service.</div>
-              {!customAuthUrl && getDefaultAuthURL && getDefaultAuthURL() && (
-                <div className="text-[10px] text-emerald-400 mt-1">Using project default Auth URL (VITE_AUTH_URL). Enter above + Save to override only in this browser.</div>
-              )}
+              <div className="font-semibold text-sm mb-2 text-emerald-400">Node Configuration</div>
+              <div className="text-xs text-zinc-400">Connected to official MT ECO SYSTEM nodes for primary native $MT and secure backups. Managed for reliability.</div>
+              <div className="mt-2 text-[10px] text-emerald-400/70">MT Node: http://161.97.106.182:4001 (locked)</div>
+              <div className="text-[10px] text-emerald-400/70">Auth: http://161.97.106.182:4002 (locked)</div>
             </div>
 
             <div className="text-xs text-zinc-500 pt-4">Primary holdings live on the MT native chain. Solana SPL is legacy for bridging.</div>
