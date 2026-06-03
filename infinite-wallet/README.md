@@ -2,7 +2,7 @@
 
 The self-built wallet with infinite possibilities. Full client-side control, email/phone accounts, cross-device encrypted backups via our mt-auth, native MT on our chain as primary, and more.
 
-Phantom-grade, self-built, self-custodial wallet for the MT ECO SYSTEM.
+Self-built, self-custodial wallet for the MT ECO SYSTEM.
 
 - 100% local key management (bip39 mnemonic → ed25519)
 - AES-GCM + PBKDF2 encrypted vault (password protected, never sent anywhere)
