@@ -529,7 +529,7 @@ export default function MTWalletApp() {
     setMyWallets(list);
     saveLocalWallets(list); // for guest or local cache
 
-    if (isLoggedIn && getAuthToken()) {
+    if (isLoggedIn && getAuthToken() && AUTH_URL) {
       try {
         const { backupWallet } = await import('./lib/mt-wallet');
         await backupWallet({
