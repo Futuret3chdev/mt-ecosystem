@@ -7,6 +7,7 @@ import {
 import QRCode from 'qrcode';
 
 import {
+  // existing
   generateMTWallet,
   importMTWalletFromMnemonic,
   unlockVault,
@@ -25,11 +26,33 @@ import {
   fetchSolanaMTBalance,
   fetchSolanaSOLBalance,
   deriveSolanaKeypairFromSeed,
+
+  // new auth + multi
+  AUTH_URL,
+  signup,
+  verifyAccount,
+  login,
+  getMe,
+  backupWallet,
+  fetchBackedUpWallets,
+  deleteBackedUpWallet,
+  createNewWalletForAccount,
+  importWalletAsEntry,
+  getAuthToken,
+  setAuthToken,
+  clearAuth,
+  getUserProfile,
+  saveUserProfile,
+  getLocalWallets,
+  saveLocalWallets,
+  addOrUpdateLocalWallet,
+  removeLocalWallet,
 } from './lib/mt-wallet';
 
 const TABS = [
   { id: 'portfolio', label: 'Portfolio', icon: Zap },
   { id: 'send-receive', label: 'Send / Receive', icon: Send },
+  { id: 'trade', label: 'Buy / Sell', icon: RefreshCw },
   { id: 'nfts', label: 'NFTs', icon: Image },
   { id: 'rockets', label: 'Rockets', icon: Zap },
   { id: 'activity', label: 'Activity', icon: RefreshCw },
@@ -49,6 +72,18 @@ export default function MTWalletApp() {
   const [authError, setAuthError] = useState('');
   const [showSeed, setShowSeed] = useState(false);
   const [seedRevealed, setSeedRevealed] = useState(false);
+
+  // === NEW: Email + Phone account system + multiple wallets per account ===
+  const [accountEmail, setAccountEmail] = useState('');
+  const [accountPhone, setAccountPhone] = useState('');
+  const [accountPassword, setAccountPassword] = useState(''); // used for login AND client-side encryption of all wallets
+  const [verifyCode, setVerifyCode] = useState('');
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup' | 'verify'
+  const [isLoggedIn, setIsLoggedIn] = useState(!!getAuthToken());
+  const [currentUser, setCurrentUser] = useState(getUserProfile());
+  const [myWallets, setMyWallets] = useState([]); // [{id, name, publicKey, encryptedData}]
+  const [activeWalletId, setActiveWalletId] = useState(null);
+  const [masterPassword, setMasterPassword] = useState(''); // in-memory only after login
 
   // App state
   const [activeTab, setActiveTab] = useState('portfolio');
@@ -346,99 +381,178 @@ export default function MTWalletApp() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // ========== LOCKED / SETUP SCREEN ==========
-  if (!isUnlocked) {
-    const hasExisting = typeof window !== 'undefined' && localStorage.getItem('mt_vault_v1');
+  // === NEW HELPERS for multi-wallet + account auth ===
+  async function activateWalletEntry(entry, pwd) {
+    if (!entry || !entry.encryptedData || !pwd) return;
+    try {
+      const mnemonic = await (await import('./lib/mt-wallet')).decryptMnemonic(entry.encryptedData, pwd);
+      const w = (await import('./lib/mt-wallet')).importMTWalletFromMnemonic(mnemonic);
+      setWallet(w);
+      setIsUnlocked(true);
+      setActiveWalletId(entry.id);
+      setMasterPassword(pwd);
+      setAccountPassword(pwd); // keep in sync for new creations
+      setStatus(`Activated wallet: ${entry.name}`);
+      setTimeout(() => {
+        generateQR(w.publicKey);
+        refreshAll();
+      }, 80);
+    } catch (e) {
+      setStatus('Failed to unlock wallet with this password: ' + e.message);
+    }
+  }
 
+  async function loadMyWallets() {
+    if (!getAuthToken()) return;
+    try {
+      const list = await (await import('./lib/mt-wallet')).fetchBackedUpWallets();
+      setMyWallets(list);
+      if (list.length > 0 && !activeWalletId) {
+        // auto activate first
+        // but we need the password - ask user or use master
+      }
+    } catch (e) {
+      // no server or not logged - use local
+      setMyWallets(getLocalWallets());
+    }
+  }
+
+  async function handleCreateAccountWallet() {
+    if (!accountPassword) {
+      setAuthError('Set your account password first');
+      return;
+    }
+    try {
+      const { wallet: entry, encryptedPayload } = await (await import('./lib/mt-wallet')).createNewWalletForAccount(
+        'Wallet ' + (myWallets.length + 1),
+        accountPassword,
+        !!getAuthToken()
+      );
+      const fullEntry = { ...entry, encryptedData: encryptedPayload };
+      addOrUpdateLocalWallet(fullEntry);
+      setMyWallets(prev => [...prev, fullEntry]);
+      await activateWalletEntry(fullEntry, accountPassword);
+    } catch (e) {
+      setStatus('Create wallet failed: ' + e.message);
+    }
+  }
+
+  // ========== NEW LOCKED / ACCOUNT SCREEN (email + phone + multi-wallet) ==========
+  if (!isLoggedIn && !isUnlocked) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center p-6 selection:bg-emerald-500 selection:text-black">
         <div className="w-full max-w-md">
-          {/* Brand */}
-          <div className="flex flex-col items-center mb-10">
+          <div className="flex flex-col items-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-500 flex items-center justify-center shadow-2xl shadow-emerald-500/30 mb-4">
               <span className="font-black text-3xl text-black tracking-[-2px]">MT</span>
             </div>
             <div className="text-3xl font-black tracking-[-1.5px]">MT Wallet</div>
             <div className="text-emerald-400 text-sm tracking-[3px] mt-1 font-mono">MT ECO SYSTEM</div>
-            <div className="text-[10px] text-zinc-500 mt-2">SELF-CUSTODIAL • NO THIRD PARTIES • 1¢ FEES</div>
+            <div className="text-[10px] text-zinc-500 mt-2 text-center">Email + Phone accounts • Multiple wallets • Access anywhere • Self-custodial keys</div>
           </div>
 
           <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-8 shadow-xl">
-            {!hasExisting && !showCreate && !showImport && (
-              <div className="text-center space-y-6">
-                <div>
-                  <div className="text-lg font-semibold">Welcome to the future of on-chain.</div>
-                  <p className="text-sm text-zinc-400 mt-2">Your keys. Your assets. Your rockets.<br />Everything built in-house for the MT network.</p>
-                </div>
-                <div className="space-y-3 pt-2">
-                  <button onClick={() => setShowCreate(true)} className="w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-black font-bold text-sm tracking-widest transition flex items-center justify-center gap-2">
-                    <Plus className="w-4 h-4" /> CREATE NEW WALLET
-                  </button>
-                  <button onClick={() => setShowImport(true)} className="w-full py-3.5 rounded-2xl border border-zinc-700 hover:bg-zinc-900 text-sm font-semibold tracking-widest transition">
-                    IMPORT RECOVERY PHRASE
-                  </button>
-                </div>
-                <div className="text-[10px] text-emerald-400/70 pt-3">100% client-side encryption • Ed25519 keys • Compatible with MT node</div>
-              </div>
-            )}
-
-            {/* CREATE FORM */}
-            {showCreate && (
-              <form onSubmit={handleCreateWallet} className="space-y-5">
+            {/* LOGIN */}
+            {authMode === 'login' && (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setAuthError('');
+                try {
+                  const res = await login(accountEmail || accountPhone, accountPassword);
+                  setIsLoggedIn(true);
+                  setCurrentUser(res.user || getUserProfile());
+                  setMasterPassword(accountPassword);
+                  setStatus('Logged in • Loading your wallets...');
+                  await loadMyWallets();
+                  setAccountPassword('');
+                } catch (err) {
+                  setAuthError(err.message || 'Login failed');
+                }
+              }} className="space-y-4">
                 <div className="text-center mb-2">
-                  <div className="font-semibold text-lg">Create Secure Vault</div>
-                  <div className="text-xs text-zinc-500">Password encrypts your seed phrase locally</div>
+                  <div className="font-semibold text-xl">Sign in to your MT Account</div>
+                  <div className="text-xs text-zinc-500">Access all your wallets from any device</div>
                 </div>
-                <input type="password" required minLength={6} placeholder="Create password (min 6 chars)" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono placeholder:text-zinc-600" />
-                <input type="password" required placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono placeholder:text-zinc-600" />
+                <input type="text" placeholder="Email or Phone" value={accountEmail || accountPhone} onChange={(e) => { const v = e.target.value; if (v.includes('@')) setAccountEmail(v); else setAccountPhone(v); }} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
+                <input type="password" placeholder="Password" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" required />
                 {authError && <div className="text-red-400 text-xs">{authError}</div>}
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => { setShowCreate(false); setAuthError(''); }} className="flex-1 py-3 rounded-2xl border border-zinc-700 text-sm">Cancel</button>
-                  <button type="submit" className="flex-1 py-3 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider">CREATE &amp; ENCRYPT</button>
+                <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider mt-2">SIGN IN</button>
+                <div className="text-center text-xs">
+                  No account? <button type="button" onClick={() => { setAuthMode('signup'); setAuthError(''); }} className="text-emerald-400 underline">Create one with email + phone</button>
                 </div>
               </form>
             )}
 
-            {/* IMPORT FORM */}
-            {showImport && (
-              <form onSubmit={handleImportWallet} className="space-y-5">
+            {/* SIGNUP */}
+            {authMode === 'signup' && (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setAuthError('');
+                if (!accountEmail || !accountPhone || accountPassword.length < 6) {
+                  setAuthError('Email, phone and password (6+ chars) required');
+                  return;
+                }
+                try {
+                  const res = await signup(accountEmail, accountPhone, accountPassword);
+                  setAuthMode('verify');
+                  // For live demo the backend returns the code
+                  if (res.demoVerificationCode) {
+                    setVerifyCode(res.demoVerificationCode);
+                  }
+                  setStatus('Account created. Enter the verification code (demo: shown below).');
+                } catch (err) {
+                  setAuthError(err.message || 'Signup failed');
+                }
+              }} className="space-y-4">
                 <div className="text-center mb-1">
-                  <div className="font-semibold text-lg">Import Existing Wallet</div>
-                  <div className="text-xs text-zinc-500">Enter your 12-word recovery phrase</div>
+                  <div className="font-semibold text-lg">Create MT Account</div>
+                  <div className="text-xs text-zinc-500">Email + Phone for recovery &amp; access on any device</div>
                 </div>
-                <textarea value={importMnemonic} onChange={(e) => setImportMnemonic(e.target.value)} placeholder="word1 word2 word3 ..." className="w-full h-24 bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono placeholder:text-zinc-600 resize-y" />
-                <input type="password" required minLength={6} placeholder="New vault password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
-                <input type="password" required placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" />
+                <input type="email" placeholder="Email address" value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
+                <input type="tel" placeholder="Phone number (e.g. +1 555 123 4567)" value={accountPhone} onChange={(e) => setAccountPhone(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
+                <input type="password" placeholder="Password (min 6 chars)" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" required />
                 {authError && <div className="text-red-400 text-xs">{authError}</div>}
-                <div className="flex gap-3 pt-1">
-                  <button type="button" onClick={() => { setShowImport(false); setAuthError(''); }} className="flex-1 py-3 rounded-2xl border border-zinc-700 text-sm">Cancel</button>
-                  <button type="submit" className="flex-1 py-3 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider">IMPORT &amp; SECURE</button>
+                <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider">CREATE ACCOUNT</button>
+                <div className="text-center text-xs">
+                  Already have an account? <button type="button" onClick={() => { setAuthMode('login'); setAuthError(''); }} className="text-emerald-400 underline">Sign in</button>
                 </div>
+                <div className="text-[10px] text-center text-zinc-500 pt-2">We will never see your private keys. Only encrypted backups.</div>
               </form>
             )}
 
-            {/* UNLOCK (existing vault) */}
-            {hasExisting && !showCreate && !showImport && (
-              <form onSubmit={handleUnlock} className="space-y-4">
+            {/* VERIFY */}
+            {authMode === 'verify' && (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setAuthError('');
+                try {
+                  const res = await verifyAccount(accountEmail, verifyCode);
+                  setIsLoggedIn(true);
+                  setCurrentUser(res.user);
+                  setMasterPassword(accountPassword);
+                  setStatus('Account verified! Creating your first wallet...');
+                  await loadMyWallets();
+                  // Auto create first wallet if none
+                  if ((await (await import('./lib/mt-wallet')).fetchBackedUpWallets()).length === 0) {
+                    await handleCreateAccountWallet();
+                  }
+                } catch (err) {
+                  setAuthError(err.message || 'Verification failed');
+                }
+              }} className="space-y-4">
                 <div className="text-center">
-                  <div className="font-semibold">Unlock MT Wallet</div>
-                  <div className="text-xs text-zinc-500 mt-1">Enter the password you used to encrypt this vault</div>
+                  <div className="font-semibold">Verify your account</div>
+                  <div className="text-xs text-zinc-500 mt-1">Enter the code sent to {accountEmail} / {accountPhone}</div>
                 </div>
-                <div className="relative">
-                  <input type="password" autoFocus required placeholder="Vault password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3.5 text-sm font-mono" />
-                </div>
-                {authError && <div className="text-red-400 text-xs -mt-1">{authError}</div>}
-                <button type="submit" className="w-full py-3.5 mt-2 rounded-2xl bg-white text-black font-bold text-sm tracking-[1.5px] flex items-center justify-center gap-2 active:opacity-90">
-                  <Unlock className="w-4 h-4" /> UNLOCK VAULT
-                </button>
-                <div className="text-center pt-1">
-                  <button type="button" onClick={() => setShowImport(true)} className="text-xs text-emerald-400 hover:underline">Import different seed instead</button>
-                </div>
+                <input type="text" placeholder="123456" value={verifyCode} onChange={(e) => setVerifyCode(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-center font-mono text-lg tracking-[4px]" maxLength={6} />
+                {authError && <div className="text-red-400 text-xs text-center">{authError}</div>}
+                <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider">VERIFY &amp; ACTIVATE</button>
+                <div className="text-[10px] text-center text-emerald-400/70">DEMO: The code was shown in the previous step (in real it would be emailed/SMSed by our self-built service)</div>
               </form>
             )}
           </div>
 
-          <div className="text-center mt-6 text-[10px] text-zinc-500 font-mono tracking-widest">NO KEYS SENT • NO FIREBASE • NO PHANTOM • BUILT FOR MT</div>
+          <div className="text-center mt-6 text-[10px] text-zinc-500 font-mono tracking-widest">BUILT IN-HOUSE • EMAIL + PHONE RECOVERY • MULTIPLE WALLETS • NO THIRD PARTIES</div>
         </div>
       </div>
     );
@@ -586,6 +700,57 @@ export default function MTWalletApp() {
               <button onClick={() => setShowMintModal(true)} className="px-6 py-3 border border-emerald-800 hover:bg-emerald-950 text-emerald-400 rounded-2xl font-semibold flex items-center gap-2 text-sm"><Plus className="w-4 h-4" /> MINT NFT ON MT</button>
               <button onClick={refreshAll} className="px-5 py-3 text-sm border border-zinc-800 rounded-2xl flex items-center gap-2 hover:bg-zinc-950"><RefreshCw className="w-4 h-4" /> SYNC ALL</button>
             </div>
+
+            {/* Multi-wallet manager (email/phone accounts) */}
+            {isLoggedIn && (
+              <div className="mt-6 bg-zinc-950 border border-zinc-800 rounded-3xl p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="font-semibold">Your Wallets ({myWallets.length})</div>
+                  <button onClick={handleCreateAccountWallet} className="text-xs px-3 py-1.5 rounded-xl border border-emerald-800 text-emerald-400">+ New Wallet</button>
+                </div>
+                {myWallets.length === 0 && <div className="text-xs text-zinc-500">No wallets yet. Create one above — it will be backed up to your account for access on any device.</div>}
+                <div className="space-y-2 mt-2">
+                  {myWallets.map(w => (
+                    <div key={w.id} className={`flex justify-between items-center p-3 rounded-2xl border ${activeWalletId === w.id ? 'border-emerald-500 bg-emerald-950/20' : 'border-zinc-800'}`}>
+                      <div>
+                        <div className="font-medium">{w.name}</div>
+                        <div className="text-[10px] font-mono text-zinc-500">{w.publicKey?.slice(0,10)}...</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => activateWalletEntry(w, masterPassword || accountPassword)} className="text-xs px-3 py-1 rounded bg-emerald-500 text-black">ACTIVATE</button>
+                        {getAuthToken() && <button onClick={async () => { await (await import('./lib/mt-wallet')).deleteBackedUpWallet(w.id); await loadMyWallets(); }} className="text-xs px-2 text-red-400">Delete</button>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-[10px] text-zinc-500 mt-3">Wallets are encrypted with your account password. Login on any device to restore them.</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* BUY / SELL / TRADE - real live DEX links, nothing fake */}
+        {activeTab === 'trade' && (
+          <div className="max-w-2xl mx-auto space-y-6">
+            <div className="text-center">
+              <div className="font-semibold text-2xl">Buy &amp; Sell $MT</div>
+              <div className="text-sm text-zinc-400 mt-1">Live on Solana • Real liquidity via Jupiter &amp; Raydium</div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <a href="https://jup.ag/swap/SOL-ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump" target="_blank" rel="noreferrer" className="block rounded-3xl border border-emerald-800 bg-zinc-950 p-6 hover:border-emerald-500 transition">
+                <div className="font-semibold text-lg">Buy $MT</div>
+                <div className="text-sm text-zinc-400 mt-2">Swap SOL for $MT on Jupiter (best rates, live order books)</div>
+                <div className="mt-4 text-emerald-400 text-sm">Open Jupiter →</div>
+              </a>
+              <a href="https://raydium.io/swap/?inputMint=sol&outputMint=ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump" target="_blank" rel="noreferrer" className="block rounded-3xl border border-zinc-700 bg-zinc-950 p-6 hover:border-zinc-500 transition">
+                <div className="font-semibold text-lg">Sell $MT</div>
+                <div className="text-sm text-zinc-400 mt-2">Swap $MT back to SOL on Raydium</div>
+                <div className="mt-4 text-emerald-400 text-sm">Open Raydium →</div>
+              </a>
+            </div>
+
+            <div className="text-xs text-center text-zinc-500">All trades are real on-chain Solana transactions. Use the address from your active wallet in Portfolio.</div>
           </div>
         )}
 

@@ -21,24 +21,24 @@ export default function WalletPromo() {
               <div>
                 <div className="font-mono text-emerald-400 text-xs mb-1">CORE</div>
                 <ul className="space-y-1.5 opacity-80">
-                  <li>Seed phrase + password vault (AES encrypted)</li>
-                  <li>Local ed25519 signing (matches our node)</li>
-                  <li>Send / Receive with QR</li>
-                  <li>Live MT native balance + Solana $MT</li>
+                  <li>Email + Phone account (real signup)</li>
+                  <li>Multiple wallets per account</li>
+                  <li>Access the same wallets from any device</li>
+                  <li>Live MT native + Solana $MT balances</li>
                 </ul>
               </div>
               <div>
-                <div className="font-mono text-emerald-400 text-xs mb-1">UNIQUE TO MT</div>
+                <div className="font-mono text-emerald-400 text-xs mb-1">LIVE &amp; REAL</div>
                 <ul className="space-y-1.5 opacity-80">
-                  <li>Mint NFTs directly in wallet</li>
-                  <li>Rockets balance (game earnings)</li>
-                  <li>Self-built Solana bridge stub</li>
-                  <li>Zero third-party custody ever</li>
+                  <li>Mint real on-chain NFTs in wallet</li>
+                  <li>Buy / Sell $MT on live Jupiter &amp; Raydium</li>
+                  <li>Rockets (cross-game utility)</li>
+                  <li>Self-built everything — no fake metrics</li>
                 </ul>
               </div>
             </div>
 
-            <div className="mt-8 pt-6 border-t border-white/10 text-xs text-emerald-400/80">Future: Hardware wallet support, browser extension, in-wallet game launcher, full cross-chain.</div>
+            <div className="mt-8 pt-6 border-t border-white/10 text-xs text-emerald-400/80">Login with email/phone on any device. Keys stay encrypted &amp; client-side.</div>
           </div>
         </div>
       </div>

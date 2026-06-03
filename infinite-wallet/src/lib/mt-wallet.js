@@ -15,6 +15,9 @@ import { Buffer } from 'buffer';
 // MT Node (local dev by default - later configurable / prod endpoint)
 export const MT_NODE = 'http://localhost:4000';
 
+// Auth service (for email/phone accounts + cross-device encrypted wallet backup)
+export const AUTH_URL = 'http://localhost:4001';
+
 // Fixed ultra-low fee (marketed as ~1 cent SOL equivalent)
 export const MT_TX_FEE = 0.01;
 
@@ -313,5 +316,194 @@ export function deriveSolanaKeypairFromSeed(seed32) {
   return {
     publicKey: kp.publicKey.toBase58(),
     keypair: kp, // only for advanced signing if needed in future
+  };
+}
+
+/**
+ * ============================================
+ * AUTH + MULTI-WALLET (email/phone accounts + cross device)
+ * ============================================
+ * - Signup with email + phone + password
+ * - Login anywhere
+ * - Multiple wallets per account
+ * - Encrypted backups stored on our self-built auth service
+ * - Client always decrypts with the user's password
+ */
+
+const AUTH_TOKEN_KEY = 'mt_auth_token';
+const USER_PROFILE_KEY = 'mt_user_profile';
+const LOCAL_WALLETS_KEY = 'mt_local_wallets_v2'; // supports multiple
+
+export function getAuthToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function setAuthToken(token) {
+  if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+export function clearAuth() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(USER_PROFILE_KEY);
+  // keep local wallets or clear? keep for offline
+}
+
+export function getUserProfile() {
+  try {
+    return JSON.parse(localStorage.getItem(USER_PROFILE_KEY) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+export function saveUserProfile(profile) {
+  localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile));
+}
+
+/**
+ * Local multi-wallet storage (encrypted blobs)
+ */
+export function getLocalWallets() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_WALLETS_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalWallets(wallets) {
+  localStorage.setItem(LOCAL_WALLETS_KEY, JSON.stringify(wallets));
+}
+
+export function addOrUpdateLocalWallet(walletEntry) {
+  const list = getLocalWallets();
+  const idx = list.findIndex(w => w.id === walletEntry.id);
+  if (idx >= 0) list[idx] = walletEntry;
+  else list.push(walletEntry);
+  saveLocalWallets(list);
+  return list;
+}
+
+export function removeLocalWallet(id) {
+  const list = getLocalWallets().filter(w => w.id !== id);
+  saveLocalWallets(list);
+  return list;
+}
+
+/**
+ * AUTH API CALLS
+ */
+async function authFetch(path, options = {}) {
+  const token = getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  };
+  const res = await fetch(`${AUTH_URL}${path}`, { ...options, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Auth request failed');
+  return data;
+}
+
+export async function signup(email, phone, password) {
+  return authFetch('/signup', {
+    method: 'POST',
+    body: JSON.stringify({ email, phone, password }),
+  });
+}
+
+export async function verifyAccount(email, code) {
+  const data = await authFetch('/verify', {
+    method: 'POST',
+    body: JSON.stringify({ email, code }),
+  });
+  if (data.token) {
+    setAuthToken(data.token);
+    if (data.user) saveUserProfile(data.user);
+  }
+  return data;
+}
+
+export async function login(emailOrPhone, password) {
+  const data = await authFetch('/login', {
+    method: 'POST',
+    body: JSON.stringify({ emailOrPhone, password }),
+  });
+  if (data.token) {
+    setAuthToken(data.token);
+    if (data.user) saveUserProfile(data.user);
+  }
+  return data;
+}
+
+export async function getMe() {
+  return authFetch('/me');
+}
+
+/**
+ * Backup current encrypted wallet data to the server (cross-device)
+ * encryptedData = the full encrypted vault payload from encryptMnemonic
+ */
+export async function backupWallet(name, encryptedData, address) {
+  return authFetch('/wallets/backup', {
+    method: 'POST',
+    body: JSON.stringify({ name, encryptedData, address }),
+  });
+}
+
+/**
+ * Fetch all backed up wallets for the logged in user
+ */
+export async function fetchBackedUpWallets() {
+  return authFetch('/wallets');
+}
+
+/**
+ * Delete a backed up wallet
+ */
+export async function deleteBackedUpWallet(id) {
+  return authFetch(`/wallets/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * Create a new wallet (mnemonic) and optionally back it up.
+ * password = the user's login password (used for client-side encryption)
+ */
+export async function createNewWalletForAccount(name = 'Main Wallet', password, backupToCloud = true) {
+  if (!password) throw new Error('Password required to encrypt new wallet');
+  const w = generateMTWallet();
+  const encryptedPayload = await encryptMnemonic(w.mnemonic, password);
+
+  const entry = {
+    id: 'w_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
+    name,
+    publicKey: w.publicKey,
+    createdAt: Date.now(),
+  };
+
+  if (backupToCloud && getAuthToken()) {
+    try {
+      await backupWallet(name, encryptedPayload, w.publicKey);
+    } catch (e) {
+      console.warn('Cloud backup failed (will retry later)', e);
+    }
+  }
+
+  return { wallet: entry, encryptedPayload };
+}
+
+// Helper to import a mnemonic as a new wallet entry (client encrypted)
+export async function importWalletAsEntry(mnemonic, name = 'Imported Wallet', password) {
+  if (!password) throw new Error('Password required to encrypt imported wallet');
+  if (!bip39.validateMnemonic(mnemonic)) throw new Error('Invalid recovery phrase');
+  const w = importMTWalletFromMnemonic(mnemonic);
+  const encryptedPayload = await encryptMnemonic(mnemonic, password);
+  return {
+    id: 'w_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
+    name,
+    publicKey: w.publicKey,
+    encryptedPayload,
+    createdAt: Date.now(),
   };
 }

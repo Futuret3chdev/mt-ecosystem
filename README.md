@@ -4,12 +4,13 @@
 
 Native token: **$MT** (`ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump`)
 
-- Self-built **MT Wallet** (Phantom-like experience, 100% client-side keys, no third parties)
+- Self-built **MT Wallet** (Phantom-like, email + phone accounts, multiple wallets per user, cross-device access via our self-built auth)
 - Ultra-low fixed fees (~1¢ SOL equivalent)
 - On-chain NFTs (mint directly in the wallet)
 - **Rockets** — cross-game/platform utility earned in MT Games, stored and transferable via the wallet
+- Real Buy/Sell on live Jupiter & Raydium (nothing fake)
 - Self-built bridge (starting with Solana)
-- Everything built in-house: wallet, node/protocol, future games, developer APIs
+- Everything built in-house: wallet, node/protocol, auth service, future games, developer APIs
 
 **No third-party chains, bridges, wallets, or custodians.**
 
@@ -56,7 +57,18 @@ npm run dev
 # Open the Next.js dev server
 ```
 
-All frontends are self-contained. The wallet talks to the local node when running.
+### 4. Auth Service (email + phone accounts + cross-device wallet restore)
+```powershell
+cd mt-auth
+npm install
+npm start
+# Runs on http://localhost:4001
+# Wallet will use it for signup/login + encrypted backups
+```
+
+All frontends are self-contained. The wallet talks to the local node (4000) and auth (4001) when running locally.
+
+On the live Vercel previews the wallet works in "local demo" mode. For full email/phone + multi-device, run the auth service locally and update AUTH_URL in the wallet lib.
 
 ## GitHub + Vercel Deployment
 

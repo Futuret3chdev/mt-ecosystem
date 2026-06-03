@@ -1,0 +1,16 @@
+{
+  "name": "mt-auth",
+  "version": "0.1.0",
+  "description": "MT ECO SYSTEM Auth & Wallet Backup Service - Self-built email/phone account system for cross-device access. Keys remain client-encrypted.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "express": "^5.0.1",
+    "uuid": "^9.0.0"
+  }
+}
