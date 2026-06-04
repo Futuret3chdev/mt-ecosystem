@@ -378,9 +378,11 @@ export async function submitMTTx(unsignedTx, signature) {
   }
   if (!res.ok || (json && json.error)) {
     const errDetail = (json && json.error) ||
-      (trimmed.startsWith('<!') || trimmed.startsWith('<html')
-        ? `server at ${node} returned HTML (status ${res.status}) instead of JSON. This usually means the fetch URL resolved to the wallet frontend (SPA catch-all) or a misconfigured proxy instead of the MT core API. Check: 1) VITE_MT_NODE_URL in Vercel is set to https://api.futuret3ch.com.au (or /api/mt), 2) curl -v https://api.futuret3ch.com.au/tx or /health returns JSON (not 403/404/HTML), 3) nginx on VPS has active api.futuret3ch.com.au block proxying to correct mt-core port.`
-        : (text || 'Transaction failed'));
+      (res.status === 413
+        ? `Payload too large (413). The NFT metadata (especially the image data URL) is too big for the server limit. Use a smaller image (the designer produces tiny ones; uploads limited to ~500KB in UI). Or increase client_max_body_size in nginx and bodyParser limit in mt-core.`
+        : (trimmed.startsWith('<!') || trimmed.startsWith('<html')
+            ? `server at ${node} returned HTML (status ${res.status}) instead of JSON. This usually means the fetch URL resolved to the wallet frontend (SPA catch-all) or a misconfigured proxy instead of the MT core API. Check: 1) VITE_MT_NODE_URL in Vercel is set to https://api.futuret3ch.com.au (or /api/mt), 2) curl -v https://api.futuret3ch.com.au/tx or /health returns JSON (not 403/404/HTML), 3) nginx on VPS has active api.futuret3ch.com.au block proxying to correct mt-core port.`
+            : (text || 'Transaction failed')));
     throw new Error(errDetail);
   }
   return json || { ok: true };

@@ -2024,12 +2024,34 @@ ${revealedMnemonic}
 
               {/* Image upload for real image NFTs */}
               <div className="mb-3">
-                <label className="text-xs text-zinc-400 block mb-1">Image (upload PNG/JPG — stored in on-chain metadata)</label>
+                <label className="text-xs text-zinc-400 block mb-1">Image (upload PNG/JPG — auto-resized to 512px max for on-chain metadata)</label>
                 <input type="file" accept="image/*" onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
+                  if (file.size > 2 * 1024 * 1024) { // 2MB raw
+                    alert('Image file too large (>2MB). Compress or use smaller image.');
+                    e.target.value = '';
+                    return;
+                  }
                   const reader = new FileReader();
-                  reader.onload = (ev) => setMintImage(ev.target.result);
+                  reader.onload = (ev) => {
+                    // Auto-resize large uploads to keep on-chain metadata reasonable (~<1MB base64)
+                    const img = new Image();
+                    img.onload = () => {
+                      const maxDim = 512;
+                      let w = img.width;
+                      let h = img.height;
+                      if (w > maxDim || h > maxDim) {
+                        if (w > h) { h = Math.round(h * (maxDim / w)); w = maxDim; }
+                        else { w = Math.round(w * (maxDim / h)); h = maxDim; }
+                      }
+                      const c = document.createElement('canvas');
+                      c.width = w; c.height = h;
+                      c.getContext('2d').drawImage(img, 0, 0, w, h);
+                      setMintImage(c.toDataURL('image/png', 0.9));
+                    };
+                    img.src = ev.target.result;
+                  };
                   reader.readAsDataURL(file);
                 }} className="text-sm" />
                 {mintImage && (

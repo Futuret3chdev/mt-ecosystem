@@ -165,7 +165,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type'],
 }));
 
-app.use(bodyParser.json({ limit: '1mb' }));
+app.use(bodyParser.json({ limit: '10mb' })); // must be >= nginx client_max_body_size for NFT image data URLs in /tx mints
 
 /**
  * =========================

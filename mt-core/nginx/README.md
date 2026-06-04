@@ -193,6 +193,10 @@ sudo cp mt-auth.conf /etc/nginx/sites-available/auth.futuret3ch.com.au
 sudo cp mt-core.conf /etc/nginx/sites-available/api.futuret3ch.com.au
 sudo cp wallet.conf /etc/nginx/sites-available/wallet.futuret3ch.com.au
 
+# IMPORTANT for NFT mints: after copy + certbot, ensure BOTH 80 and 443 server blocks
+# have `client_max_body_size 20m;` (nginx default is 1m, which causes 413 on image NFTs).
+# Edit the ssl block added by certbot if necessary.
+
 # Symlinks
 sudo ln -sf /etc/nginx/sites-available/auth.futuret3ch.com.au /etc/nginx/sites-enabled/auth.futuret3ch.com.au
 sudo ln -sf /etc/nginx/sites-available/api.futuret3ch.com.au /etc/nginx/sites-enabled/api.futuret3ch.com.au
