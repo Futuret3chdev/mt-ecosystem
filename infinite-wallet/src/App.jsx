@@ -117,6 +117,16 @@ export default function MTWalletApp() {
   const [showSeed, setShowSeed] = useState(false);
   const [seedRevealed, setSeedRevealed] = useState(false);
 
+  // New: per-wallet seed reveal (with password)
+  const [revealedMnemonic, setRevealedMnemonic] = useState('');
+  const [revealedWalletName, setRevealedWalletName] = useState('');
+
+  // Settings import from external (Phantom etc)
+  const [settingsImportMnemonic, setSettingsImportMnemonic] = useState('');
+  const [settingsImportName, setSettingsImportName] = useState('');
+  const [settingsImportPwd, setSettingsImportPwd] = useState('');
+  const [settingsImportConfirmPwd, setSettingsImportConfirmPwd] = useState('');
+
   // === NEW: Email + Phone account system + multiple wallets per account ===
   const [accountEmail, setAccountEmail] = useState('');
   const [accountPhone, setAccountPhone] = useState('');
@@ -627,6 +637,92 @@ export default function MTWalletApp() {
     } catch (e) {
       setStatus('Failed to unlock wallet with this password: ' + e.message);
       alert('Wrong password or corrupted data for this wallet.');
+    }
+  }
+
+  // Reveal seed phrase for a specific wallet entry (requires password re-entry for security)
+  async function revealSeedForEntry(entry) {
+    const encrypted = entry?.encryptedData || entry?.encryptedPayload;
+    if (!entry || !encrypted) {
+      alert('No seed data available for this wallet.');
+      return;
+    }
+    const pwd = window.prompt(`Enter your password to reveal the recovery phrase for "${entry.name || 'this wallet'}":\n\nThis will show your 12/24 word seed. Never share it.`);
+    if (!pwd) return;
+    try {
+      const { decryptMnemonic } = await import('./lib/mt-wallet');
+      const mnemonic = await decryptMnemonic(encrypted, pwd);
+      if (!mnemonic || typeof mnemonic !== 'string') throw new Error('Decryption returned no phrase');
+      setRevealedMnemonic(mnemonic);
+      setRevealedWalletName(entry.name || 'Wallet');
+      // Remember pwd for the session if useful
+      if (!masterPassword) setMasterPassword(pwd);
+    } catch (err) {
+      alert('Failed to reveal seed: ' + (err.message || 'wrong password?'));
+    }
+  }
+
+  // Import wallet in Settings (mnemonic from Phantom / other platforms)
+  async function handleSettingsImportWallet() {
+    const mnemonic = settingsImportMnemonic.trim();
+    if (!mnemonic || mnemonic.split(/\s+/).length < 12) {
+      alert('Please enter a valid 12 or 24 word recovery phrase');
+      return;
+    }
+    if (!settingsImportPwd || settingsImportPwd.length < 6) {
+      alert('Password must be at least 6 characters');
+      return;
+    }
+    if (settingsImportPwd !== settingsImportConfirmPwd) {
+      alert('Passwords do not match');
+      return;
+    }
+    try {
+      const { importWalletAsEntry, backupWallet, addOrUpdateLocalWallet, getLocalWallets, saveLocalWallets } = await import('./lib/mt-wallet');
+      const name = settingsImportName.trim() || 'Imported from Phantom/External';
+      const imported = await importWalletAsEntry(mnemonic, name, settingsImportPwd);
+      const fullEntry = {
+        ...imported,
+        encryptedData: imported.encryptedPayload || imported.encryptedData,
+        createdAt: Date.now(),
+      };
+
+      // Update UI list
+      setMyWallets(prev => {
+        const deduped = prev.filter(x => x.publicKey !== fullEntry.publicKey);
+        return [...deduped, fullEntry];
+      });
+
+      if (isLoggedIn && getAuthToken()) {
+        try {
+          await backupWallet({
+            name: fullEntry.name,
+            encryptedData: fullEntry.encryptedData,
+            address: fullEntry.publicKey || fullEntry.address,
+            color: fullEntry.color || '#10b981',
+          });
+        } catch (bErr) {
+          console.warn('Import backup to auth may need retry:', bErr);
+        }
+      } else {
+        // Guest / local only
+        addOrUpdateLocalWallet(fullEntry);
+        saveLocalWallets(getLocalWallets());
+      }
+
+      // Activate the new/imported wallet
+      await activateWalletEntry(fullEntry, settingsImportPwd);
+
+      // Clear form
+      setSettingsImportMnemonic('');
+      setSettingsImportName('');
+      setSettingsImportPwd('');
+      setSettingsImportConfirmPwd('');
+
+      setStatus(`Imported "${name}" successfully. Check your Portfolio list.`);
+      setActiveTab('portfolio');
+    } catch (err) {
+      alert('Import failed: ' + err.message);
     }
   }
 
@@ -1394,6 +1490,10 @@ export default function MTWalletApp() {
                                 setEditColor(w.color || '#10b981');
                               }} 
                               className="text-xs px-1.5 py-0.5 rounded border border-zinc-700 hover:bg-zinc-900">✎</button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); revealSeedForEntry(w); }} 
+                              className="text-xs px-1.5 py-0.5 rounded border border-amber-700 text-amber-400 hover:bg-amber-950" 
+                              title="Reveal recovery phrase (enter password)">🔑</button>
                             {isLoggedIn && getAuthToken() && getAuthURL() && <button onClick={async () => { await (await import('./lib/mt-wallet')).deleteBackedUpWallet(w.id); await loadMyWallets(); }} className="text-xs px-1 text-red-400">×</button>}
                           </div>
                         </div>
@@ -1725,7 +1825,7 @@ export default function MTWalletApp() {
               </ul>
             </div>
 
-            {/* Seed reveal removed for customer view - internal recovery only. Users should have backed up at creation. */}
+            {/* Seed reveal available per-wallet in the list above (Portfolio tab) — requires password. */}
 
             {/* Solana RPC override removed from customer Settings - managed internally */}
 
@@ -1741,9 +1841,121 @@ export default function MTWalletApp() {
             </div>
 
             <div className="text-xs text-zinc-500 pt-4">Primary holdings live on the MT native chain. Solana SPL is legacy for bridging.</div>
+
+            {/* IMPORT FROM EXTERNAL (Phantom etc) - requested feature */}
+            <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950">
+              <div className="font-semibold text-sm mb-1 text-emerald-400">Import from Phantom / Other Platforms</div>
+              <div className="text-[10px] text-zinc-400 mb-3">Paste a Secret Recovery Phrase (seed) exported from Phantom (Settings → Export Secret Recovery Phrase) or another compatible wallet. It will be encrypted locally + backed up to your account (if logged in).</div>
+              <div className="space-y-2">
+                <textarea 
+                  value={settingsImportMnemonic} 
+                  onChange={(e) => setSettingsImportMnemonic(e.target.value)} 
+                  placeholder="12 or 24 word recovery phrase" 
+                  className="w-full h-14 bg-black border border-zinc-800 rounded-2xl px-3 py-2 text-xs font-mono" 
+                />
+                <input 
+                  value={settingsImportName} 
+                  onChange={(e) => setSettingsImportName(e.target.value)} 
+                  placeholder="Name for imported wallet (optional)" 
+                  className="w-full bg-black border border-zinc-800 rounded-2xl px-3 py-2 text-sm" 
+                />
+                <input type="password" value={settingsImportPwd} onChange={(e) => setSettingsImportPwd(e.target.value)} placeholder="Password to encrypt imported wallet" className="w-full bg-black border border-zinc-800 rounded-2xl px-3 py-2 text-sm font-mono" />
+                <input type="password" value={settingsImportConfirmPwd} onChange={(e) => setSettingsImportConfirmPwd(e.target.value)} placeholder="Confirm password" className="w-full bg-black border border-zinc-800 rounded-2xl px-3 py-2 text-sm font-mono" />
+                <button 
+                  onClick={handleSettingsImportWallet} 
+                  className="w-full py-2.5 mt-1 bg-emerald-500 hover:bg-emerald-600 active:bg-black active:text-emerald-400 border border-emerald-400 text-black font-bold rounded-2xl text-sm tracking-wider"
+                >
+                  IMPORT &amp; ADD TO MY WALLETS
+                </button>
+              </div>
+              <div className="text-[9px] text-amber-400/70 mt-2">After import, go to Portfolio tab to activate the new wallet entry. Always double-check the phrase you pasted.</div>
+            </div>
           </div>
         )}
       </div>
+
+      {/* SEED REVEAL MODAL - view + export seed with password */}
+      {revealedMnemonic && (
+        <div 
+          className="fixed inset-0 z-[210] flex items-center justify-center bg-black/85 p-4" 
+          onClick={() => { setRevealedMnemonic(''); setRevealedWalletName(''); }}
+        >
+          <div 
+            className="bg-zinc-950 border border-amber-900 rounded-3xl p-8 max-w-lg w-full" 
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl">🔑</span>
+              <div>
+                <div className="font-bold text-amber-400">Recovery Phrase</div>
+                <div className="text-xs text-zinc-400">for {revealedWalletName}</div>
+              </div>
+            </div>
+
+            <div className="bg-red-950/60 border border-red-800 text-red-300 text-[11px] px-3 py-2 rounded-2xl mb-4">
+              NEVER share this phrase. Anyone who has it can steal your funds on MT and Solana. Write it down offline. Close this window when done.
+            </div>
+
+            <div className="bg-black border border-zinc-800 rounded-2xl p-3 mb-4 font-mono text-sm">
+              <div className="grid grid-cols-3 gap-1.5">
+                {revealedMnemonic.trim().split(/\s+/).map((word, idx) => (
+                  <div key={idx} className="flex items-center bg-zinc-900 rounded-xl px-3 py-1 text-xs">
+                    <span className="w-5 text-right pr-2 text-emerald-400/60">{idx + 1}.</span>
+                    <span className="font-semibold tracking-wider">{word}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(revealedMnemonic).then(() => {
+                    setStatus('Recovery phrase copied to clipboard');
+                  }).catch(() => alert('Copy failed'));
+                }}
+                className="flex-1 py-3 border border-zinc-700 hover:bg-zinc-900 rounded-2xl text-sm font-semibold"
+              >
+                Copy to Clipboard
+              </button>
+              <button 
+                onClick={() => {
+                  const content = 
+`MT-ECO SYSTEM Wallet Recovery Phrase
+Wallet: ${revealedWalletName}
+Exported: ${new Date().toISOString().slice(0,10)}
+
+WARNING: This is your secret seed. Store it offline and never share it.
+Anyone with these words can access ALL funds associated with this wallet (MT native + Solana).
+
+${revealedMnemonic}
+`;
+                  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `mt-eco-${revealedWalletName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-seed.txt`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                  setStatus('Seed file downloaded. Store it safely offline.');
+                }}
+                className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-2xl text-sm"
+              >
+                Download as .txt
+              </button>
+            </div>
+
+            <button 
+              onClick={() => { setRevealedMnemonic(''); setRevealedWalletName(''); }} 
+              className="mt-4 w-full py-2 text-xs text-zinc-400 hover:text-white"
+            >
+              Close (I have backed it up)
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* FOOTER BAR */}
       <div className="border-t border-zinc-800 py-3 text-center text-[10px] text-zinc-500 font-mono tracking-widest">MT-ECO SYSTEM — Developed by Futuret3ch and MemeTorrent • EVERYTHING BUILT IN-HOUSE • 1 CENT FEES • YOUR ASSETS, YOUR RULES</div>
