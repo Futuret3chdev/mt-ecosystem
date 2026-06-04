@@ -398,10 +398,11 @@ export default function MTWalletApp() {
       };
       addOrUpdateLocalWallet(localEntry);
       // Use the (deduped) local list so re-importing same seed doesn't create second entry
-      const updated = getLocalWallets();
+      const updated = getLocalWallets().map(normalizeWalletEntry);
       setMyWallets(updated);
       // activate the (possibly pre-existing) entry for this pk
-      const target = updated.find(x => x.publicKey === localEntry.publicKey) || localEntry;
+      const pk = localEntry.publicKey || localEntry.address;
+      const target = updated.find(x => (x.publicKey || x.address) === pk) || localEntry;
       setActiveWalletId(target.id);
 
       setWallet(w);
@@ -538,7 +539,7 @@ export default function MTWalletApp() {
   // Load local wallets for guest mode when unlocked
   useEffect(() => {
     if (isUnlocked && !isLoggedIn) {
-      const locals = getLocalWallets();
+      const locals = getLocalWallets().map(normalizeWalletEntry);
       if (locals.length > 0) {
         setMyWallets(locals);
         if (!activeWalletId) {
@@ -689,7 +690,8 @@ export default function MTWalletApp() {
 
       // Update UI list
       setMyWallets(prev => {
-        const deduped = prev.filter(x => x.publicKey !== fullEntry.publicKey);
+        const pk = fullEntry.publicKey || fullEntry.address;
+        const deduped = prev.filter(x => (x.publicKey || x.address) !== pk);
         return [...deduped, fullEntry];
       });
 
@@ -747,16 +749,18 @@ export default function MTWalletApp() {
   async function loadMyWallets() {
     if (!getAuthToken()) {
       const local = getLocalWallets();
-      setMyWallets(local);
-      return local;
+      const normalized = local.map(normalizeWalletEntry);
+      setMyWallets(normalized);
+      return normalized;
     }
     try {
       // When logged in, ONLY use the server-backed wallets for THIS account.
       // Do not merge localList -- local_wallets_v2 is global on device and would leak wallets from other accounts/guests.
       // This enforces isolation: each logged-in account only sees its own backed-up wallets from mt-auth.
       const serverList = await (await import('./lib/mt-wallet')).fetchBackedUpWallets() || [];
-      setMyWallets(serverList);
-      return serverList;
+      const normalized = serverList.map(normalizeWalletEntry);
+      setMyWallets(normalized);
+      return normalized;
     } catch (e) {
       // Fetch failed (e.g. auth server unreachable, mixed content, bad token) -- show empty for this account.
       // Do NOT fall back to local (which may contain other accounts' wallets).
@@ -765,6 +769,17 @@ export default function MTWalletApp() {
       setMyWallets([]);
       return [];
     }
+  }
+
+  function normalizeWalletEntry(w) {
+    if (!w) return w;
+    const pk = w.publicKey || w.address;
+    return {
+      ...w,
+      publicKey: pk,
+      address: pk,
+      encryptedData: w.encryptedData || w.encryptedPayload,
+    };
   }
 
   // Social login handler - uses real auth flow with demo social accounts for seamless experience.
@@ -801,7 +816,7 @@ export default function MTWalletApp() {
       setIsLoggedIn(true);
       setCurrentUser({ email, socialProvider: platform, name: `Demo ${platform} User` });
       setMasterPassword(pass);
-      setMyWallets(getLocalWallets() || []);
+      setMyWallets( (getLocalWallets() || []).map(normalizeWalletEntry) );
       setStatus(`Connected via ${platform} (demo mode)`);
       setGuestMode(false);
       setShowSocialDrawer(false);
@@ -864,7 +879,8 @@ export default function MTWalletApp() {
 
       // Optimistic add (so it doesn't disappear even if server list refresh lags or backup had transient issue)
       setMyWallets(prev => {
-        const without = prev.filter(x => x.publicKey !== fullEntry.publicKey);
+        const pk = fullEntry.publicKey || fullEntry.address;
+        const without = prev.filter(x => (x.publicKey || x.address) !== pk);
         return [...without, fullEntry];
       });
       await activateWalletEntry(fullEntry, pwd);
@@ -873,15 +889,16 @@ export default function MTWalletApp() {
       const serverListAfter = await loadMyWallets();
 
       // After refresh, prefer server version if present (correct id + persisted), else keep optimistic so it doesn't disappear.
-      const serverMatch = serverListAfter.find(x => x.publicKey === fullEntry.publicKey);
+      const serverMatch = serverListAfter.find(x => (x.publicKey || x.address) === (fullEntry.publicKey || fullEntry.address));
       const bestEntry = serverMatch || fullEntry;
 
       if (serverMatch) {
         setMyWallets(serverListAfter);
       } else {
         setMyWallets(prev => {
-          const has = prev.some(x => x.publicKey === fullEntry.publicKey);
-          return has ? prev : [...prev.filter(x => x.publicKey !== fullEntry.publicKey), fullEntry];
+          const pk = fullEntry.publicKey || fullEntry.address;
+          const has = prev.some(x => (x.publicKey || x.address) === pk);
+          return has ? prev : [...prev.filter(x => (x.publicKey || x.address) !== pk), fullEntry];
         });
       }
 
@@ -920,12 +937,13 @@ export default function MTWalletApp() {
       );
       const fullEntry = { ...entry, encryptedData: encryptedPayload, color, type };
       setMyWallets(prev => {
-        const without = prev.filter(x => x.publicKey !== fullEntry.publicKey);
+        const pk = fullEntry.publicKey || fullEntry.address;
+        const without = prev.filter(x => (x.publicKey || x.address) !== pk);
         return [...without, fullEntry];
       });
       await activateWalletEntry(fullEntry, pwd);
       const serverList = await loadMyWallets();
-      const best = serverList.find(x => x.publicKey === fullEntry.publicKey) || fullEntry;
+      const best = serverList.find(x => (x.publicKey || x.address) === (fullEntry.publicKey || fullEntry.address)) || fullEntry;
       await activateWalletEntry(best, pwd);
       setStatus(`${name} created! Promoted in your portfolio.`);
     } catch (e) {
