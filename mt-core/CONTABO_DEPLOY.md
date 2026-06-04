@@ -62,7 +62,7 @@ nano .env
 Example content for your setup:
 
 ```
-PORT=4000
+PORT=4001
 CORS_ORIGINS=https://infinite-wallet.vercel.app,https://your-wallet-domain.com,http://localhost:5173
 DATA_DIR=/opt/mt-ecosystem/mt-core/data
 # NETWORK_NAME=MT ECO SYSTEM Main
@@ -123,7 +123,7 @@ WorkingDirectory=/opt/mt-ecosystem/mt-core
 EnvironmentFile=-/opt/mt-ecosystem/mt-core/.env
 
 # Fallback direct env (uncomment and customize if not using .env file)
-# Environment=PORT=4000
+# Environment=PORT=4001
 # Environment=CORS_ORIGINS=https://infinite-wallet.vercel.app,https://yourdomain.com
 # Environment=DATA_DIR=/opt/mt-ecosystem/mt-core/data
 # Environment=NODE_ENV=production

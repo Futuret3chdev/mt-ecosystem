@@ -31,8 +31,8 @@ const app = express();
  * CONFIG - Perfect for Contabo / self-hosted VPS
  * =========================
  */
-const PORT = process.env.PORT || 4000;
-const rawCors = process.env.CORS_ORIGINS || 'http://localhost:5173,https://infinite-wallet.vercel.app,https://*.vercel.app';
+const PORT = process.env.PORT || 4001;
+const rawCors = process.env.CORS_ORIGINS || 'http://localhost:5173,https://wallet.futuret3ch.com.au,https://infinite-wallet.vercel.app,https://api.futuret3ch.com.au,https://auth.futuret3ch.com.au,https://*.vercel.app';
 const CORS_ORIGINS = rawCors.split(',').map(s => s.trim()).filter(Boolean);
 
 function isOriginAllowed(origin) {

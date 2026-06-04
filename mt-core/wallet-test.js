@@ -1,7 +1,7 @@
 const axios = require('axios');
 const { generateKeypair, signTx } = require('./crypto');
 
-const NODE = 'http://localhost:4000';
+const NODE = 'http://localhost:4001';
 
 async function run() {
   const alice = generateKeypair();

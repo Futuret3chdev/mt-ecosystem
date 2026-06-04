@@ -44,15 +44,15 @@ if [ ! -f "$MTCORE_DIR/.env" ]; then
     echo "Created $MTCORE_DIR/.env from example. Please edit it now:"
     echo "  nano $MTCORE_DIR/.env"
     echo "At minimum set:"
-    echo "  PORT=4000"
-    echo "  CORS_ORIGINS=https://infinite-wallet.vercel.app"
+    echo "  PORT=4001"
+    echo "  CORS_ORIGINS=https://infinite-wallet.vercel.app,https://wallet.futuret3ch.com.au,https://auth.futuret3ch.com.au,https://api.futuret3ch.com.au"
     echo "  DATA_DIR=$MTCORE_DIR/data"
     read -p "Press enter after you have edited .env ..."
   else
     echo "WARNING: No .env.example found. Creating basic .env"
     cat > "$MTCORE_DIR/.env" << EENV
-PORT=4000
-CORS_ORIGINS=https://infinite-wallet.vercel.app
+PORT=4001
+CORS_ORIGINS=https://infinite-wallet.vercel.app,https://wallet.futuret3ch.com.au,https://auth.futuret3ch.com.au,https://api.futuret3ch.com.au
 DATA_DIR=$MTCORE_DIR/data
 EENV
     nano "$MTCORE_DIR/.env"
@@ -109,4 +109,4 @@ echo ""
 echo "To watch logs: journalctl -u mt-core -f"
 echo "To restart after editing .env: systemctl restart mt-core"
 echo ""
-echo "Test: curl http://localhost:4000/health"
+echo "Test: curl http://localhost:4001/health"

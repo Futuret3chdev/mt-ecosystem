@@ -1,7 +1,8 @@
 export default async function handler(req, res) {
   // Proxy for mt-auth to allow HTTPS browser -> Vercel function -> HTTP VPS (avoids mixed content on live site)
   // Real data stays in mt-auth's per-user secure storage (encrypted wallets, user isolation by token/userId)
-  const authBase = process.env.VITE_AUTH_URL || 'http://161.97.106.182:4002';
+  // Target can be overridden by setting AUTH_TARGET_URL env in Vercel (e.g. https://auth.futuret3ch.com.au or http://IP:4002 for direct)
+  const authBase = process.env.AUTH_TARGET_URL || 'https://auth.futuret3ch.com.au';
   let targetPath = req.url.replace(/^\/api\/auth/, '');
   if (!targetPath.startsWith('/')) targetPath = '/' + targetPath;
   const targetUrl = authBase + targetPath;

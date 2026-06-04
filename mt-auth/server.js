@@ -19,9 +19,9 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 4001;
+const PORT = process.env.PORT || 4002;
 
-const rawCors = process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,https://infinite-wallet.vercel.app,https://*.vercel.app';
+const rawCors = process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,https://wallet.futuret3ch.com.au,https://infinite-wallet.vercel.app,https://api.futuret3ch.com.au,https://auth.futuret3ch.com.au,https://*.vercel.app';
 const CORS_ORIGINS = rawCors.split(',').map(s => s.trim()).filter(Boolean);
 
 function isOriginAllowed(origin) {

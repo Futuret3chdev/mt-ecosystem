@@ -14,7 +14,7 @@ WorkingDirectory=/opt/mt-ecosystem/mt-core
 EnvironmentFile=-/opt/mt-ecosystem/mt-core/.env
 
 # Fallback direct env (uncomment and customize if not using .env file)
-# Environment=PORT=4000
+# Environment=PORT=4001
 # Environment=CORS_ORIGINS=https://infinite-wallet.vercel.app,https://yourdomain.com
 # Environment=DATA_DIR=/opt/mt-ecosystem/mt-core/data
 # Environment=NODE_ENV=production
@@ -33,6 +33,7 @@ EnvironmentFile=-/opt/mt-ecosystem/mt-core/.env
 # ExecStart=/usr/bin/node node.js
 #
 # Do NOT use "node" without full path in systemd.
+# After start: curl http://localhost:4001/health  (or via https://api.futuret3ch.com.au/health after nginx)
 ExecStart=/usr/bin/node node.js
 
 # Restart policy

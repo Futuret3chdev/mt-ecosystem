@@ -2,7 +2,8 @@ export default async function handler(req, res) {
   // Proxy for mt-core (native MT node) to allow HTTPS browser -> Vercel function -> HTTP VPS
   // This makes native primary balances/NFTs/txs work on the live HTTPS site.
   // Real on-chain data comes from the VPS mt-core as always.
-  const mtBase = process.env.VITE_MT_NODE_URL || 'http://161.97.106.182:4001';
+  // Target can be overridden by setting MT_TARGET_URL env in Vercel (e.g. https://api.futuret3ch.com.au or http://IP:4001 for direct)
+  const mtBase = process.env.MT_TARGET_URL || 'https://api.futuret3ch.com.au';
   let targetPath = req.url.replace(/^\/api\/mt/, '');
   if (!targetPath.startsWith('/')) targetPath = '/' + targetPath;
   const targetUrl = mtBase + targetPath;

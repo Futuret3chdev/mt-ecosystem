@@ -52,11 +52,19 @@ export function getDefaultAuthURL() {
 export function getMTNode() {
   if (typeof window === 'undefined') return 'http://localhost:4000';
   const fromEnv = getDefaultMTNode();
-  if (fromEnv && fromEnv.startsWith('https')) return fromEnv;
+  // Respect VITE_MT_NODE_URL even if relative (e.g. /api/mt for Vercel serverless proxy fallback)
+  // or http/https. This allows documented use of VITE=/api/mt (shows in UI, routes via vercel fn)
+  // while still defaulting to direct https subdomains on prod hosts when no VITE is set.
+  if (fromEnv) {
+    if (fromEnv.startsWith('/')) return fromEnv; // relative base like /api/mt
+    if (/^https?:\/\//i.test(fromEnv)) return fromEnv;
+    // bare host? prefix http for safety
+    return 'http://' + fromEnv;
+  }
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const isVercelOrCustom = hostname.includes('vercel.app') || hostname.endsWith('futuret3ch.com.au');
   // On production (Vercel or our custom domains), default to the https api subdomain.
-  // Set VITE_MT_NODE_URL in Vercel env to override (e.g. if using different).
+  // Set VITE_MT_NODE_URL=https://api.futuret3ch.com.au (or /api/mt) in Vercel env to override.
   if (isVercelOrCustom) {
     return 'https://api.futuret3ch.com.au'; // official api subdomain (nginx proxy to core)
   }
@@ -72,7 +80,6 @@ export function getMTNode() {
     }
     return local;
   }
-  if (fromEnv) return fromEnv;
   return 'http://localhost:4000';
 }
 
@@ -94,11 +101,16 @@ export function setMTNode(url) {
 export function getAuthURL() {
   if (typeof window === 'undefined') return 'http://localhost:4001';
   const fromEnv = getDefaultAuthURL();
-  if (fromEnv && fromEnv.startsWith('https')) return fromEnv;
+  // Respect VITE_AUTH_URL even if relative (e.g. /api/auth) or http/https.
+  if (fromEnv) {
+    if (fromEnv.startsWith('/')) return fromEnv;
+    if (/^https?:\/\//i.test(fromEnv)) return fromEnv;
+    return 'http://' + fromEnv;
+  }
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const isVercelOrCustom = hostname.includes('vercel.app') || hostname.endsWith('futuret3ch.com.au');
   // On production (Vercel or our custom domains), default to the https auth subdomain.
-  // Set VITE_AUTH_URL in Vercel env to override.
+  // Set VITE_AUTH_URL=https://auth.futuret3ch.com.au (or /api/auth) in Vercel env to override.
   if (isVercelOrCustom) {
     return 'https://auth.futuret3ch.com.au'; // official auth subdomain (nginx proxy to mt-auth)
   }
@@ -113,7 +125,6 @@ export function getAuthURL() {
     }
     return local;
   }
-  if (fromEnv) return fromEnv;
   return 'http://localhost:4001';
 }
 
@@ -343,11 +354,22 @@ export async function submitMTTx(unsignedTx, signature) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const json = await res.json();
-  if (!res.ok || json.error) {
-    throw new Error(json.error || 'Transaction failed');
+  // Safe parse: detect HTML (SPA index.html or nginx error page) which produces the "Unexpected token '<'" error on mint
+  const text = await res.text();
+  let json = null;
+  const ct = (res.headers.get && res.headers.get('content-type')) || '';
+  const trimmed = (text || '').trim();
+  if (ct.includes('application/json') || trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try { json = JSON.parse(text); } catch (_) { json = null; }
   }
-  return json;
+  if (!res.ok || (json && json.error)) {
+    const errDetail = (json && json.error) ||
+      (trimmed.startsWith('<!') || trimmed.startsWith('<html')
+        ? `server at ${node} returned HTML (status ${res.status}) instead of JSON. This usually means the fetch URL resolved to the wallet frontend (SPA catch-all) or a misconfigured proxy instead of the MT core API. Check: 1) VITE_MT_NODE_URL in Vercel is set to https://api.futuret3ch.com.au (or /api/mt), 2) curl -v https://api.futuret3ch.com.au/tx or /health returns JSON (not 403/404/HTML), 3) nginx on VPS has active api.futuret3ch.com.au block proxying to correct mt-core port.`
+        : (text || 'Transaction failed'));
+    throw new Error(errDetail);
+  }
+  return json || { ok: true };
 }
 
 /**
@@ -364,11 +386,21 @@ export async function requestTestFunds(address) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ address }),
   });
-  const json = await res.json();
-  if (!res.ok || json.error) {
-    throw new Error(json.error || 'Faucet request failed');
+  const text = await res.text();
+  let json = null;
+  const ct = (res.headers.get && res.headers.get('content-type')) || '';
+  const trimmed = (text || '').trim();
+  if (ct.includes('application/json') || trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try { json = JSON.parse(text); } catch (_) { json = null; }
   }
-  return json;
+  if (!res.ok || (json && json.error)) {
+    const errDetail = (json && json.error) ||
+      (trimmed.startsWith('<!') || trimmed.startsWith('<html')
+        ? `server at ${node} returned HTML (status ${res.status}) instead of JSON (faucet). Check VITE_MT_NODE_URL and that the MT API host serves JSON (see submitMTTx for debug steps).`
+        : (text || 'Faucet request failed'));
+    throw new Error(errDetail);
+  }
+  return json || { ok: true };
 }
 
 /**
@@ -812,15 +844,22 @@ async function authFetch(path, options = {}) {
     if (!res.ok) throw new Error(data.error || 'Auth request failed');
     return data;
   } catch (e) {
-    // Fallback to demo only if real call fails (e.g. proxy or backend issue)
-    // On live Vercel this should now succeed via the /api/auth proxy -> real VPS storage
+    const isProdTarget = typeof authBase === 'string' && (authBase.includes('futuret3ch.com.au') || authBase.includes('https://'));
+    if (isProdTarget) {
+      // On production custom domain or any https target, never silently fall back to browser-local demo data.
+      // Doing so would hide the user's real per-userId encrypted wallets from mt-auth.
+      // Let the caller (loadMyWallets etc) surface the failure cleanly (sets [] + warning).
+      console.error('Prod auth call failed, NOT falling back to demo (wallets would appear to disappear):', authBase, e?.message || e);
+      throw e;
+    }
+    // Only demo for true local/dev cases where no real authBase was configured.
     return getDemoAuthResponse(path, options);
   }
 }
 
 function getDemoAuthResponse(path, options) {
-  // DEMO FALLBACK for live Vercel previews (no public auth server)
-  // Simulates real email+phone account + multi-wallet without real backend.
+  // DEMO FALLBACK only for local/dev or when no real auth target is configured (see authFetch guards).
+  // On any prod target (futuret3ch / https) we intentionally do NOT call this on fetch failure — prevents "wallets disappearing".
   if (path === '/signup') {
     const { email, phone } = JSON.parse(options.body || '{}');
     const demoCode = '123456'; // always works in demo
