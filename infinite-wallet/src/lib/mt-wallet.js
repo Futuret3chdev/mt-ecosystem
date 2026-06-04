@@ -57,7 +57,14 @@ export function getMTNode() {
   // while still defaulting to direct https subdomains on prod hosts when no VITE is set.
   if (fromEnv) {
     if (fromEnv.startsWith('/')) return fromEnv; // relative base like /api/mt
-    if (/^https?:\/\//i.test(fromEnv)) return fromEnv;
+    if (/^https?:\/\//i.test(fromEnv)) {
+      // Safety: never let MT node point at the auth subdomain (common misconfig of VITE vars)
+      if (fromEnv.includes('auth.futuret3ch.com.au')) {
+        console.error('[mt-wallet] VITE_MT_NODE_URL is pointing at auth subdomain! Forcing correct api. Fix your Vercel env var.');
+        return 'https://api.futuret3ch.com.au';
+      }
+      return fromEnv;
+    }
     // bare host? prefix http for safety
     return 'http://' + fromEnv;
   }
@@ -104,7 +111,14 @@ export function getAuthURL() {
   // Respect VITE_AUTH_URL even if relative (e.g. /api/auth) or http/https.
   if (fromEnv) {
     if (fromEnv.startsWith('/')) return fromEnv;
-    if (/^https?:\/\//i.test(fromEnv)) return fromEnv;
+    if (/^https?:\/\//i.test(fromEnv)) {
+      // Safety: never let auth URL point at the api (MT) subdomain
+      if (fromEnv.includes('api.futuret3ch.com.au')) {
+        console.error('[mt-wallet] VITE_AUTH_URL is pointing at api subdomain! Forcing correct auth. Fix your Vercel env var.');
+        return 'https://auth.futuret3ch.com.au';
+      }
+      return fromEnv;
+    }
     return 'http://' + fromEnv;
   }
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
