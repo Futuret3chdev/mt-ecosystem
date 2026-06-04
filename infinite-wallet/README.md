@@ -1,8 +1,8 @@
-# INFINITE WALLET — Official Wallet for the MT ECO SYSTEM
+# INFINITE WALLET — Official Wallet for the MT-ECO SYSTEM
 
 The self-built wallet with infinite possibilities. Full client-side control, email/phone accounts, cross-device encrypted backups via our mt-auth, native MT on our chain as primary, and more.
 
-Self-built, self-custodial wallet for the MT ECO SYSTEM.
+Self-built, self-custodial wallet for the MT-ECO SYSTEM. Developed by Futuret3ch and MemeTorrent.
 
 - 100% local key management (bip39 mnemonic → ed25519)
 - AES-GCM + PBKDF2 encrypted vault (password protected, never sent anywhere)

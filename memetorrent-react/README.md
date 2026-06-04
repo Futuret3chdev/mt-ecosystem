@@ -1,6 +1,6 @@
-# memetorrent.futuret3ch.com.au — MT ECO SYSTEM Web3 Site
+# memetorrent.futuret3ch.com.au — MT-ECO SYSTEM Web3 Site
 
-The official marketing + on-ramp site for the MT ECO SYSTEM.
+The official marketing + on-ramp site for the MT-ECO SYSTEM (developed by Futuret3ch and MemeTorrent).
 
 - Hero with strong vision + direct "Launch INFINITE WALLET" CTAs
 - $MT token stats (via existing API)

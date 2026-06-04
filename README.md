@@ -1,10 +1,10 @@
-# MT ECO SYSTEM
+# MT-ECO SYSTEM
 
 **Next-generation decentralized on-chain network.**
 
 Native token: **$MT** (`ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump`)
 
-- Self-built **INFINITE WALLET** (Phantom-like, email + phone accounts, multiple wallets per user, cross-device access via our self-built auth)
+- Self-built **INFINITE WALLET** (email + phone accounts, multiple wallets per user, cross-device access via our self-built auth) — developed by Futuret3ch and MemeTorrent for the MT-ECO SYSTEM
 - Ultra-low fixed fees (~1¢ SOL equivalent)
 - On-chain NFTs (mint directly in the wallet)
 - **Rockets** — cross-game/platform utility earned in MT Games, stored and transferable via the wallet
@@ -142,7 +142,7 @@ Update the wallet's `MT_NODE` constant (in `infinite-wallet/src/lib/mt-wallet.js
 
 ## License / Contact
 
-Built by FutureT3ch for the MT ECO SYSTEM.
+Developed by Futuret3ch and MemeTorrent for the MT-ECO SYSTEM.
 
 See individual package READMEs for more details:
 - `infinite-wallet/README.md`

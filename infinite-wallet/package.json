@@ -2,6 +2,7 @@
   "name": "mt-ecosystem-hub",
   "private": true,
   "version": "0.0.0",
+  "description": "INFINITE WALLET — MT-ECO SYSTEM. Developed by Futuret3ch and MemeTorrent. Self-custodial native MT wallet with on-chain NFTs, auth, and backups.",
   "type": "module",
   "scripts": {
     "dev": "vite",

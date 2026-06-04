@@ -1,5 +1,5 @@
 /**
- * INFINITE WALLET - Secure client-side wallet engine for MT ECO SYSTEM
+ * INFINITE WALLET - Secure client-side wallet engine for MT-ECO SYSTEM (developed by Futuret3ch and MemeTorrent)
  * - Zero third-party auth (local only)
  * - Keys NEVER leave the browser
  * - Compatible with mt-core (ed25519 + tweetnacl + bs58 + JSON tx)

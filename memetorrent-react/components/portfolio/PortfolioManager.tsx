@@ -205,7 +205,7 @@ export default function PortfolioManager() {
     {
       key: 'constellation' as const,
       title: 'Ecosystem Constellation',
-      desc: 'Interactive visual map of the entire MT ECO SYSTEM — nodes for wallet, core, TAP, bridges & more.',
+      desc: 'Interactive visual map of the entire MT-ECO SYSTEM — nodes for wallet, core, TAP, bridges & more.',
       icon: '✨',
     },
   ];
@@ -320,7 +320,7 @@ export default function PortfolioManager() {
 
         {/* Constellation visual of the ecosystem — cool interactive feature */}
         <div className="mb-10">
-          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-2">THE MT ECO SYSTEM CONSTELLATION</div>
+          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-2">THE MT-ECO SYSTEM CONSTELLATION</div>
           <div className="text-2xl font-semibold tracking-tight mb-4">Everything connected. Tap a node.</div>
 
           <div className="relative h-[220px] rounded-3xl border border-white/10 bg-black/60 overflow-hidden flex items-center justify-center">

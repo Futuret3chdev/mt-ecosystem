@@ -162,7 +162,7 @@ export default function MTWalletApp() {
 
   // App state
   const [activeTab, setActiveTab] = useState('portfolio');
-  const [status, setStatus] = useState('INFINITE WALLET ready • Self-custodial • Ultra-low fees • Infinite possibilities');
+  const [status, setStatus] = useState('INFINITE WALLET ready • MT-ECO SYSTEM • Self-custodial • Ultra-low fees');
   const [copied, setCopied] = useState('');
 
   // Balances
@@ -481,7 +481,7 @@ export default function MTWalletApp() {
     const tokenId = `mt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const metadata = {
       name: mintName.trim(),
-      description: mintDesignerText ? `Decorated: ${mintDesignerText}` : 'Minted via INFINITE WALLET • MT ECO SYSTEM',
+      description: mintDesignerText ? `Decorated: ${mintDesignerText}` : 'Minted via INFINITE WALLET • MT-ECO SYSTEM',
       image: mintImage || '', // data URL from upload or designer canvas (base64 image)
       attributes: [
         { trait_type: 'Origin', value: 'INFINITE WALLET' },
@@ -599,7 +599,7 @@ export default function MTWalletApp() {
       }
 
       // PRIMARY: fetch native MT balance from OUR network (mt-core /account for the MT addr)
-      // This wallet is native to MT ECO SYSTEM — we retrieve balances from us first.
+      // This wallet is native to MT-ECO SYSTEM — we retrieve balances from us first.
       const mtAddrForEntry = entry.publicKey || entry.address;
       let nativeBal = 0;
       if (mtAddrForEntry) {
@@ -650,8 +650,9 @@ export default function MTWalletApp() {
 
   async function loadMyWallets() {
     if (!getAuthToken()) {
-      setMyWallets(getLocalWallets());
-      return;
+      const local = getLocalWallets();
+      setMyWallets(local);
+      return local;
     }
     try {
       // When logged in, ONLY use the server-backed wallets for THIS account.
@@ -659,12 +660,14 @@ export default function MTWalletApp() {
       // This enforces isolation: each logged-in account only sees its own backed-up wallets from mt-auth.
       const serverList = await (await import('./lib/mt-wallet')).fetchBackedUpWallets() || [];
       setMyWallets(serverList);
+      return serverList;
     } catch (e) {
       // Fetch failed (e.g. auth server unreachable, mixed content, bad token) -- show empty for this account.
       // Do NOT fall back to local (which may contain other accounts' wallets).
       // User can logout to see local/guest wallets, or fix connection.
       console.warn('loadMyWallets: failed to fetch from auth server for current account, showing empty list', e);
       setMyWallets([]);
+      return [];
     }
   }
 
@@ -755,20 +758,82 @@ export default function MTWalletApp() {
       return;
     }
     try {
+      setStatus('Creating and backing up wallet to your secure account...');
       const { wallet: entry, encryptedPayload } = await (await import('./lib/mt-wallet')).createNewWalletForAccount(
         'Wallet ' + (myWallets.length + 1),
         pwd,
         !!getAuthToken()
       );
       const fullEntry = { ...entry, encryptedData: encryptedPayload };
-      // Do NOT add to global local_wallets_v2 when backing up to account -- that would leak to other logins on same device.
-      // The server list (fetched on loadMyWallets) is the source of truth for this account.
-      setMyWallets(prev => [...prev, fullEntry]);
+
+      // Optimistic add (so it doesn't disappear even if server list refresh lags or backup had transient issue)
+      setMyWallets(prev => {
+        const without = prev.filter(x => x.publicKey !== fullEntry.publicKey);
+        return [...without, fullEntry];
+      });
       await activateWalletEntry(fullEntry, pwd);
-      // Refresh from server to get authoritative ids (server uses uuid, client create uses 'w_') and confirm backup.
-      await loadMyWallets();
+
+      // Refresh authoritative list from server (enforces isolation + gets server id if backup succeeded)
+      const serverListAfter = await loadMyWallets();
+
+      // After refresh, prefer server version if present (correct id + persisted), else keep optimistic so it doesn't disappear.
+      const serverMatch = serverListAfter.find(x => x.publicKey === fullEntry.publicKey);
+      const bestEntry = serverMatch || fullEntry;
+
+      if (serverMatch) {
+        setMyWallets(serverListAfter);
+      } else {
+        setMyWallets(prev => {
+          const has = prev.some(x => x.publicKey === fullEntry.publicKey);
+          return has ? prev : [...prev.filter(x => x.publicKey !== fullEntry.publicKey), fullEntry];
+        });
+      }
+
+      await activateWalletEntry(bestEntry, pwd);
+
+      setStatus('Wallet created and backed up to your account.');
     } catch (e) {
       setStatus('Create wallet failed: ' + e.message);
+    }
+  }
+
+  // Create special wallets (Couples / Business) with nice defaults and promoted features.
+  // These are just named + colored + tagged wallets using the same secure flow.
+  async function createSpecialWallet(type) {
+    const pwd = accountPassword || masterPassword;
+    if (!pwd && isLoggedIn) {
+      setAuthError('Account password required to create and backup special wallets');
+      return;
+    }
+    const names = {
+      couples: 'Our Couples Wallet',
+      business: 'Business Vault'
+    };
+    const colors = {
+      couples: '#a855f7',
+      business: '#3b82f6'
+    };
+    const name = names[type] || 'Special Wallet';
+    const color = colors[type] || '#10b981';
+    try {
+      setStatus(`Creating ${name}...`);
+      const { wallet: entry, encryptedPayload } = await (await import('./lib/mt-wallet')).createNewWalletForAccount(
+        name,
+        pwd || 'guest-special',
+        !!getAuthToken()
+      );
+      const fullEntry = { ...entry, encryptedData: encryptedPayload, color, type };
+      setMyWallets(prev => {
+        const without = prev.filter(x => x.publicKey !== fullEntry.publicKey);
+        return [...without, fullEntry];
+      });
+      await activateWalletEntry(fullEntry, pwd);
+      const serverList = await loadMyWallets();
+      const best = serverList.find(x => x.publicKey === fullEntry.publicKey) || fullEntry;
+      await activateWalletEntry(best, pwd);
+      setStatus(`${name} created! Promoted in your portfolio.`);
+    } catch (e) {
+      setStatus('Special wallet create failed: ' + e.message);
     }
   }
 
@@ -782,7 +847,8 @@ export default function MTWalletApp() {
               <span className="font-black text-3xl text-black tracking-[-2px]">MT</span>
             </div>
             <div className="text-3xl font-black tracking-[-1.5px]">INFINITE WALLET</div>
-            <div className="text-emerald-400 text-sm tracking-[3px] mt-1 font-mono">MT ECO SYSTEM</div>
+            <div className="text-emerald-400 text-sm tracking-[3px] mt-1 font-mono">MT-ECO SYSTEM</div>
+            <div className="text-[10px] text-zinc-500 mt-1 tracking-widest">DEVELOPED BY FUTURET3CH AND MEMETORRENT</div>
           </div>
 
           <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-8 shadow-xl">
@@ -1060,10 +1126,10 @@ export default function MTWalletApp() {
               </div>
               <div>
                 <div className="font-bold tracking-tight text-xl leading-none">INFINITE WALLET</div>
-                <div className="text-[10px] text-emerald-400/90 -mt-0.5 font-mono tracking-[1px]">MT ECO SYSTEM</div>
+                <div className="text-[10px] text-emerald-400/90 -mt-0.5 font-mono tracking-[1px]">MT-ECO SYSTEM</div>
               </div>
             </div>
-            <div className="ml-3 px-3 py-1 rounded-full bg-emerald-950 text-emerald-400 text-[10px] font-mono border border-emerald-900">LIVE • SELF BUILT</div>
+            <div className="ml-3 px-3 py-1 rounded-full bg-emerald-950 text-emerald-400 text-[10px] font-mono border border-emerald-900">LIVE • SELF BUILT • MT-ECO SYSTEM</div>
           </div>
 
           <div className="flex items-center gap-3 text-sm">
@@ -1242,10 +1308,20 @@ export default function MTWalletApp() {
               <div className="mt-6 bg-zinc-950 border border-zinc-800 rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-3">
                   <div className="font-semibold">Your Wallets</div>
-                  <button 
-                    onClick={isLoggedIn ? handleCreateAccountWallet : () => { /* for guest, user can use initial guest create */ setStatus('For additional local wallets, lock and use guest create, or activate one first.'); }} 
-                    className="text-xs px-3 py-1.5 rounded-xl border border-emerald-800 text-emerald-400">+ New Wallet
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={isLoggedIn ? handleCreateAccountWallet : () => { /* for guest, user can use initial guest create */ setStatus('For additional local wallets, lock and use guest create, or activate one first.'); }} 
+                      className="text-xs px-3 py-1.5 rounded-xl border border-emerald-800 text-emerald-400">+ Personal
+                    </button>
+                    <button 
+                      onClick={() => createSpecialWallet('couples')} 
+                      className="text-xs px-3 py-1.5 rounded-xl border border-purple-800 text-purple-400">+ Couples
+                    </button>
+                    <button 
+                      onClick={() => createSpecialWallet('business')} 
+                      className="text-xs px-3 py-1.5 rounded-xl border border-blue-800 text-blue-400">+ Business
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2 mt-2">
                   {(() => {
@@ -1265,6 +1341,8 @@ export default function MTWalletApp() {
                             <div className="font-medium flex items-center gap-2">
                               <span className="inline-block w-2.5 h-2.5 rounded-full" style={{background: accent}} />
                               {w.name}
+                              {w.type === 'couples' && <span className="ml-1 text-[9px] px-1.5 py-0 bg-purple-500/20 text-purple-400 rounded">COUPLES</span>}
+                              {w.type === 'business' && <span className="ml-1 text-[9px] px-1.5 py-0 bg-blue-500/20 text-blue-400 rounded">BUSINESS</span>}
                             </div>
                             <div className="text-[10px] font-mono text-zinc-500 mt-0.5 truncate">
                               MT: {mtAddr ? mtAddr.slice(0,8) + '...' : '—'}
@@ -1531,10 +1609,24 @@ export default function MTWalletApp() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {nfts.map((nft, i) => (
-                  <div key={i} className="border border-zinc-800 bg-zinc-950 rounded-3xl p-5">
-                    <div className="font-mono text-xs text-emerald-400 mb-2">{nft.tokenId}</div>
-                    <div className="font-semibold text-lg">{nft.metadata?.name || 'Unnamed Asset'}</div>
-                    <div className="text-sm text-zinc-400 mt-1 line-clamp-2">{nft.metadata?.description}</div>
+                  <div key={i} className="border border-zinc-800 bg-zinc-950 rounded-3xl p-5 flex flex-col">
+                    {nft.metadata?.image && (
+                      <img 
+                        src={nft.metadata.image} 
+                        alt={nft.metadata?.name || 'NFT'} 
+                        className="w-full aspect-square object-cover rounded-2xl mb-3 border border-zinc-700" 
+                      />
+                    )}
+                    <div className="font-mono text-xs text-emerald-400 mb-1 truncate">{nft.tokenId}</div>
+                    <div className="font-semibold text-lg truncate">{nft.metadata?.name || 'Unnamed Asset'}</div>
+                    <div className="text-sm text-zinc-400 mt-1 line-clamp-3 flex-1">{nft.metadata?.description}</div>
+                    {nft.metadata?.attributes?.length > 0 && (
+                      <div className="mt-3 text-[10px] text-zinc-500 space-y-0.5">
+                        {nft.metadata.attributes.map((attr, idx) => (
+                          <div key={idx}>{attr.trait_type}: {attr.value}</div>
+                        ))}
+                      </div>
+                    )}
                     <div className="text-[10px] text-zinc-500 mt-4 font-mono">OWNER: {shortAddr(nft.owner)}</div>
                   </div>
                 ))}
@@ -1642,9 +1734,10 @@ export default function MTWalletApp() {
             {/* Official locked nodes - no customer-editable fields */}
             <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
               <div className="font-semibold text-sm mb-2 text-emerald-400">Node Configuration</div>
-              <div className="text-xs text-zinc-400">Connected to official MT ECO SYSTEM nodes for primary native $MT and secure backups. Managed for reliability.</div>
-              <div className="mt-2 text-[10px] text-emerald-400/70">MT Node: http://161.97.106.182:4001 (locked)</div>
-              <div className="text-[10px] text-emerald-400/70">Auth: http://161.97.106.182:4002 (locked)</div>
+              <div className="text-xs text-zinc-400">Connected to official MT-ECO SYSTEM nodes for primary native $MT and secure backups. Managed for reliability.</div>
+              <div className="mt-2 text-[10px] text-emerald-400/70">MT Node: {getMTNode()} (locked official)</div>
+              <div className="text-[10px] text-emerald-400/70">Auth: {getAuthURL()} (locked official)</div>
+              <div className="mt-3 pt-3 border-t border-zinc-800 text-[10px] text-zinc-500">Developed by Futuret3ch and MemeTorrent • MT-ECO SYSTEM</div>
             </div>
 
             <div className="text-xs text-zinc-500 pt-4">Primary holdings live on the MT native chain. Solana SPL is legacy for bridging.</div>
@@ -1653,7 +1746,7 @@ export default function MTWalletApp() {
       </div>
 
       {/* FOOTER BAR */}
-      <div className="border-t border-zinc-800 py-3 text-center text-[10px] text-zinc-500 font-mono tracking-widest">MT ECO SYSTEM — EVERYTHING BUILT IN-HOUSE • 1 CENT FEES • YOUR ASSETS, YOUR RULES</div>
+      <div className="border-t border-zinc-800 py-3 text-center text-[10px] text-zinc-500 font-mono tracking-widest">MT-ECO SYSTEM — Developed by Futuret3ch and MemeTorrent • EVERYTHING BUILT IN-HOUSE • 1 CENT FEES • YOUR ASSETS, YOUR RULES</div>
 
       {/* SEND MODAL */}
       <AnimatePresence>
@@ -1733,7 +1826,7 @@ export default function MTWalletApp() {
                     ctx.textAlign = 'center';
                     ctx.fillText(text.slice(0, 20), 128, 128);
                     ctx.font = '12px monospace';
-                    ctx.fillText('MT ECO SYSTEM', 128, 160);
+                    ctx.fillText('MT-ECO SYSTEM', 128, 160);
                     setMintImage(canvas.toDataURL('image/png'));
                   }} className="px-3 py-1 text-xs border border-zinc-700 rounded">Apply Designer</button>
                 </div>

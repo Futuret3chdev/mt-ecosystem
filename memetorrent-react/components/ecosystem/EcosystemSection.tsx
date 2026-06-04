@@ -2,7 +2,7 @@ export default function EcosystemSection() {
   const items = [
     {
       title: '$MT Token & Chain',
-      desc: 'Native token of the MT ECO SYSTEM. Ultra-low fixed fees. Real on-chain state machine powering everything.',
+      desc: 'Native token of the MT-ECO SYSTEM. Ultra-low fixed fees. Real on-chain state machine powering everything.',
     },
     {
       title: 'INFINITE WALLET',
