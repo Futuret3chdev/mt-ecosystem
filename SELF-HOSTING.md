@@ -70,38 +70,48 @@ systemctl enable --now mt-core
 systemctl enable --now mt-auth
 ```
 
-## 4. Nginx + SSL (example for api.yourdomain.com)
-```nginx
-server {
-    listen 80;
-    server_name core.yourdomain.com auth.yourdomain.com;
+## 4. Nginx + SSL (for auth.futuret3ch.com.au + api.futuret3ch.com.au)
+Use the ready confs in `mt-core/nginx/` (recommended):
 
-    location / {
-        proxy_pass http://localhost:4001;  # mt-core; use 4002 for auth block / separate server_name
-
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-Then:
 ```bash
-certbot --nginx -d core.yourdomain.com -d auth.yourdomain.com
+cd /opt/mt-ecosystem
+git pull
+cd mt-core/nginx
+sudo cp mt-core.conf /etc/nginx/sites-available/mt-core
+sudo cp mt-auth.conf /etc/nginx/sites-available/mt-auth
+sudo ln -s /etc/nginx/sites-available/mt-core /etc/nginx/sites-enabled/ 2>/dev/null || true
+sudo ln -s /etc/nginx/sites-available/mt-auth /etc/nginx/sites-enabled/ 2>/dev/null || true
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d auth.futuret3ch.com.au -d api.futuret3ch.com.au
 ```
 
-## 5. Point the Wallet (Vercel)
-In your Vercel project for `infinite-wallet` set these Environment Variables (Production + Preview) **only after** you have HTTPS endpoints (nginx+certbot):
+(Or manually place the server blocks with correct `server_name api.futuret3ch.com.au;` proxying 127.0.0.1:4001, and separate for auth on 4002.)
 
-- `VITE_MT_NODE_URL=https://core.yourdomain.com`
-- `VITE_AUTH_URL=https://auth.yourdomain.com`
+## 5. Point the Wallet frontend (Vercel custom domain + env)
+**wallet.futuret3ch.com.au must be validated in Vercel** (this is the current "Invalid Configuration" issue if DNS is wrong).
 
-Redeploy the wallet (or use the in-app Settings on the deployed site for per-browser override).
+- In DNS: DELETE any A record (and any wrong/old CNAME) pointing `wallet` at the VPS IP or using the full name in the host field.
+- In Vercel infinite-wallet project Domains: add/connect `wallet.futuret3ch.com.au` (clean, no www.).
+- Vercel will show a table:
+  Type: CNAME
+  Name: wallet
+  Value: <the vercel-dns hash>.vercel-dns-xxx.com.
+- In your DNS provider, set:
+  - Name / Host / Subdomain field: exactly `wallet` (bare — do not paste the full `wallet.futuret3ch.com.au`)
+  - Value / Target: the full value from Vercel, with trailing dot if your provider accepts it (e.g. `bb78f335c0031b77.vercel-dns-017.com.`)
+- Wait for validation → status changes to "Valid Configuration".
+- Then set these Environment Variables in Vercel (Production + Preview):
 
-For local dev testing against your VPS (no mixed content issue on http://localhost:5173):
+  - `VITE_MT_NODE_URL=https://api.futuret3ch.com.au`
+  - `VITE_AUTH_URL=https://auth.futuret3ch.com.au`
+
+- Redeploy.
+
+Once valid, https://wallet.futuret3ch.com.au becomes the production URL (you can promote it as primary; the *.vercel.app will continue to work or redirect).
+
+See `mt-core/nginx/README.md` for the full current steps + the wallet DNS troubleshooting.
+
+Local dev testing against your VPS (no mixed content issue on http://localhost:5173):
 - Run `npm run dev` inside `infinite-wallet/`
 - In the app Settings tab set the http://IP:4001 and :4002 values (they persist in localStorage for that browser).
 
