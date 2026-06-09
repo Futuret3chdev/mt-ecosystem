@@ -63,30 +63,49 @@ export default function Navbar() {
     setIsConnecting(true);
 
     try {
-      // Prioritize deep link on mobile (as per game logic and senior dev recommendation)
-      if (/iPhone|Android/i.test(navigator.userAgent)) {
-        const currentUrl = window.location.href;
+      // Poll for provider first (handles case where already in-app browser on mobile, or delayed injection)
+      let provider: any = null;
+      for (let i = 0; i < 10; i++) {
+        if (walletType === 'phantom') provider = (window as any).phantom?.solana;
+        if (walletType === 'solflare') provider = (window as any).solflare;
+        if (walletType === 'backpack') provider = (window as any).backpack;
+        if (provider) break;
+        await new Promise(r => setTimeout(r, 200));
+      }
 
+      // Only deep link on mobile if no provider found (prevents redirect loops when already inside wallet browser)
+      if (!provider && /iPhone|Android/i.test(navigator.userAgent)) {
+        const currentUrl = window.location.href;
         if (walletType === 'solflare') {
           window.location.href = `https://solflare.com/ul/v1/browse/${encodeURIComponent(currentUrl)}`;
-          throw new Error('Opening Solflare app...');
+          return;
         }
         if (walletType === 'phantom') {
           window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
-          throw new Error('Opening Phantom app...');
+          return;
         }
         if (walletType === 'backpack') {
           window.location.href = `https://backpack.app/ul/browse/${encodeURIComponent(currentUrl)}`;
-          throw new Error('Opening Backpack app...');
+          return;
         }
       }
 
-      // Desktop / in-app: select and connect (adapter handles injection + polling internally)
+      if (!provider) {
+        // No provider and not mobile or deep link not triggered: open install page
+        const installUrls: Record<string, string> = {
+          phantom: 'https://phantom.app/',
+          solflare: 'https://solflare.com/',
+          backpack: 'https://backpack.app/',
+        };
+        window.open(installUrls[walletType], '_blank');
+        return;
+      }
+
+      // Provider available (desktop or in-app after deep link), use adapter
       const adapterName = walletType === 'phantom' ? 'Phantom' : walletType === 'solflare' ? 'Solflare' : 'Backpack';
       select(adapterName as any);
       await adapterConnect();
     } catch (error: any) {
-      // Fail silently for UI (no cluttering error message); console for debug
       console.error('Wallet connect error:', error?.message || error);
     } finally {
       setIsConnecting(false);
@@ -284,29 +303,25 @@ export default function Navbar() {
               <button onClick={() => setShowBuyPanel(false)} className="text-xl leading-none opacity-60 hover:opacity-100 px-2" aria-label="Close buy panel">×</button>
             </div>
 
-            {/* Manual connect buttons — kept for mobile users (deeplinks via adapter for Phantom/Solflare/Backpack).
-                No connected clutter, no address, no quick buy, no one-click transaction display. */}
-            <div className="mb-3">
-              <div className="flex flex-wrap gap-2">
-                {(['phantom', 'solflare', 'backpack'] as const).map((name) => (
-                  <button
-                    key={name}
-                    disabled={isConnecting}
-                    onClick={() => connectWalletForBuy(name)}
-                    className="px-3 py-1.5 text-xs rounded-2xl border border-white/20 hover:bg-white/5 active:bg-white/10 disabled:opacity-50"
-                  >
-                    {isConnecting ? 'Connecting...' : (name === 'phantom' ? 'Phantom' : name === 'solflare' ? 'Solflare' : 'Backpack')}
-                  </button>
-                ))}
-              </div>
-
-              {/* Mobile tip */}
-              {isMobile && (
-                <div className="mt-1 text-[10px] opacity-60 text-center">
-                  On mobile: tap a wallet button to deep link into the app.
+            {/* Manual connect buttons — only on mobile for deeplink support (Phantom/Solflare/Backpack).
+                Uses polling + conditional deep link (v1 for Solflare) per wallet-adapter and your game logic.
+                No clutter: no address, no Disconnect, no Quick Buy, no error messages in panel. */}
+            {isMobile && (
+              <div className="mb-3">
+                <div className="flex flex-wrap gap-2">
+                  {(['phantom', 'solflare', 'backpack'] as const).map((name) => (
+                    <button
+                      key={name}
+                      disabled={isConnecting}
+                      onClick={() => connectWalletForBuy(name)}
+                      className="px-3 py-1.5 text-xs rounded-2xl border border-white/20 hover:bg-white/5 active:bg-white/10 disabled:opacity-50"
+                    >
+                      {isConnecting ? 'Connecting...' : (name === 'phantom' ? 'Phantom' : name === 'solflare' ? 'Solflare' : 'Backpack')}
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Desktop: Gateway (THE WALLET IS THE GATEWAY) on LEFT expanding to fill gap, Jupiter swap box on RIGHT.
                 Mobile: stacks naturally. */}
