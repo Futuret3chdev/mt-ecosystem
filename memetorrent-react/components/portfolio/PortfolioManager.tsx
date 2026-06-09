@@ -46,6 +46,9 @@ export default function PortfolioManager() {
   const [nftPreview, setNftPreview] = useState({ color: '#10b981', type: 'Rocket', accessory: 'Wings' }); // for NFT designer
   const [stakedRockets, setStakedRockets] = useState(0); // for staking preview (demo only)
 
+  // Whitepaper flip state
+  const [whitepaperFlipped, setWhitepaperFlipped] = useState(false);
+
   // Real direct buy states (wallet connect + Jupiter swap)
   const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -565,12 +568,60 @@ export default function PortfolioManager() {
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">ONE-PLACE MANAGEMENT FLOWS</div>
           <div className="text-2xl font-semibold tracking-tight mb-6">Command-center actions. Real ownership.</div>
 
-          {/* Direct $MT purchase section - prominent at top of management, triggered by top bar BUY $MT NOW */}
-          <div id="direct-buy" className="mb-8 p-6 rounded-3xl border border-emerald-400/30 bg-emerald-400/5">
-            <div className="uppercase text-xs tracking-[3px] text-emerald-400 mb-1">Direct $MT purchase in LIVE $MT + ONE-PLACE MANAGEMENT FLOWS</div>
-            <div className="text-lg font-semibold mb-4">Buy $MT directly on this page using your own wallet (Phantom, Solflare, Backpack). Real on-chain swap via Jupiter. No custody.</div>
+          {/* Interactive flip whitepaper - flip the card to view the PDF */}
+          <div className="mb-8">
+            <div className="uppercase text-xs tracking-[3px] opacity-60 mb-2">WHITEPAPER</div>
+            <div 
+              className="relative w-full max-w-md mx-auto h-72 cursor-pointer" 
+              style={{ perspective: '1000px' }}
+              onClick={() => setWhitepaperFlipped(!whitepaperFlipped)}
+            >
+              <div 
+                className="relative w-full h-full transition-transform duration-700" 
+                style={{ 
+                  transformStyle: 'preserve-3d', 
+                  transform: whitepaperFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' 
+                }}
+              >
+                {/* Front - Cover */}
+                <div 
+                  className="absolute inset-0 bg-gradient-to-br from-emerald-900 to-black border border-white/20 rounded-3xl flex flex-col items-center justify-center p-6 text-center"
+                  style={{ backfaceVisibility: 'hidden' }}
+                >
+                  <div className="text-4xl mb-3">📖</div>
+                  <div className="text-xl font-semibold tracking-tight">MT ECO SYSTEM</div>
+                  <div className="text-lg">WHITEPAPER</div>
+                  <div className="mt-3 text-xs opacity-70">Click to flip and read</div>
+                </div>
 
-            {/* Wallet Connection */}
+                {/* Back - PDF Viewer */}
+                <div 
+                  className="absolute inset-0 bg-black border border-white/20 rounded-3xl overflow-hidden"
+                  style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                >
+                  <iframe 
+                    src="https://memetorrent.futuret3ch.com.au/whitepaper.pdf" 
+                    className="w-full h-full" 
+                    title="MT Whitepaper"
+                  />
+                  <div className="absolute bottom-1 right-1 text-[9px] bg-black/80 px-1.5 py-0.5 rounded">
+                    <a href="https://memetorrent.futuret3ch.com.au/whitepaper.pdf" target="_blank" className="underline">Open full</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="text-center text-[10px] opacity-50 mt-1">Tap to flip the whitepaper</div>
+          </div>
+
+          {/* Direct $MT purchase section - triggered by top BUY $MT NOW */}
+          <div id="direct-buy" className="mb-8 p-6 rounded-3xl border border-emerald-400/30 bg-emerald-400/5">
+            {/* THE WALLET IS THE GATEWAY placed just above the buy form */}
+            <div className="mb-4 text-center">
+              <div className="text-emerald-400 text-xs tracking-[4px]">THE WALLET IS THE GATEWAY</div>
+              <div className="text-xl font-semibold tracking-tight mt-1">INFINITE WALLET<br />For infinite possibilities.<br />Truly ours.</div>
+            </div>
+
+            {/* Wallet Connection - clean form */}
             {!walletAddress ? (
               <div>
                 <div className="text-sm font-medium mb-3">Connect your wallet to buy</div>

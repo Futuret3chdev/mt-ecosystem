@@ -95,10 +95,21 @@ export default function TokenStats() {
     return () => clearInterval(i);
   }, []);
 
-  if (!stats) return null;
+  // Always render the card; use fallbacks if live data fails (e.g. network/DNS issues)
+  const safeStats = stats || {
+    price: '0.000000012',
+    market_cap: '$0',
+    total_supply: '1,000,000,000,000',
+    name: 'MT',
+    symbol: '$MT',
+    total_buys: '0',
+    total_sells: '0',
+    total_buy_volume: '$0',
+    total_sell_volume: '$0',
+  };
 
-  const priceNum = parseFloat(stats.price || '0');
-  const marketCapNum = parseFloat((stats.market_cap || '$0').replace(/[$,]/g, ''));
+  const priceNum = parseFloat(safeStats.price || '0');
+  const marketCapNum = parseFloat((safeStats.market_cap || '$0').replace(/[$,]/g, ''));
 
   return (
     <section id="stats" className="py-12">
@@ -120,34 +131,33 @@ export default function TokenStats() {
               <div className="text-emerald-400 text-xs tracking-[3px] mb-1">LIVE ON SOLANA • PUMP.FUN</div>
               <div className="text-4xl font-semibold tracking-tight">MT Token Stats</div>
               <div className="text-xs opacity-60 mt-1">Live from DexScreener • Auto-refreshes every 15s</div>
+              {/* Contract Address centered under the live from line */}
+              <div className="text-center mt-2">
+                <span className="text-xs opacity-70">Contract Address: </span>
+                <button 
+                  onClick={() => navigator.clipboard.writeText('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump')} 
+                  className="font-mono text-sm text-emerald-400 hover:text-white underline"
+                  title="Copy contract address"
+                >
+                  ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump
+                </button>
+              </div>
             </div>
             <div className="text-right text-xs opacity-60">
-              {stats.name} ({stats.symbol})<br />
-              24h Buys/Sells: {stats.total_buys || 0}/{stats.total_sells || 0}
+              {safeStats.name} ({safeStats.symbol})<br />
+              24h Buys/Sells: {safeStats.total_buys || 0}/{safeStats.total_sells || 0}
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <Stat label="Price" value={`$${stats.price}`} sub={`~${(priceNum * 1e9).toFixed(0)} per 1B`} />
-            <Stat label="Market Cap" value={stats.market_cap} sub={marketCapNum > 0 ? `FDV ~${stats.market_cap}` : ''} />
-            <Stat label="Total Supply" value={stats.total_supply} sub="1T max • Burnable" />
-          </div>
-
-          {/* Contract address - noticeable, just above the stats (this is how we make money) */}
-          <div className="mb-3 p-3 rounded-2xl border border-emerald-400/30 bg-emerald-400/5 text-sm">
-            <span className="opacity-70">💰 $MT Contract (primary revenue):</span>{' '}
-            <button 
-              onClick={() => navigator.clipboard.writeText('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump')} 
-              className="font-mono text-emerald-400 hover:text-white underline active:no-underline"
-            >
-              ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump
-            </button>
-            <span className="text-[10px] opacity-60 ml-2">(tap to copy)</span>
+            <Stat label="Price" value={`$${safeStats.price}`} sub={`~${(priceNum * 1e9).toFixed(0)} per 1B`} />
+            <Stat label="Market Cap" value={safeStats.market_cap} sub={marketCapNum > 0 ? `FDV ~${safeStats.market_cap}` : ''} />
+            <Stat label="Total Supply" value={safeStats.total_supply} sub="1T max • Burnable" />
           </div>
 
           <div className="mt-6 pt-6 border-t border-white/10 flex flex-wrap gap-4 text-xs opacity-70">
-            <div>24h Buy Vol: {stats.total_buy_volume}</div>
-            <div>24h Sell Vol: {stats.total_sell_volume}</div>
+            <div>24h Buy Vol: {safeStats.total_buy_volume}</div>
+            <div>24h Sell Vol: {safeStats.total_sell_volume}</div>
             <a href="#management" className="ml-auto font-medium text-emerald-400 hover:underline">Buy $MT directly on this page (no third party) →</a>
           </div>
 

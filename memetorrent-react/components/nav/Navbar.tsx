@@ -88,9 +88,9 @@ export default function Navbar() {
             <i className="fab fa-telegram text-xl"></i>
           </a>
 
-          {/* Contract address near social icons, slightly away, noticeable as revenue source */}
+          {/* Contract address near social icons, slightly away */}
           <div className="ml-4 pl-4 border-l border-white/20 flex items-center gap-2 text-[11px]">
-            <span className="opacity-60">💰 Contract (revenue):</span>
+            <span className="opacity-60">Contract Address:</span>
             <button
               onClick={() => {
                 navigator.clipboard.writeText('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump');
@@ -101,7 +101,7 @@ export default function Navbar() {
                 setTimeout(() => { if (btn) btn.innerText = origText || 'ELyw...pump'; }, 1500);
               }}
               className="font-mono text-emerald-400 hover:text-emerald-300 active:text-white transition"
-              title="Copy $MT contract address - this is how we make money"
+              title="Copy $MT contract address"
             >
               ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump
             </button>
