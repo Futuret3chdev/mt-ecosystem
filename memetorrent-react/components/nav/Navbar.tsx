@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ThemeToggle from '@/components/theme/ThemeToggle';
 import { LINKS } from '@/lib/constants';
 import { Connection, PublicKey, VersionedTransaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { useWallet } from '@solana/wallet-adapter-react';
 
 export default function Navbar() {
   const [authOpen, setAuthOpen] = useState(false);
@@ -54,7 +55,43 @@ export default function Navbar() {
     }
   }, []);
 
+  // Wallet adapter for manual connect buttons (needed for mobile deeplinks for Phantom/Solflare/Backpack)
+  const { select, connect: adapterConnect } = useWallet();
+  const [isConnecting, setIsConnecting] = useState(false);
 
+  const connectWalletForBuy = async (walletType: 'phantom' | 'solflare' | 'backpack') => {
+    setIsConnecting(true);
+
+    try {
+      // Prioritize deep link on mobile (as per game logic and senior dev recommendation)
+      if (/iPhone|Android/i.test(navigator.userAgent)) {
+        const currentUrl = window.location.href;
+
+        if (walletType === 'solflare') {
+          window.location.href = `https://solflare.com/ul/v1/browse/${encodeURIComponent(currentUrl)}`;
+          throw new Error('Opening Solflare app...');
+        }
+        if (walletType === 'phantom') {
+          window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
+          throw new Error('Opening Phantom app...');
+        }
+        if (walletType === 'backpack') {
+          window.location.href = `https://backpack.app/ul/browse/${encodeURIComponent(currentUrl)}`;
+          throw new Error('Opening Backpack app...');
+        }
+      }
+
+      // Desktop / in-app: select and connect (adapter handles injection + polling internally)
+      const adapterName = walletType === 'phantom' ? 'Phantom' : walletType === 'solflare' ? 'Solflare' : 'Backpack';
+      select(adapterName as any);
+      await adapterConnect();
+    } catch (error: any) {
+      // Fail silently for UI (no cluttering error message); console for debug
+      console.error('Wallet connect error:', error?.message || error);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
   // Jupiter Plugin init effect (replaces all previous custom buy logic that was erroring)
   useEffect(() => {
@@ -247,7 +284,29 @@ export default function Navbar() {
               <button onClick={() => setShowBuyPanel(false)} className="text-xl leading-none opacity-60 hover:opacity-100 px-2" aria-label="Close buy panel">×</button>
             </div>
 
+            {/* Manual connect buttons — kept for mobile users (deeplinks via adapter for Phantom/Solflare/Backpack).
+                No connected clutter, no address, no quick buy, no one-click transaction display. */}
+            <div className="mb-3">
+              <div className="flex flex-wrap gap-2">
+                {(['phantom', 'solflare', 'backpack'] as const).map((name) => (
+                  <button
+                    key={name}
+                    disabled={isConnecting}
+                    onClick={() => connectWalletForBuy(name)}
+                    className="px-3 py-1.5 text-xs rounded-2xl border border-white/20 hover:bg-white/5 active:bg-white/10 disabled:opacity-50"
+                  >
+                    {isConnecting ? 'Connecting...' : (name === 'phantom' ? 'Phantom' : name === 'solflare' ? 'Solflare' : 'Backpack')}
+                  </button>
+                ))}
+              </div>
 
+              {/* Mobile tip */}
+              {isMobile && (
+                <div className="mt-1 text-[10px] opacity-60 text-center">
+                  On mobile: tap a wallet button to deep link into the app.
+                </div>
+              )}
+            </div>
 
             {/* Desktop: Gateway (THE WALLET IS THE GATEWAY) on LEFT expanding to fill gap, Jupiter swap box on RIGHT.
                 Mobile: stacks naturally. */}
@@ -273,13 +332,6 @@ export default function Navbar() {
                 <div className="text-[10px] opacity-50 mt-1 text-center">Jupiter widget (alternative)</div>
               </div>
             </div>
-
-            {/* Mobile tip (no separate ugly deeplink buttons — handled inside the connect clicks like your game) */}
-            {isMobile && (
-              <div className="mt-1 text-[10px] opacity-60 text-center">
-                On mobile: tap a wallet button above. It will deep link into the app if needed.
-              </div>
-            )}
 
             {/* CSS vars to theme the Jupiter plugin to match the site's dark + emerald look */}
             <style>{`
