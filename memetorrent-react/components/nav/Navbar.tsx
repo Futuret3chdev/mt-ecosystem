@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ThemeToggle from '@/components/theme/ThemeToggle';
 import { LINKS } from '@/lib/constants';
 import { Connection, PublicKey, VersionedTransaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import servicesData from '@/app/status/services.json';
 import { useWallet } from '@solana/wallet-adapter-react';
 
 export default function Navbar() {
@@ -180,14 +181,14 @@ export default function Navbar() {
             <a href="/developers" className="opacity-70 hover:opacity-100">API</a>
           </div>
 
-          {/* Status icon (replaces Launch) — pulls summary from /status page data for consistency */}
+          {/* Status icon (replaces Launch) — pulls live summary from /status services.json */}
           <a 
             href="/status" 
             className="flex items-center gap-1.5 text-xs sm:text-sm px-3 py-1 rounded-xl border border-white/20 hover:bg-white/5"
             title="System Status"
           >
             <span className="inline-block w-2 h-2 rounded-full bg-[#19d37e]"></span>
-            <span>Status <span className="text-[#19d37e]">7/7</span></span>
+            <span>Status <span className="text-[#19d37e]">{servicesData.services.length}/7</span></span>
           </a>
 
           {/* Unified account icon (replaces separate Login + Register) */}
