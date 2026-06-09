@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import ThemeToggle from '@/components/theme/ThemeToggle';
 import { LINKS } from '@/lib/constants';
+import { Connection, PublicKey, VersionedTransaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 export default function Navbar() {
   const [authOpen, setAuthOpen] = useState(false);
@@ -52,6 +53,152 @@ export default function Navbar() {
       setIsMobile(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
     }
   }, []);
+
+  // ==================== MANUAL WALLET CONNECT (from your SolanaReels game pattern) ====================
+  // This makes BUY $MT NOW actually pick up Phantom / Solflare / Backpack on mobile + desktop via deeplinks + injected
+  const SOLANA_RPC_URL =
+    (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SOLANA_RPC_URL) ||
+    'https://api.mainnet-beta.solana.com';
+  const BUY_CONNECTION = new Connection(SOLANA_RPC_URL, 'confirmed');
+
+  const [connectedWallet, setConnectedWallet] = useState<{ address: string; provider: any } | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [buying, setBuying] = useState(false);
+  const [buyResult, setBuyResult] = useState<{ signature?: string; error?: string } | null>(null);
+
+  const getProvider = (name: 'phantom' | 'solflare' | 'backpack') => {
+    if (typeof window === 'undefined') return null;
+    const w = window as any;
+
+    if (name === 'phantom') {
+      return w.phantom?.solana || (w.solana?.isPhantom ? w.solana : null);
+    }
+    if (name === 'solflare') {
+      return w.solflare?.isSolflare ? w.solflare : (w.solflare || null);
+    }
+    if (name === 'backpack') {
+      return w.backpack?.solana || w.backpack || null;
+    }
+    return null;
+  };
+
+  const openWalletDeeplink = (name: 'phantom' | 'solflare' | 'backpack') => {
+    const current = typeof window !== 'undefined' ? window.location.href : 'https://memetorrent.futuret3ch.com.au';
+    const encoded = encodeURIComponent(current);
+    let url = '';
+    if (name === 'phantom') url = `https://phantom.app/ul/browse/${encoded}`;
+    else if (name === 'solflare') url = `https://solflare.com/ul/browse/${encoded}?ref=mt`;
+    else url = `https://backpack.app/ul/browse/${encoded}`;
+    window.open(url, '_blank');
+  };
+
+  const connectWalletForBuy = async (name: 'phantom' | 'solflare' | 'backpack') => {
+    setBuyResult(null);
+    const provider = getProvider(name);
+
+    if (!provider) {
+      // No injected provider — use deeplink so user can connect from inside the wallet app (exactly like the game)
+      openWalletDeeplink(name);
+      setBuyResult({ error: `No ${name} injected provider found. Opened deeplink — connect inside the ${name} browser then tap Connect ${name} again.` });
+      return;
+    }
+
+    try {
+      // Explicit connect call — this is what often fixes Solflare "stuck connecting" vs auto-detect in widgets
+      const resp = await provider.connect();
+      const pk = resp?.publicKey?.toString?.() || resp?.publicKey?.toBase58?.();
+      if (!pk) throw new Error('No public key returned from wallet');
+
+      // Fetch SOL balance
+      let bal = 0;
+      try {
+        const lamports = await BUY_CONNECTION.getBalance(new PublicKey(pk));
+        bal = lamports / LAMPORTS_PER_SOL;
+      } catch {}
+
+      setConnectedWallet({ address: pk, provider });
+      setWalletBalance(bal);
+      setBuyResult(null);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to connect';
+      setBuyResult({ error: msg });
+      // On failure, still offer the deeplink as escape hatch
+      if (isMobile) openWalletDeeplink(name);
+    }
+  };
+
+  const disconnectWalletForBuy = () => {
+    const prov = connectedWallet?.provider;
+    setConnectedWallet(null);
+    setWalletBalance(null);
+    setBuyResult(null);
+    try { prov?.disconnect?.(); } catch {}
+  };
+
+  // Real self-custodial buy using Jupiter quote + swap API + manual sign (like the game does real transfers)
+  const quickBuyMT = async (solAmount: number) => {
+    if (!connectedWallet?.provider || !connectedWallet.address) {
+      setBuyResult({ error: 'Connect a wallet first' });
+      return;
+    }
+
+    setBuying(true);
+    setBuyResult(null);
+
+    try {
+      const inputMint = 'So11111111111111111111111111111111111111112'; // wSOL / SOL
+      const outputMint = MT_MINT;
+      const amount = Math.floor(solAmount * 1_000_000_000);
+
+      // 1. Get quote from Jupiter (public API, no plugin)
+      const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=100&swapMode=ExactIn`;
+      const quoteResp = await fetch(quoteUrl);
+      if (!quoteResp.ok) throw new Error('Failed to get quote from Jupiter');
+      const quote = await quoteResp.json();
+
+      // 2. Get serialized swap transaction
+      const swapResp = await fetch('https://quote-api.jup.ag/v6/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quoteResponse: quote,
+          userPublicKey: connectedWallet.address,
+          wrapAndUnwrapSol: true,
+          dynamicComputeUnitLimit: true,
+          prioritizationFeeLamports: 10000,
+        }),
+      });
+      if (!swapResp.ok) throw new Error('Failed to build swap transaction');
+      const { swapTransaction } = await swapResp.json();
+
+      // 3. Deserialize, sign with the manually connected provider (this is the key for Solflare mobile)
+      // Use atob + Uint8Array so we don't depend on global Buffer (works in browser)
+      const binary = atob(swapTransaction);
+      const txBuffer = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) txBuffer[i] = binary.charCodeAt(i);
+      const transaction = VersionedTransaction.deserialize(txBuffer);
+
+      const signedTx = await connectedWallet.provider.signTransaction(transaction);
+
+      // 4. Send (self-custodial — user signed it)
+      const raw = signedTx.serialize();
+      const signature = await BUY_CONNECTION.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 3 });
+
+      // Confirm
+      await BUY_CONNECTION.confirmTransaction(signature, 'confirmed');
+
+      setBuyResult({ signature });
+      // Refresh balance
+      try {
+        const newLamports = await BUY_CONNECTION.getBalance(new PublicKey(connectedWallet.address));
+        setWalletBalance(newLamports / LAMPORTS_PER_SOL);
+      } catch {}
+    } catch (e: any) {
+      setBuyResult({ error: e?.message || 'Swap failed. Try a smaller amount or use the Jupiter widget below.' });
+    } finally {
+      setBuying(false);
+    }
+  };
 
   // Jupiter Plugin init effect (replaces all previous custom buy logic that was erroring)
   useEffect(() => {
@@ -240,17 +387,81 @@ export default function Navbar() {
       </div>
 
       {/* Compact buy form panel - shows just below BUY $MT NOW, hides on click off.
-          Form (connect) first, then the full THE WALLET IS THE GATEWAY block below it. */}
+          Manual wallet connect (Phantom/Solflare/Backpack + deeplinks) is now primary so mobile actually works.
+          Jupiter widget kept as secondary / visual option. */}
       {showBuyPanel && (
         <div ref={buyPanelRef} className="border-t border-white/10 bg-zinc-950/95 backdrop-blur max-w-[480px] md:max-w-[620px] ml-auto mr-4 shadow-2xl rounded-b-xl z-50">
           <div className="px-4 sm:px-6 py-3 sm:py-4 text-sm">
             {/* Header with close for mobile/desktop */}
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs sm:text-sm font-medium">Direct on-chain buy — self-custodial</div>
+              <div className="text-xs sm:text-sm font-medium">Direct on-chain buy — self-custodial (SOL → $MT)</div>
               <button onClick={() => setShowBuyPanel(false)} className="text-xl leading-none opacity-60 hover:opacity-100 px-2" aria-label="Close buy panel">×</button>
             </div>
+
+            {/* MANUAL CONNECT SECTION — this is the important part for mobile Solflare/Phantom/Backpack */}
+            <div className="mb-3">
+              <div className="text-[10px] tracking-[2px] opacity-60 mb-1.5">CONNECT WALLET (works on mobile + desktop)</div>
+
+              {!connectedWallet ? (
+                <div className="flex flex-wrap gap-2">
+                  {(['phantom', 'solflare', 'backpack'] as const).map((name) => (
+                    <button
+                      key={name}
+                      onClick={() => connectWalletForBuy(name)}
+                      className="px-3 py-1.5 text-xs rounded-2xl border border-white/20 hover:bg-white/5 active:bg-white/10"
+                    >
+                      {name === 'phantom' ? 'Phantom' : name === 'solflare' ? 'Solflare' : 'Backpack'}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/5 p-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-mono text-emerald-400 break-all">{connectedWallet.address}</div>
+                      {walletBalance !== null && <div className="opacity-70">Balance: {walletBalance.toFixed(4)} SOL</div>}
+                    </div>
+                    <button onClick={disconnectWalletForBuy} className="text-[10px] underline opacity-70">Disconnect</button>
+                  </div>
+
+                  {/* Quick buy amounts + execute button using the manually connected wallet */}
+                  <div className="mt-3">
+                    <div className="text-[10px] opacity-60 mb-1">Quick Buy $MT (signs real swap tx)</div>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {[0.05, 0.1, 0.25, 0.5, 1].map((amt) => (
+                        <button
+                          key={amt}
+                          disabled={buying}
+                          onClick={() => quickBuyMT(amt)}
+                          className="px-2.5 py-1 text-xs rounded-xl border border-white/15 hover:bg-white/5 disabled:opacity-50"
+                        >
+                          {amt} SOL
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      disabled={buying}
+                      onClick={() => quickBuyMT(0.1)}
+                      className="w-full py-2 rounded-2xl bg-emerald-400 text-black text-sm font-medium disabled:opacity-60"
+                    >
+                      {buying ? 'Swapping...' : 'Buy $MT with 0.1 SOL (manual sign)'}
+                    </button>
+                  </div>
+
+                  {buyResult?.signature && (
+                    <div className="mt-2 text-[10px] text-emerald-400 break-all">
+                      Success! Tx: <a href={`https://solscan.io/tx/${buyResult.signature}`} target="_blank" className="underline">view on Solscan</a>
+                    </div>
+                  )}
+                  {buyResult?.error && (
+                    <div className="mt-2 text-[10px] text-amber-400">{buyResult.error}</div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Desktop: Gateway (THE WALLET IS THE GATEWAY) on LEFT expanding to fill gap, Jupiter swap box on RIGHT.
-                Mobile: stacks naturally. Reduced gap. */}
+                Mobile: stacks naturally. */}
             <div className="flex flex-col md:flex-row gap-2 md:gap-3">
               {/* Gateway block on left, flex-1 to expand and fill left/center space on desktop */}
               <div className="md:flex-1">
@@ -267,35 +478,29 @@ export default function Navbar() {
                 </div>
               </div>
 
-              {/* Swap box (Jupiter plugin) on right, fixed reasonable width */}
+              {/* Swap box (Jupiter plugin) on right — kept as visual / advanced alternative */}
               <div className="md:w-[280px]">
-                <div id="jupiter-buy-container" style={{ width: '100%', height: '380px', borderRadius: '12px', overflow: 'hidden', background: '#000' }} />
+                <div id="jupiter-buy-container" style={{ width: '100%', height: '340px', borderRadius: '12px', overflow: 'hidden', background: '#000' }} />
+                <div className="text-[10px] opacity-50 mt-1 text-center">Jupiter widget (alternative)</div>
               </div>
             </div>
 
-            {/* Mobile tip + deeplink helpers (modeled on the SolanaReels game pattern you provided for true PC + mobile wallet support) */}
-            {isMobile && (
-              <div className="mt-1 text-[10px] opacity-70 text-center">
-                On mobile: open this page inside your wallet app's browser (Phantom, Solflare or Backpack) so wallets are detected.
+            {/* Mobile tip + extra deeplinks (helps when injected is not present) */}
+            <div className="mt-2 text-[10px] opacity-70 text-center space-y-1">
+              {isMobile && (
+                <div>On mobile: best results when you open this site from inside Phantom / Solflare / Backpack browser.</div>
+              )}
+              <div className="flex flex-wrap gap-1.5 justify-center">
+                {(['phantom', 'solflare', 'backpack'] as const).map((name) => (
+                  <button
+                    key={name}
+                    onClick={() => openWalletDeeplink(name)}
+                    className="px-2 py-0.5 text-[10px] rounded border border-white/15 hover:bg-white/5"
+                  >
+                    Open in {name}
+                  </button>
+                ))}
               </div>
-            )}
-
-            {/* Quick deeplink buttons — same universal link approach used in your full game for mobile/PC compatibility */}
-            <div className="mt-2 flex flex-wrap gap-1.5 justify-center">
-              {[
-                { name: 'Phantom', url: `https://phantom.app/ul/browse/${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : 'https://memetorrent.futuret3ch.com.au')}` },
-                { name: 'Solflare', url: `https://solflare.com/ul/browse/${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : 'https://memetorrent.futuret3ch.com.au')}` },
-              ].map((w) => (
-                <a
-                  key={w.name}
-                  href={w.url}
-                  target="_blank"
-                  className="text-[10px] px-2 py-0.5 rounded border border-white/15 hover:bg-white/5 opacity-80"
-                  onClick={() => { /* user will connect inside the opened wallet browser or use the Jupiter plugin there */ }}
-                >
-                  Open in {w.name} →
-                </a>
-              ))}
             </div>
 
             {/* CSS vars to theme the Jupiter plugin to match the site's dark + emerald look */}

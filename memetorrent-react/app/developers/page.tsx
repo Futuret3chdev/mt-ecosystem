@@ -586,12 +586,11 @@ const report = await client.generateAuditReport({
           </div>
         </div>
 
-        {/* Live Wallet Connect Demo — deeplink + injected, modeled on the game you pasted */}
-        <div className="mb-10 border border-emerald-400/30 rounded-3xl p-6 sm:p-8 bg-black/60">
-          <div className="uppercase text-xs tracking-[3px] text-emerald-400 mb-1">LIVE DEMO — EXACTLY LIKE YOUR SOLANAREELS GAME</div>
-          <h2 className="text-2xl font-semibold tracking-tight mb-2">Wallet Connect (Injected + Mobile Deeplink)</h2>
+        {/* Wallet Connection Example (cross-platform support) */}
+        <div className="mb-10 border border-white/10 rounded-3xl p-6 sm:p-8 bg-zinc-950/60">
+          <h2 className="text-2xl font-semibold tracking-tight mb-2">Wallet Connection (Injected + Mobile Deeplink)</h2>
           <p className="text-sm opacity-80 mb-4">
-            This uses the same manual provider detection + connect + sign pattern from the SolanaReels game you shared (window.phantom?.solana, solflare, backpack). On desktop it uses the injected provider. On mobile (or when no provider detected) it opens the proper universal/deeplink so the user can connect inside Phantom, Solflare or Backpack and return.
+            Manual provider detection for Phantom, Solflare and Backpack. Works on desktop via injected providers. On mobile it falls back to universal/deeplinks so the user can open the page inside the wallet browser and connect directly.
           </p>
 
           <div className="flex flex-wrap gap-2 mb-4">
@@ -624,7 +623,7 @@ const report = await client.generateAuditReport({
             </div>
           )}
 
-          <div className="text-[10px] opacity-60">Mobile tip: If injected is not available the buttons open a deeplink / universal link (https://phantom.app/ul/... etc). Once inside the wallet browser, tap Connect again — identical pattern to the full game you provided.</div>
+          <div className="text-[10px] opacity-60">On mobile without an injected provider the buttons open a deeplink. Open the site from inside Phantom, Solflare or Backpack and the injected path will be available.</div>
         </div>
 
         {/* Resources & Downloads (disabled per request) */}
