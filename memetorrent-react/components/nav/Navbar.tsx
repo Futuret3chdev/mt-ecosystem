@@ -138,6 +138,7 @@ export default function Navbar() {
             <a href="/#safety" className="opacity-70 hover:opacity-100">SAFETY</a>
             <a href="/contact" className="opacity-70 hover:opacity-100">CONTACT</a>
             <a href="/whitepaper" className="opacity-70 hover:opacity-100">WHITEPAPER</a>
+            <a href="/developers" className="opacity-70 hover:opacity-100">API</a>
           </div>
 
           <a href={LINKS.wallet} target="_blank" className="font-medium px-3 sm:px-4 py-1 sm:py-1.5 rounded-xl border border-white/30 hover:bg-white/5 text-xs sm:text-sm">Launch</a>
@@ -184,6 +185,7 @@ export default function Navbar() {
           <a href="/#safety" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">SAFETY</a>
           <a href="/contact" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">CONTACT</a>
           <a href="/whitepaper" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">WHITEPAPER</a>
+          <a href="/developers" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">API</a>
           <button 
             onClick={() => { setMobileMenuOpen(false); setShowBuyPanel(true); }}
             className="py-1 text-left font-medium text-emerald-400 hover:opacity-100"

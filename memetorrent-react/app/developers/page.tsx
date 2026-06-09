@@ -191,6 +191,18 @@ const report = await client.generateAuditReport({
           <div className="mt-2 opacity-60">Core architecture, token mechanics and integration concepts are documented there.</div>
         </div>
 
+        {/* Simple Sandbox mock */}
+        <div className="mt-8 p-6 border border-white/10 rounded-3xl">
+          <h3 className="font-semibold mb-3">Sandbox (Devnet) — Try it now</h3>
+          <p className="text-xs opacity-70 mb-3">Test endpoints safely. (Mock responses for demo.)</p>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => alert('Response: { "balance": "124567890", "mint": "ELyw...pump" }')} className="px-3 py-1 text-xs border border-white/20 rounded hover:bg-white/5">GET /v1/wallet</button>
+            <button onClick={() => alert('Response: { "txId": "simulated-123", "status": "confirmed" }')} className="px-3 py-1 text-xs border border-white/20 rounded hover:bg-white/5">POST /v1/transactions</button>
+            <button onClick={() => alert('Response: { "nftId": "new-456", "owner": "your-wallet" }')} className="px-3 py-1 text-xs border border-white/20 rounded hover:bg-white/5">POST /v1/nft/mint</button>
+          </div>
+          <p className="text-[10px] opacity-50 mt-2">Real Devnet coming soon. Use the whitepaper for full spec.</p>
+        </div>
+
         {/* Get Started & Jupiter-style Docs (added per request) */}
         <div className="mt-12 pt-8 border-t border-white/10">
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">GET STARTED</div>
@@ -210,6 +222,30 @@ const report = await client.generateAuditReport({
             <div>
               <h3 className="font-semibold mb-2">Changelog</h3>
               <p>Track updates to the SDK, APIs, and on-chain features. Full changelog coming soon in the MT GitHub.</p>
+            </div>
+
+            {/* Full pasted Jupiter-style content for Get Started / Swap / Advanced / Guides / Migration */}
+            <div className="mt-6 pt-4 border-t border-white/10 text-xs opacity-80">
+              <h4 className="font-semibold mb-1">Get Started</h4>
+              <p>AI • Tool Kits • Changelog • Resources</p>
+
+              <h4 className="font-semibold mt-3 mb-1">Swap</h4>
+              <p>Overview: One API for all swap use cases on MT-ECO SYSTEM (inspired by Meta-Aggregator patterns).</p>
+              <p className="mt-1">Meta-Aggregator: All routers compete for the best price. You get a fully assembled transaction, sign it, and MT handles landing. Best for most integrations.</p>
+              <p className="mt-1">Router: Metis onchain routing. Get raw swap instructions to build your own transaction. Add custom instructions, CPI, or modify the transaction however you need.</p>
+              <p className="mt-1">Choosing a path: Start with Meta-Aggregator for best price. Only use the Router if you need to modify the transaction.</p>
+
+              <h4 className="font-semibold mt-3 mb-1">Order &amp; Execute</h4>
+              <p>The Swap API unifies capabilities into a single entry point. Two paths cover every use case: Meta-Aggregator (all routing engines compete for the best price. You get a fully assembled transaction, sign it, and Jupiter handles landing) and Router (Metis onchain routing only. You get raw swap instructions with full transaction control for custom builds, CPI, and composability).</p>
+
+              <h4 className="font-semibold mt-3 mb-1">Router</h4>
+              <p>Build: Common Instructions, Transaction Submission (GET /build, POST /submit). Self-managed via your own RPC, or via /submit with SOL tips for Jupiter’s proprietary landing pipeline.</p>
+
+              <h4 className="font-semibold mt-3 mb-1">Advanced</h4>
+              <p>Overview, Slippage Estimation, Gasless Swaps, Compute Units &amp; Priority Fees, Reduce Transaction Size, Reduce Latency, Routing Integration, Integrate DEX into Metis, Market Listing, Integrate MM into JupiterZ (RFQ).</p>
+
+              <h4 className="font-semibold mt-3 mb-1">Guides</h4>
+              <p>Embed Swap Widget, Migration (Metis to Router, Metis to Meta-Aggregator, Ultra to Meta-Aggregator).</p>
             </div>
 
             <div>
