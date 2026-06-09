@@ -256,6 +256,21 @@ const report = await client.generateAuditReport({
             </div>
 
             <div className="text-[10px] opacity-50">Full interactive docs and live API explorer coming soon. See the Jupiter and Raydium docs style for reference on structure.</div>
+
+            {/* Additional pasted Jupiter-style content for Get Started / Swap / Advanced / Guides / Migration */}
+            <div className="mt-8 pt-4 border-t border-white/10 text-xs opacity-80">
+              <h4 className="font-semibold mb-1">Order &amp; Execute</h4>
+              <p>The Swap API unifies Jupiter’s swap capabilities into a single entry point at https://api.jup.ag/swap/v2. Two paths cover every use case: Meta-Aggregator (all routing engines compete for the best price. You get a fully assembled transaction, sign it, and Jupiter handles landing) and Router (Metis onchain routing only. You get raw swap instructions with full transaction control for custom builds, CPI, and composability).</p>
+
+              <h4 className="font-semibold mt-3 mb-1">Router</h4>
+              <p>Build: Common Instructions, Transaction Submission (GET /build, POST /submit). Self-managed via your own RPC or /submit with SOL tips.</p>
+
+              <h4 className="font-semibold mt-3 mb-1">Advanced</h4>
+              <p>Overview, Slippage Estimation, Gasless Swaps, Compute Units &amp; Priority Fees, Reduce Transaction Size, Reduce Latency, Routing Integration, Integrate DEX into Metis, Market Listing, Integrate MM into JupiterZ (RFQ).</p>
+
+              <h4 className="font-semibold mt-3 mb-1">Guides</h4>
+              <p>Embed Swap Widget, Migration (Metis to Router, Metis to Meta-Aggregator, Ultra to Meta-Aggregator).</p>
+            </div>
           </div>
         </div>
       </div>
