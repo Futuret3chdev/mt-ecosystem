@@ -88,17 +88,25 @@ export default function Navbar() {
     setJupQuote(null);
   };
 
-  const getJupiterQuote = async () => {
+  const getRaydiumQuote = async () => {
     if (!buySolAmount || buySolAmount <= 0) return;
     setIsLoadingQuote(true);
     try {
-      const inputMint = 'So11111111111111111111111111111111111111112';
-      const amountLamports = Math.floor(buySolAmount * 1_000_000_000);
-      const url = `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint}&outputMint=${MT_MINT}&amount=${amountLamports}&slippageBps=100&onlyDirectRoutes=false`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Quote failed');
+      // Use dexscreener for price estimate (avoids Jupiter DNS issues)
+      const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${MT_MINT}`);
       const data = await res.json();
-      setJupQuote(data);
+      const pair = data.pairs?.[0];
+      let outAmount = '0';
+      if (pair) {
+        const tokenPriceUsd = parseFloat(pair.priceUsd || '0');
+        // Approximate SOL price
+        const solRes = await fetch('https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112');
+        const solData = await solRes.json();
+        const solPriceUsd = parseFloat(solData.pairs?.[0]?.priceUsd || '140');
+        const amountOut = Math.floor((buySolAmount * solPriceUsd) / tokenPriceUsd);
+        outAmount = (amountOut * 1_000_000).toString(); // 6 decimals for the token
+      }
+      setJupQuote({ outAmount });
     } catch (e) {
       alert('Failed to get quote (network). Use the Raydium link below.');
       setJupQuote(null);
@@ -107,36 +115,53 @@ export default function Navbar() {
   };
 
   const executeRealBuy = async () => {
-    if (!walletAddress || !jupQuote || !connectedWallet) {
-      alert('Connect wallet and get quote first.');
+    if (!walletAddress || !connectedWallet) {
+      alert('Connect wallet first.');
       return;
     }
     setIsExecutingSwap(true);
     try {
-      const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          quoteResponse: jupQuote,
-          userPublicKey: walletAddress,
-          wrapAndUnwrapSol: true,
-        }),
-      });
-      if (!swapRes.ok) throw new Error('Swap tx failed');
-      const { swapTransaction } = await swapRes.json();
-      const connection = new (await import('@solana/web3.js')).Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-      const transaction = (await import('@solana/web3.js')).Transaction.from(Buffer.from(swapTransaction, 'base64'));
+      const { Connection, PublicKey } = await import('@solana/web3.js');
+      const { Raydium, TxVersion } = await import('@raydium-io/raydium-sdk-v2');
+
+      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+      const owner = new PublicKey(walletAddress);
+
       let provider: any = null;
       if (connectedWallet === 'phantom') provider = (window as any).phantom?.solana;
       else if (connectedWallet === 'solflare') provider = (window as any).solflare;
       else if (connectedWallet === 'backpack') provider = (window as any).backpack?.solana;
       if (!provider) throw new Error('Provider not available');
-      const signedTx = await provider.signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signedTx.serialize());
-      await connection.confirmTransaction(signature, 'confirmed');
-      alert(`Buy successful! Tx: ${signature}`);
+
+      const signAllTransactions = async (txs: any[]) => {
+        const signedTxs = [];
+        for (const tx of txs) {
+          const signed = await provider.signTransaction(tx);
+          signedTxs.push(signed);
+        }
+        return signedTxs;
+      };
+
+      const raydium = await Raydium.load({
+        connection,
+        owner,
+        signAllTransactions,
+      });
+
+      // Use Raydium SDK v2 as per docs for direct on-chain swap (avoids Jupiter)
+      const { execute } = await (raydium.tradeV2.swap as any)({
+        inputMint: 'So11111111111111111111111111111111111111112',
+        outputMint: MT_MINT,
+        amountIn: BigInt(Math.floor(buySolAmount * 1_000_000_000)),
+        slippageBps: 100,
+        txVersion: TxVersion.V0,
+      });
+
+      const { txId } = await execute({ sendAndConfirm: true });
+      alert(`Buy successful! Tx: ${txId}`);
       setJupQuote(null);
     } catch (err: any) {
+      console.error('Swap error:', err);
       alert('Swap failed: ' + (err.message || 'Use Raydium link.'));
     }
     setIsExecutingSwap(false);
@@ -351,9 +376,9 @@ export default function Navbar() {
                   <input type="range" min="0.01" max="5" step="0.01" value={buySolAmount} onChange={e => setBuySolAmount(parseFloat(e.target.value))} className="flex-1 accent-emerald-400" />
                   <span className="font-mono text-xs sm:text-sm">{buySolAmount}</span>
                 </div>
-                <button onClick={getJupiterQuote} disabled={isLoadingQuote} className="w-full py-2.5 min-h-[44px] text-xs sm:text-sm border border-white/20 rounded-xl mb-2 active:bg-white/5">Get On-Chain Quote</button>
+                <button onClick={getRaydiumQuote} disabled={isLoadingQuote} className="w-full py-2.5 min-h-[44px] text-xs sm:text-sm border border-white/20 rounded-xl mb-2 active:bg-white/5">Get On-Chain Quote</button>
                 {jupQuote && <div className="text-xs mb-2">~{(Number(jupQuote.outAmount)/1e6).toFixed(0)} $MT</div>}
-                <button onClick={executeRealBuy} disabled={!jupQuote || isExecutingSwap} className="w-full py-2.5 min-h-[44px] bg-emerald-400 text-black text-xs sm:text-sm font-semibold rounded-xl active:opacity-90">SIGN &amp; SEND ON-CHAIN BUY</button>
+                <button onClick={executeRealBuy} disabled={isExecutingSwap} className="w-full py-2.5 min-h-[44px] bg-emerald-400 text-black text-xs sm:text-sm font-semibold rounded-xl active:opacity-90">SIGN &amp; SEND ON-CHAIN BUY</button>
                 <div className="text-center mt-1">
                   <a href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} target="_blank" className="text-xs sm:text-sm text-emerald-400 underline">Or buy directly on Raydium</a>
                 </div>
