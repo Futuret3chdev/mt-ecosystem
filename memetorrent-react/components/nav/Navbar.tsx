@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import ThemeToggle from '@/components/theme/ThemeToggle';
 import { LINKS } from '@/lib/constants';
@@ -169,9 +170,9 @@ export default function Navbar() {
   return (
     <header className="w-full border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-5 flex items-center justify-between text-sm">
-        <div className="font-semibold tracking-tight flex items-center gap-2">
+        <Link href="/" className="font-semibold tracking-tight flex items-center gap-2 hover:opacity-80 transition">
           <span className="text-emerald-400">MT</span> ECO SYSTEM
-        </div>
+        </Link>
 
         <div className="flex items-center gap-3 sm:gap-6 text-sm">
           {/* Desktop nav links - use /# so they work correctly even from /contact or /whitepaper */}

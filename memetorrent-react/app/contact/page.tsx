@@ -19,21 +19,41 @@ export default function ContactPage() {
     }).catch(() => showToast(email));
   };
 
-  const sendToBot = () => {
+  const sendToBot = async () => {
     const q = botInput.trim();
     if (!q) return;
-    setBotLog(l => [...l, `> ${q}`]);
+
+    const userMsg = `> ${q}`;
+    setBotLog(l => [...l, userMsg, '> Thinking...']);
+    const currentInput = q;
     setBotInput('');
-    setTimeout(() => {
-      const replies = [
-        'The Overlords are aware. Stand by.',
-        'Utility acknowledged. $MT to the moon.',
-        'Your query has been logged in the MT-CHAIN queue.',
-        'Soon™ — but real progress happening now.',
-        'Message received. We move faster than the market.',
-      ];
-      setBotLog(l => [...l, replies[Math.floor(Math.random() * replies.length)]]);
-    }, 520);
+
+    try {
+      const res = await fetch('/api/grokchat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: currentInput }),
+      });
+
+      const data = await res.json();
+
+      setBotLog(l => {
+        // Remove the last "Thinking..." line and append the real reply
+        const withoutThinking = l.slice(0, -1);
+        return [...withoutThinking, `> ${data.reply || 'No reply received.'}`];
+      });
+    } catch (err) {
+      setBotLog(l => {
+        const withoutThinking = l.slice(0, -1);
+        return [...withoutThinking, '> Error – AI service temporarily unavailable. Your message was forwarded to the team.'];
+      });
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      sendToBot();
+    }
   };
 
   return (
@@ -83,7 +103,7 @@ export default function ContactPage() {
             <input
               value={botInput}
               onChange={(e) => setBotInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') sendToBot(); }}
+              onKeyDown={handleKeyDown}
               placeholder="Type your message to the Overlords..."
               className="flex-1 bg-white/5 border border-white/15 rounded-2xl px-4 sm:px-5 py-3 text-sm focus:outline-none focus:border-emerald-400/60 min-h-[44px]"
             />
