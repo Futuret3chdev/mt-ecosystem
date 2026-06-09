@@ -14,7 +14,7 @@ type Asset = {
   logo?: string;
 };
 
-type FlowType = 'bridge' | 'swap' | 'harvest' | 'report' | 'nft-designer' | 'rockets-staking' | 'multi-wallet' | 'constellation' | 'token-info' | 'contact' | 'utility' | null;
+type FlowType = 'bridge' | 'swap' | 'harvest' | 'report' | 'nft-designer' | 'rockets-staking' | 'multi-wallet' | 'constellation' | 'buy-mt' | null;
 
 export default function PortfolioManager() {
   const [price, setPrice] = useState(0);
@@ -44,10 +44,6 @@ export default function PortfolioManager() {
   const [message, setMessage] = useState<string | null>(null);
   const [nftPreview, setNftPreview] = useState({ color: '#10b981', type: 'Rocket', accessory: 'Wings' }); // for NFT designer
   const [stakedRockets, setStakedRockets] = useState(0); // for staking preview (demo only)
-
-  // For Contact flow (InnoBot-AI demo from old site)
-  const [botInput, setBotInput] = useState('');
-  const [botLog, setBotLog] = useState<string[]>(['Hello human. What do you seek?']);
 
   // Ref for the active flow panel so we can scroll it directly under the clicked flow launcher
   const panelRef = useRef<HTMLDivElement>(null);
@@ -92,29 +88,6 @@ export default function PortfolioManager() {
   const showToast = (text: string) => {
     setMessage(text);
     setTimeout(() => setMessage(null), 2400);
-  };
-
-  const copyEmail = (email: string) => {
-    navigator.clipboard.writeText(email).then(() => {
-      showToast(`Copied ${email} to clipboard`);
-    }).catch(() => showToast(email));
-  };
-
-  const sendToBot = () => {
-    const q = botInput.trim();
-    if (!q) return;
-    setBotLog(l => [...l, `> ${q}`]);
-    setBotInput('');
-    setTimeout(() => {
-      const replies = [
-        'The Overlords are aware. Stand by.',
-        'Utility acknowledged. $MT to the moon.',
-        'Your query has been logged in the MT-CHAIN queue.',
-        'Soon™ — but real progress happening now.',
-        'Message received. We move faster than the market.',
-      ];
-      setBotLog(l => [...l, replies[Math.floor(Math.random() * replies.length)]]);
-    }, 520);
   };
 
   // Flow handlers — real-feeling self-custodial management flows
@@ -200,10 +173,12 @@ export default function PortfolioManager() {
       setTimeout(() => closeFlow(), 400);
     }
 
-    // Info flows (tokenomics / contact / utility) — act on view, then close
-    if (activeFlow === 'token-info' || activeFlow === 'contact' || activeFlow === 'utility') {
-      showToast('Info loaded from MT ECO SYSTEM records');
-      setTimeout(() => closeFlow(), 900);
+    // Direct buy $MT (on-page, no third party)
+    if (activeFlow === 'buy-mt') {
+      const amt = flowData.buyAmt || 5000000;
+      updateCurrentWallet({ balanceSPL: currentWallet.balanceSPL + amt });
+      showToast(`Purchased ${amt.toLocaleString()} $MT directly • credited to vault (demo)`);
+      setTimeout(() => closeFlow(), 1100);
     }
   };
 
@@ -215,6 +190,12 @@ export default function PortfolioManager() {
       icon: '🔗',
     },
     {
+      key: 'buy-mt' as const,
+      title: 'Buy $MT Directly',
+      desc: 'Purchase $MT right here on-page. Demo SOL → $MT instantly credited to your vault. No third-party DEX.',
+      icon: '💰',
+    },
+    {
       key: 'harvest' as const,
       title: 'Harvest TAP Earnings',
       desc: 'Play Cosmic Dash or Neon Salvage → Rockets land directly in your vault.',
@@ -222,8 +203,8 @@ export default function PortfolioManager() {
     },
     {
       key: 'swap' as const,
-      title: 'In-Wallet Swap & Buy',
-      desc: 'Jupiter powered. Your keys sign. Full control, no custody handoff.',
+      title: 'In-Wallet Swap',
+      desc: 'Jupiter powered routing available. Your keys sign locally. Full control.',
       icon: '↔',
     },
     {
@@ -232,7 +213,6 @@ export default function PortfolioManager() {
       desc: 'On-chain verified reports. Native + SPL + Rockets + NFTs with proofs.',
       icon: '📊',
     },
-    // New cool features requested
     {
       key: 'nft-designer' as const,
       title: 'NFT Designer',
@@ -256,25 +236,6 @@ export default function PortfolioManager() {
       title: 'Ecosystem Constellation',
       desc: 'Interactive visual map of the entire MT-ECO SYSTEM — nodes for wallet, core, TAP, bridges & more.',
       icon: '✨',
-    },
-    // Pulled from the original site — important token + contact + utility info now live in flows
-    {
-      key: 'token-info' as const,
-      title: 'Tokenomics',
-      desc: '1,000,000,000 TOTAL SUPPLY. Presale • Liquidity • Staking • Mining • Airdrops • Team. Full breakdown.',
-      icon: '🪙',
-    },
-    {
-      key: 'contact' as const,
-      title: 'Contact the Meme Overlords',
-      desc: 'Official support & Michael emails. Message InnoBot-AI. We reply faster than a dev sells at ATH.',
-      icon: '📡',
-    },
-    {
-      key: 'utility' as const,
-      title: 'Utility Control Panel',
-      desc: '$MT unlocks everything: P2E mining, NFT identity, store, launchpad, MT-CHAIN, drops, vault rewards & more.',
-      icon: '⚙️',
     },
   ];
 
@@ -437,10 +398,37 @@ export default function PortfolioManager() {
           </div>
         </div>
 
+        {/* Tokenomics — original important allocations, in its own dedicated location (not a flow card) */}
+        <div className="mb-10">
+          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-2">TOKENOMICS $MT</div>
+          <div className="text-3xl font-semibold tracking-tight mb-4">1,000,000,000 TOTAL SUPPLY</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {[
+              { pct: '18%', label: 'PRESALE', amt: '180 Million', note: '' },
+              { pct: '10%', label: 'LIQUIDITY', amt: '100 Million', note: 'Over 12 months' },
+              { pct: '20%', label: 'STAKING', amt: '200 Million', note: 'Vested 2 years' },
+              { pct: '45%', label: 'MINING', amt: '450 Million', note: 'Interact to earn' },
+              { pct: '4%', label: 'AIRDROPS', amt: '40 Million', note: '' },
+              { pct: '2.5%', label: 'DEVELOPMENT', amt: '25 Million', note: 'Over 2 years' },
+              { pct: '0.5%', label: 'TEAM', amt: '5 Million', note: 'Locked 5 years' },
+            ].map((a, i) => (
+              <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.015] p-4 text-sm">
+                <div className="flex gap-2 items-baseline">
+                  <span className="font-mono text-emerald-400">{a.pct}</span>
+                  <span className="font-semibold">{a.label}</span>
+                </div>
+                <div>{a.amt} Tokens</div>
+                {a.note && <div className="text-[10px] opacity-60">{a.note}</div>}
+              </div>
+            ))}
+          </div>
+          <div className="text-[10px] mt-2 opacity-50">Full details in the whitepaper. $MT is the universal key across the ecosystem.</div>
+        </div>
+
         {/* The good stuff: actual management flows */}
         <div>
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">ONE-PLACE MANAGEMENT FLOWS</div>
-          <div className="text-2xl font-semibold tracking-tight mb-6">Do more than watch. Act directly.</div>
+          <div className="text-2xl font-semibold tracking-tight mb-6">Command-center actions. Real ownership.</div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
             {flows.map((f) => {
@@ -639,129 +627,64 @@ export default function PortfolioManager() {
                   <div className="mt-6 text-center">
                     <p className="opacity-80 mb-4">The full self-built constellation. Every node is connected without third parties.</p>
                     <div className="inline-block text-6xl mb-3">✨ 🌌 🔗</div>
-                    <p className="text-sm">MT Core • INFINITE WALLET • TAP (Shop • Match • Transport • Studio) • 100+ Bridges • Native NFTs • Rockets Economy • Security Layer</p>
+                    <p className="text-sm">MT Core • INFINITE WALLET • TAP (Shop • Match • Transport • Studio) • 100+ Bridges • Native NFTs • Rockets Economy • Safety Layer</p>
                     <button onClick={() => completeStep()} className="mt-4 px-8 py-3 rounded-2xl border border-white/30">CLOSE VISUAL</button>
                   </div>
                 )}
 
-                {/* Tokenomics — from original site https://memetorrent.futuret3ch.com.au/token.html */}
-                {activeFlow === 'token-info' && (
-                  <div className="mt-6">
-                    <div className="uppercase text-xs tracking-[3px] opacity-60 mb-1">TOKENOMICS $MT</div>
-                    <div className="text-3xl font-semibold tracking-[-1.2px] mb-2">1,000,000,000 TOTAL SUPPLY</div>
-                    <p className="opacity-70 mb-4 text-sm">The original allocations. $MT is the key to the entire ecosystem.</p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {[
-                        { pct: '18%', label: 'PRESALE', amt: '180 Million Tokens', note: '' },
-                        { pct: '10%', label: 'LIQUIDITY', amt: '100 Million Tokens', note: 'Released over 12 Months' },
-                        { pct: '20%', label: 'STAKING', amt: '200 Million Tokens', note: 'Vested Over 2 Years' },
-                        { pct: '45%', label: 'MINING', amt: '450 Million Tokens', note: 'Interact to Earn' },
-                        { pct: '4%', label: 'AIRDROPS', amt: '40 Million Tokens', note: '' },
-                        { pct: '2.5%', label: 'DEVELOPMENT', amt: '25 Million Tokens', note: 'Released Over 2 Years' },
-                        { pct: '0.5%', label: 'TEAM', amt: '5 Million Tokens', note: 'Locked for 5 Years' },
-                      ].map((a, i) => (
-                        <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-                          <div className="flex items-baseline gap-2">
-                            <div className="text-emerald-400 font-mono text-xl tabular-nums">{a.pct}</div>
-                            <div className="font-semibold tracking-tight">{a.label}</div>
-                          </div>
-                          <div className="text-sm mt-1 opacity-90">{a.amt}</div>
-                          {a.note && <div className="text-[10px] opacity-60 mt-0.5">{a.note}</div>}
-                        </div>
-                      ))}
+                {/* NEW: Direct Buy $MT on-page (addresses Live $MT direct purchase, no third party) */}
+                {activeFlow === 'buy-mt' && (
+                  <div className="mt-6 space-y-5">
+                    <p className="opacity-80">Buy $MT directly here. Price pulled from live stats. Purchase is simulated locally and credited to your current vault — true self-custodial demo.</p>
+                    <div>
+                      <div className="text-xs opacity-60 mb-1">Amount to buy (smallest units)</div>
+                      <input
+                        type="range"
+                        min="1000000"
+                        max="50000000"
+                        step="1000000"
+                        value={flowData.buyAmt || 5000000}
+                        onChange={(e) => setFlowData({ ...flowData, buyAmt: parseInt(e.target.value) })}
+                        className="w-full accent-emerald-400"
+                      />
+                      <div className="font-mono text-xl mt-1 tabular-nums">{(flowData.buyAmt || 5000000).toLocaleString()} $MT</div>
                     </div>
-
-                    <a
-                      href={LINKS.whitepaper || 'https://memetorrent.futuret3ch.com.au/whitepaper.pdf'}
-                      target="_blank"
-                      className="mt-4 inline-block text-sm text-emerald-400 hover:underline"
+                    <div className="text-xs opacity-60">Est. ~{((flowData.buyAmt || 5000000) * price).toFixed(2)} USD at current price (demo)</div>
+                    <button
+                      onClick={() => completeStep({ buyAmt: flowData.buyAmt || 5000000 })}
+                      className="w-full py-4 rounded-2xl bg-emerald-400 text-black font-semibold tracking-wider"
                     >
-                      READ $MT WHITEPAPER →
-                    </a>
-                    <div className="mt-4">
-                      <button onClick={() => completeStep()} className="w-full py-3 rounded-2xl border border-white/30 text-sm">CLOSE TOKENOMICS</button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Contact — from original site https://memetorrent.futuret3ch.com.au/contact.html */}
-                {activeFlow === 'contact' && (
-                  <div className="mt-6">
-                    <div className="uppercase text-xs tracking-[3px] opacity-60 mb-1">CONTACT THE MEME OVERLORDS</div>
-                    <div className="text-xl font-semibold tracking-tight mb-4">Official Contacts</div>
-
-                    <div className="space-y-3">
-                      {['Support@MemeTorrent.com', 'Michael@MemeTorrent.com'].map((e, i) => (
-                        <div key={i} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.015] px-4 py-3">
-                          <div className="font-mono text-sm">{e}</div>
-                          <button
-                            onClick={() => copyEmail(e)}
-                            className="text-xs px-3 py-1 rounded-xl border border-white/20 hover:bg-white/5 active:bg-white/10"
-                          >
-                            COPY
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-[10px] opacity-60 mt-2">We reply faster than a dev sells at ATH — Usually under 69 minutes</div>
-
-                    <div className="mt-6 border-t border-white/10 pt-5">
-                      <div className="font-semibold mb-2">Message InnoBot-AI</div>
-                      <div className="text-xs opacity-60 mb-2">Hello human. What do you seek?</div>
-
-                      <div className="rounded-2xl border border-white/10 bg-black/60 p-3 text-sm font-mono max-h-40 overflow-auto space-y-1 mb-3">
-                        {botLog.map((line, idx) => (
-                          <div key={idx} className={line.startsWith('>') ? 'opacity-70' : 'text-emerald-300'}>{line}</div>
-                        ))}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <input
-                          value={botInput}
-                          onChange={(e) => setBotInput(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') sendToBot(); }}
-                          placeholder="Ask the bot..."
-                          className="flex-1 bg-white/5 border border-white/15 rounded-2xl px-4 py-2 text-sm focus:outline-none focus:border-emerald-400/50"
-                        />
-                        <button onClick={sendToBot} className="px-5 rounded-2xl border border-emerald-400/40 text-sm hover:bg-emerald-400/5">SEND</button>
-                      </div>
-                    </div>
-
-                    <button onClick={() => completeStep()} className="mt-5 w-full py-3 rounded-2xl border border-white/30 text-sm">CLOSE CONTACT</button>
-                  </div>
-                )}
-
-                {/* Utility — from original site https://memetorrent.futuret3ch.com.au/utility.html */}
-                {activeFlow === 'utility' && (
-                  <div className="mt-6">
-                    <div className="uppercase text-xs tracking-[3px] opacity-60 mb-1">UTILITY CONTROL PANEL</div>
-                    <p className="opacity-80 mb-4">Your $MT unlocks the full power of the MemeTorrent ecosystem.</p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      {[
-                        'Token Exclusivity — $MT is the universal key. Every feature, game, marketplace, login & identity runs with $MT.',
-                        'P2E Mining — Earn real $MT by gaming, raiding socials, or completing MemeTorrent missions.',
-                        'NFT Digital Identity — Burn $MT → Mint your 1/1 NFT identity. Required for premium areas & exclusive utilities.',
-                        'Physical / Digital Store — Buy hardware, software, tech services, AI tools, dev work — ONLY with $MT.',
-                        'MT-CHAIN (Soon) — Our blockchain is coming. Validators, nodes, staking, governance, gas-less features.',
-                        'Weekly Drops — New utilities roll out constantly. New apps, bots, tools, games and protocols.',
-                        'Safety & Security — Anti-rug tech, secure ecosystem, wallet protection, community guardians.',
-                        'Launchpad Access — Exclusive early access to future tokens, NFTs, dApps & partner projects.',
-                        'Vault & Rewards — Lock $MT → earn yield, XP, badges, NFT rank-ups & weekly reward distributions.',
-                      ].map((u, i) => (
-                        <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.015] p-4 leading-snug">
-                          {u}
-                        </div>
-                      ))}
-                    </div>
-
-                    <button onClick={() => completeStep()} className="mt-5 w-full py-3 rounded-2xl border border-white/30 text-sm">CLOSE UTILITY PANEL</button>
+                      SIGN &amp; BUY $MT DIRECTLY (demo • adds to vault)
+                    </button>
+                    <div className="text-[10px] opacity-50 text-center">Real version would use on-chain purchase or our native issuance with your local keys only.</div>
                   </div>
                 )}
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Utility items now displayed statically under the ONE-PLACE MANAGEMENT FLOWS (not as individual flow cards) */}
+          <div className="mt-10 pt-8 border-t border-white/10">
+            <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">CORE UTILITIES POWERED BY $MT</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+              {[
+                'Token Exclusivity — $MT is the universal key. Every feature, game, marketplace, login & identity runs with $MT.',
+                'P2E Mining — Earn real $MT by gaming, raiding socials, or completing MemeTorrent missions.',
+                'NFT Digital Identity — Burn $MT → Mint your 1/1 NFT identity. Required for premium areas & exclusive utilities.',
+                'Physical / Digital Store — Buy hardware, software, tech services, AI tools, dev work — ONLY with $MT.',
+                'MT-CHAIN (Soon) — Our blockchain is coming. Validators, nodes, staking, governance, gas-less features.',
+                'Weekly Drops — New utilities roll out constantly. New apps, bots, tools, games and protocols.',
+                'Safety & Security — Anti-rug tech, secure ecosystem, wallet protection, community guardians.',
+                'Launchpad Access — Exclusive early access to future tokens, NFTs, dApps & partner projects.',
+                'Vault & Rewards — Lock $MT → earn yield, XP, badges, NFT rank-ups & weekly reward distributions.',
+              ].map((u, i) => (
+                <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.015] p-4 leading-snug">
+                  {u}
+                </div>
+              ))}
+            </div>
+            <div className="text-[10px] mt-3 opacity-50">These utilities are unlocked and managed through the flows above — all inside your self-custodial INFINITE WALLET.</div>
+          </div>
         </div>
 
         {/* Promote specialty wallets: Couples & Business (first-class in INFINITE WALLET) */}

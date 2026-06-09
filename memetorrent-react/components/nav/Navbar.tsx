@@ -10,16 +10,25 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-8 text-sm">
-          <a href="#features" className="opacity-70 hover:opacity-100">Features</a>
-          <a href="#management" className="opacity-70 hover:opacity-100">Management</a>
-          <a href="#ecosystem" className="opacity-70 hover:opacity-100">Ecosystem</a>
           <a href="#stats" className="opacity-70 hover:opacity-100">Live $MT</a>
           <a href="#tap" className="opacity-70 hover:opacity-100">TAP</a>
           <a href={LINKS.wallet} target="_blank" className="opacity-70 hover:opacity-100">INFINITE WALLET</a>
-          <a href={LINKS.jupiter} target="_blank" className="opacity-70 hover:opacity-100">Buy $MT</a>
-          <a href="#security" className="opacity-70 hover:opacity-100">Security</a>
+          <a href="#safety" className="opacity-70 hover:opacity-100">Safety</a>
+          <a href="/contact" className="opacity-70 hover:opacity-100">Contact</a>
           <a href={LINKS.wallet} target="_blank" className="font-medium px-4 py-1.5 rounded-xl border border-white/30 hover:bg-white/5">Launch Infinite Wallet</a>
           <ThemeToggle />
+        </div>
+
+        {/* Social links up top under the navbar (as requested) */}
+        <div className="border-t border-white/10 text-[11px]">
+          <div className="max-w-7xl mx-auto px-6 py-1.5 flex items-center gap-x-5 opacity-60">
+            <span className="tracking-widest text-[9px] mr-1">COMMUNITY</span>
+            <a href="https://discord.com/invite/FxT7q7fpkT" target="_blank" rel="noopener" className="hover:opacity-100 hover:text-white">Discord</a>
+            <a href="https://x.com/MemeTorrent" target="_blank" rel="noopener" className="hover:opacity-100 hover:text-white">X</a>
+            <a href="https://t.me/MemeTorrentPortal" target="_blank" rel="noopener" className="hover:opacity-100 hover:text-white">Telegram</a>
+            <span className="flex-1" />
+            <span className="text-[9px] opacity-40">Direct $MT purchase available in Live $MT + ONE-PLACE MANAGEMENT FLOWS (no third-party handoff)</span>
+          </div>
         </div>
       </div>
     </header>

@@ -1,8 +1,8 @@
-export default function Security() {
+export default function Safety() {
   return (
-    <section id="security" className="py-20 border-t border-white/10">
+    <section id="safety" className="py-20 border-t border-white/10">
       <div className="max-w-5xl mx-auto px-6 text-center">
-        <div className="text-emerald-400 text-xs tracking-[4px]">SECURITY IS NON-NEGOTIABLE</div>
+        <div className="text-emerald-400 text-xs tracking-[4px]">SAFETY IS NON-NEGOTIABLE</div>
         <h2 className="text-4xl font-semibold tracking-tight mt-3">Built for people who actually care about self-custody.</h2>
 
         <div className="grid sm:grid-cols-3 gap-6 mt-12 text-left">
