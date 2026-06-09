@@ -38,7 +38,7 @@ export default function ContactPage() {
   };
 
   return (
-    <main className="min-h-screen bg-black text-white">
+    <main className="min-h-screen">
       <div className="border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
           <Link href="/" className="font-semibold tracking-tight flex items-center gap-2">
@@ -47,16 +47,6 @@ export default function ContactPage() {
           <div className="flex items-center gap-3 sm:gap-6 text-sm">
             <Link href="/" className="opacity-70 hover:opacity-100">Back to Home</Link>
             <a href="https://wallet.futuret3ch.com.au/" target="_blank" className="font-medium px-3 sm:px-4 py-1 sm:py-1.5 rounded-xl border border-white/30 hover:bg-white/5 text-xs sm:text-sm">Launch Infinite Wallet</a>
-          </div>
-        </div>
-        {/* Social icons on contact page for consistency */}
-        <div className="border-t border-white/10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-            <a href="https://discord.gg/FxT7q7fpkT" target="_blank" rel="noopener" title="Discord" style={{ color: '#5865F2' }}><i className="fab fa-discord text-lg sm:text-xl"></i></a>
-            <a href="https://twitter.com/MemeTorrent" target="_blank" rel="noopener" title="X / Twitter" style={{ color: '#1DA1F2' }}><i className="fab fa-twitter text-lg sm:text-xl"></i></a>
-            <a href="https://t.me/MemeTorrentPortal" target="_blank" rel="noopener" title="Telegram" style={{ color: '#26A5E4' }}><i className="fab fa-telegram text-lg sm:text-xl"></i></a>
-            <div className="flex-1" />
-            <span className="text-[10px] opacity-50">Contract: ELyw...pump</span>
           </div>
         </div>
       </div>

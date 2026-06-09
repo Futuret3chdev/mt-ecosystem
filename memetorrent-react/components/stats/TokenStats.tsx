@@ -132,14 +132,14 @@ export default function TokenStats() {
               <div className="text-3xl sm:text-4xl font-semibold tracking-tight">MT Token Stats</div>
               <div className="text-xs opacity-60 mt-1">Live from DexScreener • Auto-refreshes every 15s</div>
               {/* Contract Address - short display + copy for mobile friendliness */}
-              <div className="mt-2">
-                <span className="text-xs opacity-70">Contract Address: </span>
+              <div className="mt-3 p-3 rounded-xl border border-emerald-400/30 bg-emerald-400/5">
+                <div className="text-[10px] opacity-70 mb-0.5 tracking-widest">CONTRACT ADDRESS (COPY)</div>
                 <button 
                   onClick={() => navigator.clipboard.writeText('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump')} 
-                  className="font-mono text-xs sm:text-sm text-emerald-400 hover:text-white underline break-all sm:break-normal"
-                  title="ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump (tap to copy)"
+                  className="font-mono text-sm sm:text-base text-emerald-400 hover:text-emerald-300 active:text-white font-semibold break-all text-left w-full"
+                  title="Click to copy full $MT contract"
                 >
-                  ELyw...pump
+                  ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump
                 </button>
               </div>
             </div>

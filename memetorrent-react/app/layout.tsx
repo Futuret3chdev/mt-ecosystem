@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <head>
         {/* Font Awesome for social icons in original brand colors */}
         <link 
@@ -23,7 +23,7 @@ export default function RootLayout({
           crossOrigin="anonymous" 
         />
       </head>
-      <body className="bg-black text-white">
+      <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
         <Navbar />
         <main className="min-h-screen">{children}</main>
         <Footer />

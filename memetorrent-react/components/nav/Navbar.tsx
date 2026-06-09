@@ -42,6 +42,12 @@ export default function Navbar() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Mobile detection for wallet links
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    setIsMobile(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
+  }, []);
+
   // Buy states and logic (duplicated here for top panel to work independently; real Jupiter buy)
   const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -135,20 +141,33 @@ export default function Navbar() {
     setIsExecutingSwap(false);
   };
 
-  // Close buy panel on outside click
+  // Close buy panel on outside click (mouse + touch for mobile)
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (buyPanelRef.current && !buyPanelRef.current.contains(event.target as Node)) {
         setShowBuyPanel(false);
       }
     };
+    const handleScroll = () => setShowBuyPanel(false);
+
     if (showBuyPanel) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside, { passive: true });
+      window.addEventListener('scroll', handleScroll, { passive: true });
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside as any);
+      window.removeEventListener('scroll', handleScroll);
     };
   }, [showBuyPanel]);
+
+  // Wallet mobile app links
+  const walletApps = {
+    phantom: { label: 'Phantom', url: 'https://phantom.app/' },
+    solflare: { label: 'Solflare', url: 'https://solflare.com/' },
+    backpack: { label: 'Backpack', url: 'https://backpack.app/' },
+  };
 
   return (
     <header className="w-full border-b border-white/10">
@@ -270,9 +289,14 @@ export default function Navbar() {
       {showBuyPanel && (
         <div ref={buyPanelRef} className="border-t border-white/10 bg-zinc-950/95 backdrop-blur">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 text-sm">
-            {/* Compact form: Connect your wallet to buy - stacked on mobile for touch */}
+            {/* Header with close for mobile/desktop */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs sm:text-sm font-medium">Connect your wallet to buy</div>
+              <button onClick={() => setShowBuyPanel(false)} className="text-xl leading-none opacity-60 hover:opacity-100 px-2" aria-label="Close buy panel">×</button>
+            </div>
+
+            {/* Connect buttons - work best inside wallet in-app browser on mobile */}
             <div className="mb-3 sm:mb-4">
-              <div className="text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Connect your wallet to buy</div>
               <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                 <button onClick={() => connectWallet('phantom')} className="px-4 py-2 min-h-[44px] text-sm rounded-xl border border-white/20 hover:bg-white/5 active:bg-white/10">👻 Phantom</button>
                 <button onClick={() => connectWallet('solflare')} className="px-4 py-2 min-h-[44px] text-sm rounded-xl border border-white/20 hover:bg-white/5 active:bg-white/10">☀️ Solflare</button>
@@ -281,7 +305,21 @@ export default function Navbar() {
               {walletAddress && (
                 <div className="mt-2 text-xs">Connected: {connectedWallet} {walletAddress.slice(0,6)}... <button onClick={disconnectWallet} className="underline ml-1">Disconnect</button></div>
               )}
-              <div className="text-[10px] opacity-60 mt-1">On mobile: open this page inside your wallet app's browser for connection to work.</div>
+
+              {/* Mobile-specific app links so users can find & open the wallets */}
+              {isMobile && (
+                <div className="mt-2 text-[10px] opacity-70">
+                  On mobile: open this page <span className="font-medium">inside your wallet app's browser</span> for connect to work.
+                  <div className="mt-1 flex flex-wrap gap-x-3">
+                    <a href={walletApps.phantom.url} target="_blank" className="text-emerald-400 underline">Get Phantom app →</a>
+                    <a href={walletApps.solflare.url} target="_blank" className="text-emerald-400 underline">Get Solflare app →</a>
+                    <a href={walletApps.backpack.url} target="_blank" className="text-emerald-400 underline">Get Backpack app →</a>
+                  </div>
+                </div>
+              )}
+              {!isMobile && (
+                <div className="text-[10px] opacity-60 mt-1">Tip: For mobile, open this site inside the Phantom / Solflare / Backpack app browser.</div>
+              )}
             </div>
 
             {/* THE WALLET IS THE GATEWAY block just below the form in the panel - full original text */}

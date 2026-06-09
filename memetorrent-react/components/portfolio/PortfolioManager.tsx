@@ -415,7 +415,7 @@ export default function PortfolioManager() {
               </div>
             ))}
           </div>
-          <a href="/whitepaper" className="inline-block mt-3 text-xs text-emerald-400 hover:underline">📄 READ $MT WHITEPAPER (interactive)</a>
+          <a href="/whitepaper" className="inline-block mt-3 px-5 py-2 text-sm sm:text-base font-medium border border-emerald-400/50 rounded-full text-emerald-400 hover:bg-emerald-400/10 hover:text-emerald-300 transition active:scale-[0.985]">📖 READ $MT WHITEPAPER — Interactive Flip Book</a>
         </div>
 
         {/* The good stuff: actual management flows */}
