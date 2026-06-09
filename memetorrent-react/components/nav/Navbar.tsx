@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ThemeToggle from '@/components/theme/ThemeToggle';
 import { LINKS } from '@/lib/constants';
 import { Connection, PublicKey, VersionedTransaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { useWallet } from '@solana/wallet-adapter-react';
 
 export default function Navbar() {
   const [authOpen, setAuthOpen] = useState(false);
@@ -54,103 +55,73 @@ export default function Navbar() {
     }
   }, []);
 
-  // ==================== REAL SOLANA WALLET CONNECTION (ported from your game) ====================
-  // No separate ugly "Open in ..." buttons. Click "Phantom" / "Solflare" / "Backpack" and it just connects (or deep links on mobile).
+  // Shared RPC for balance fetches (same as before)
   const SOLANA_RPC_URL =
     (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SOLANA_RPC_URL) ||
     'https://api.mainnet-beta.solana.com';
   const BUY_CONNECTION = new Connection(SOLANA_RPC_URL, 'confirmed');
 
+  // Official Solana Wallet Adapter (recommended over custom polling/deeplink hacks)
+  const { 
+    select, 
+    connect: adapterConnect, 
+    disconnect: adapterDisconnect, 
+    publicKey, 
+    signTransaction: adapterSignTransaction,
+    connected: adapterConnected,
+    connecting: adapterConnecting 
+  } = useWallet();
+
+  // Keep the old local state for minimal changes to the existing buy panel JSX / quick buy flow
   const [connectedWallet, setConnectedWallet] = useState<{ address: string; provider: any } | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+
+  // Sync the adapter's publicKey into the buy panel's display state (balance + address)
+  useEffect(() => {
+    if (publicKey) {
+      const addr = publicKey.toBase58();
+      setConnectedWallet({ address: addr, provider: null as any });
+
+      (async () => {
+        try {
+          const lamports = await BUY_CONNECTION.getBalance(publicKey);
+          setWalletBalance(lamports / LAMPORTS_PER_SOL);
+        } catch {}
+      })();
+    } else {
+      setConnectedWallet(null);
+      setWalletBalance(null);
+    }
+  }, [publicKey]);
+
+  // ==================== REAL SOLANA WALLET CONNECTION (ported from your game) ====================
+  // No separate ugly "Open in ..." buttons. Click "Phantom" / "Solflare" / "Backpack" and it just connects (or deep links on mobile).
+
   const [isConnecting, setIsConnecting] = useState(false);
   const [buying, setBuying] = useState(false);
   const [buyResult, setBuyResult] = useState<{ signature?: string; error?: string } | null>(null);
 
+  // Thin wrapper around the official wallet adapter.
+  // The adapter handles all the hard parts: extension detection, mobile deeplinks (including correct Solflare v1 schema), retries, etc.
   const connectWalletForBuy = async (walletType: 'phantom' | 'solflare' | 'backpack') => {
     setIsConnecting(true);
     setBuyResult(null);
 
     try {
-      // 1. Handle Mobile Deep Linking First (using correct schemas)
-      if (/iPhone|Android/i.test(navigator.userAgent)) {
-        const currentUrl = window.location.href;
+      const adapterName = 
+        walletType === 'phantom' ? 'Phantom' : 
+        walletType === 'solflare' ? 'Solflare' : 
+        'Backpack';
 
-        if (walletType === 'solflare') {
-          // Correct Solflare mobile universal link pattern (v1 as recommended)
-          window.location.href = `https://solflare.com/ul/v1/browse/${encodeURIComponent(currentUrl)}`;
-          throw new Error('Opening Solflare app...');
-        }
-        if (walletType === 'phantom') {
-          window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
-          throw new Error('Opening Phantom app...');
-        }
-        if (walletType === 'backpack') {
-          window.location.href = `https://backpack.app/ul/browse/${encodeURIComponent(currentUrl)}`;
-          throw new Error('Opening Backpack app...');
-        }
-      }
+      // This is the key: select + connect. The adapter does the right thing for desktop + mobile.
+      select(adapterName);
+      await adapterConnect();
 
-      // 2. Desktop / In-App Browser Provider Retrieval with polling
-      // (providers can take a few milliseconds to inject, even inside in-app browser)
-      let provider: any = null;
-
-      for (let i = 0; i < 10; i++) {
-        if (walletType === 'phantom') provider = (window as any).phantom?.solana;
-        if (walletType === 'solflare') provider = (window as any).solflare;
-        if (walletType === 'backpack') provider = (window as any).backpack;
-
-        if (provider) break;
-        await new Promise(r => setTimeout(r, 200));
-      }
-
-      if (!provider) {
-        // Fallback: truly not installed / injected
-        const installUrl = walletApps[walletType]?.url || 'https://solana.com/ecosystem/wallets';
-        window.open(installUrl, '_blank');
-        throw new Error(`${walletType.charAt(0).toUpperCase() + walletType.slice(1)} not found.`);
-      }
-
-      // 3. Connection Logic
-      const resp = await provider.connect();
-
-      // Robust public key extraction with retry (critical for Solflare on desktop — wallets can be slow to expose publicKey)
-      let pk = null;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        pk = resp?.publicKey || provider?.publicKey;
-        if (pk) break;
-        await new Promise(r => setTimeout(r, 250));
-      }
-
-      if (!pk) {
-        const walletName = walletType.charAt(0).toUpperCase() + walletType.slice(1);
-        throw new Error(`Failed to get public key from ${walletName}. Please try clicking the button again, or use Phantom instead.`);
-      }
-
-      const publicKey = typeof pk.toString === 'function' ? pk.toString() : String(pk);
-
-      // Fetch real SOL balance
-      let bal = 0;
-      try {
-        const pubKey = new PublicKey(publicKey);
-        const lamports = await BUY_CONNECTION.getBalance(pubKey);
-        bal = lamports / LAMPORTS_PER_SOL;
-      } catch {}
-
-      setConnectedWallet({ address: publicKey, provider });
-      setWalletBalance(bal);
-      setBuyResult(null);
-
+      // The hook (publicKey) will update reactively. We still fetch balance for the UI.
     } catch (error: any) {
-      console.error('Wallet connection error:', error);
-      const msg = error.message || 'Unknown wallet error';
-
-      if (msg.includes('Opening ') && msg.includes('app...')) {
-        // Deep link navigation in progress — user is being sent to the wallet
-        setBuyResult({ error: 'Switching to wallet app...' });
-      } else {
-        setBuyResult({ error: msg });
-      }
+      console.error('Wallet connection error (adapter):', error);
+      const msg = error?.message || 'Failed to connect wallet';
+      setBuyResult({ error: msg });
     } finally {
       setIsConnecting(false);
     }
@@ -158,16 +129,10 @@ export default function Navbar() {
 
   const disconnectWalletForBuy = async () => {
     try {
-      const prov = connectedWallet?.provider;
-      if (prov?.disconnect) {
-        await prov.disconnect();
-      }
+      await adapterDisconnect();
     } catch (e) {
-      // ignore
+      // ignore adapter disconnect errors
     }
-
-    setConnectedWallet(null);
-    setWalletBalance(null);
     setBuyResult(null);
   };
 
@@ -214,28 +179,28 @@ export default function Navbar() {
       for (let i = 0; i < binary.length; i++) txBuffer[i] = binary.charCodeAt(i);
       const transaction = VersionedTransaction.deserialize(txBuffer);
 
-      // 4. Get a fresh provider reference with short polling before signing
-      // (this helps when the stored provider ref from connect doesn't have the method yet)
-      let signProvider = connectedWallet.provider;
-      for (let i = 0; i < 8; i++) {
-        const w = window as any;
-        const p = w.solflare || w.phantom?.solana || w.backpack;
-        if (p && (typeof p.signTransaction === 'function' || typeof p.signAllTransactions === 'function')) {
-          signProvider = p;
-          break;
-        }
-        await new Promise(r => setTimeout(r, 150));
-      }
-
-      // 5. Sign — defensive for Solflare etc.
+      // 4. Prefer the adapter's standardized signTransaction (this is why we switched to wallet-adapter)
       let signedTx: any;
-      if (signProvider && typeof signProvider.signTransaction === 'function') {
-        signedTx = await signProvider.signTransaction(transaction);
-      } else if (signProvider && typeof signProvider.signAllTransactions === 'function') {
-        const signedArr = await signProvider.signAllTransactions([transaction]);
-        signedTx = signedArr[0];
+      if (adapterSignTransaction) {
+        signedTx = await adapterSignTransaction(transaction);
       } else {
-        throw new Error('Wallet did not expose signTransaction in this context. Use the Jupiter widget below or try Phantom.');
+        // Fallback to the old polling logic only if adapter is not available
+        let signProvider = connectedWallet?.provider;
+        for (let i = 0; i < 8 && !signProvider; i++) {
+          const w = window as any;
+          signProvider = w.solflare || w.phantom?.solana || w.backpack;
+          if (signProvider && (typeof signProvider.signTransaction === 'function' || typeof signProvider.signAllTransactions === 'function')) break;
+          await new Promise(r => setTimeout(r, 150));
+        }
+
+        if (signProvider && typeof signProvider.signTransaction === 'function') {
+          signedTx = await signProvider.signTransaction(transaction);
+        } else if (signProvider && typeof signProvider.signAllTransactions === 'function') {
+          const signedArr = await signProvider.signAllTransactions([transaction]);
+          signedTx = signedArr[0];
+        } else {
+          throw new Error('Wallet did not expose signTransaction. Use the Jupiter widget below or try Phantom.');
+        }
       }
 
       // 6. Serialize + send

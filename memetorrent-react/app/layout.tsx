@@ -1,6 +1,7 @@
 import './globals.css';
 import Navbar from '@/components/nav/Navbar';
 import Footer from '@/components/footer/Footer';
+import { WalletAdapterProvider } from '@/components/wallet/WalletAdapterProvider';
 
 export const metadata = {
   title: 'MT-ECO SYSTEM | $MT • INFINITE WALLET • 1¢ Fees — by Futuret3ch and MemeTorrent',
@@ -24,9 +25,11 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-        <Navbar />
-        <main className="min-h-screen">{children}</main>
-        <Footer />
+        <WalletAdapterProvider>
+          <Navbar />
+          <main className="min-h-screen">{children}</main>
+          <Footer />
+        </WalletAdapterProvider>
       </body>
     </html>
   );

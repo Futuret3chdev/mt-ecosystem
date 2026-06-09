@@ -1,0 +1,39 @@
+'use client';
+
+import { FC, ReactNode, useMemo } from 'react';
+import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
+import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
+import {
+  PhantomWalletAdapter,
+  SolflareWalletAdapter,
+  BackpackWalletAdapter,
+} from '@solana/wallet-adapter-wallets';
+import { clusterApiUrl } from '@solana/web3.js';
+
+export const WalletAdapterProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const network = WalletAdapterNetwork.Mainnet;
+
+  // Use the same RPC preference as the rest of the buy flow
+  const endpoint = useMemo(() => {
+    const envRpc = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SOLANA_RPC_URL) || '';
+    return envRpc || clusterApiUrl(network);
+  }, [network]);
+
+  const wallets = useMemo(
+    () => [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter(),
+      new BackpackWalletAdapter(),
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [network]
+  );
+
+  return (
+    <ConnectionProvider endpoint={endpoint}>
+      <WalletProvider wallets={wallets} autoConnect>
+        {children}
+      </WalletProvider>
+    </ConnectionProvider>
+  );
+};
