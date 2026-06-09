@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getTokenStats, MTStatsRaw } from '@/lib/api';
 import { LINKS } from '@/lib/constants';
+import { Connection, Transaction } from '@solana/web3.js';
 
 type Asset = {
   symbol: string;
@@ -44,6 +45,14 @@ export default function PortfolioManager() {
   const [message, setMessage] = useState<string | null>(null);
   const [nftPreview, setNftPreview] = useState({ color: '#10b981', type: 'Rocket', accessory: 'Wings' }); // for NFT designer
   const [stakedRockets, setStakedRockets] = useState(0); // for staking preview (demo only)
+
+  // Real direct buy states (wallet connect + Jupiter swap)
+  const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [buySolAmount, setBuySolAmount] = useState(0.1);
+  const [jupQuote, setJupQuote] = useState<any>(null);
+  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
+  const [isExecutingSwap, setIsExecutingSwap] = useState(false);
 
   // Ref for the active flow panel so we can scroll it directly under the clicked flow launcher
   const panelRef = useRef<HTMLDivElement>(null);
@@ -102,6 +111,139 @@ export default function PortfolioManager() {
   const showToast = (text: string) => {
     setMessage(text);
     setTimeout(() => setMessage(null), 2400);
+  };
+
+  const MT_MINT = 'ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump';
+
+  // === Real Wallet Connection (Phantom / Solflare / Backpack) ===
+  const connectWallet = async (walletType: 'phantom' | 'solflare' | 'backpack') => {
+    try {
+      let provider: any = null;
+
+      if (walletType === 'phantom') {
+        provider = (window as any).phantom?.solana;
+      } else if (walletType === 'solflare') {
+        provider = (window as any).solflare;
+      } else if (walletType === 'backpack') {
+        provider = (window as any).backpack?.solana;
+      }
+
+      if (!provider) {
+        showToast(`Please install the ${walletType.charAt(0).toUpperCase() + walletType.slice(1)} wallet extension.`);
+        return;
+      }
+
+      const resp = await provider.connect();
+      const address = resp.publicKey?.toString() || resp.publicKey;
+
+      setWalletAddress(address);
+      setConnectedWallet(walletType);
+      showToast(`Connected ${walletType} wallet`);
+    } catch (err: any) {
+      console.error(err);
+      showToast('Failed to connect wallet: ' + (err?.message || 'Unknown error'));
+    }
+  };
+
+  const disconnectWallet = () => {
+    setWalletAddress(null);
+    setConnectedWallet(null);
+    setJupQuote(null);
+    showToast('Wallet disconnected');
+  };
+
+  // === Jupiter Quote for real buy ===
+  const getJupiterQuote = async () => {
+    if (!buySolAmount || buySolAmount <= 0) return;
+
+    setIsLoadingQuote(true);
+    try {
+      const inputMint = 'So11111111111111111111111111111111111111112'; // Wrapped SOL
+      const amountLamports = Math.floor(buySolAmount * 1_000_000_000);
+
+      const url = `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint}&outputMint=${MT_MINT}&amount=${amountLamports}&slippageBps=100&onlyDirectRoutes=false`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Quote failed');
+
+      const data = await res.json();
+      setJupQuote(data);
+      showToast(`Quote ready: ~${(Number(data.outAmount) / 1e6).toFixed(0)} $MT for ${buySolAmount} SOL`);
+    } catch (e: any) {
+      console.error(e);
+      showToast('Failed to fetch quote from Jupiter. Using external link instead?');
+      setJupQuote(null);
+    }
+    setIsLoadingQuote(false);
+  };
+
+  // === Execute real swap using connected wallet + Jupiter ===
+  const executeRealBuy = async () => {
+    if (!walletAddress || !jupQuote || !connectedWallet) {
+      showToast('Connect a wallet and get a quote first.');
+      return;
+    }
+
+    setIsExecutingSwap(true);
+
+    try {
+      // 1. Get swap transaction from Jupiter
+      const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quoteResponse: jupQuote,
+          userPublicKey: walletAddress,
+          wrapAndUnwrapSol: true,
+          // feeAccount can be added later for referrals if wanted
+        }),
+      });
+
+      if (!swapRes.ok) {
+        const err = await swapRes.text();
+        throw new Error('Jupiter swap failed: ' + err);
+      }
+
+      const { swapTransaction } = await swapRes.json();
+
+      // 2. Prepare and sign the transaction
+      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+      const transaction = Transaction.from(Buffer.from(swapTransaction, 'base64'));
+
+      let provider: any = null;
+      if (connectedWallet === 'phantom') provider = (window as any).phantom?.solana;
+      else if (connectedWallet === 'solflare') provider = (window as any).solflare;
+      else if (connectedWallet === 'backpack') provider = (window as any).backpack?.solana;
+
+      if (!provider || !provider.signTransaction) {
+        throw new Error('Wallet provider not available for signing');
+      }
+
+      const signedTx = await provider.signTransaction(transaction);
+
+      // 3. Send the transaction
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+      });
+
+      // 4. Confirm
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      showToast(`✅ Buy successful! Signature: ${signature.slice(0, 12)}... Check your wallet.`);
+      setJupQuote(null); // reset quote after success
+
+      // Optional: you can still update local demo balance for the UI to reflect
+      // (kept for visual continuity)
+      const estimatedMT = Number(jupQuote.outAmount) / 1_000_000;
+      updateCurrentWallet({ balanceSPL: currentWallet.balanceSPL + Math.floor(estimatedMT) });
+
+    } catch (err: any) {
+      console.error('Swap error:', err);
+      showToast('Swap failed: ' + (err.message || 'Please try the external Raydium link below.'));
+    }
+
+    setIsExecutingSwap(false);
   };
 
   // Flow handlers — real-feeling self-custodial management flows
@@ -187,13 +329,7 @@ export default function PortfolioManager() {
       setTimeout(() => closeFlow(), 400);
     }
 
-    // Direct buy $MT (on-page, no third party)
-    if (activeFlow === 'buy-mt') {
-      const amt = flowData.buyAmt || 5000000;
-      updateCurrentWallet({ balanceSPL: currentWallet.balanceSPL + amt });
-      showToast(`Purchased ${amt.toLocaleString()} $MT directly • credited to vault (demo)`);
-      setTimeout(() => closeFlow(), 1100);
-    }
+    // Note: 'buy-mt' is now handled with real wallet connection + Jupiter inside the flow UI (no longer uses this demo path)
   };
 
   const flows = [
@@ -206,7 +342,7 @@ export default function PortfolioManager() {
     {
       key: 'buy-mt' as const,
       title: 'Buy $MT Directly',
-      desc: 'Purchase $MT right here on-page. Demo SOL → $MT instantly credited to your vault. No third-party DEX.',
+      desc: 'Connect Phantom, Solflare or Backpack and swap real SOL for $MT on Jupiter — all on this page. No custody.',
       icon: '💰',
     },
     {
@@ -649,31 +785,108 @@ export default function PortfolioManager() {
                   </div>
                 )}
 
-                {/* NEW: Direct Buy $MT on-page (addresses Live $MT direct purchase, no third party) */}
+                {/* REAL Direct Buy $MT — connect Phantom / Solflare / Backpack and swap on Jupiter */}
                 {activeFlow === 'buy-mt' && (
-                  <div className="mt-6 space-y-5">
-                    <p className="opacity-80">Buy $MT directly here. Price pulled from live stats. Purchase is simulated locally and credited to your current vault — true self-custodial demo.</p>
-                    <div>
-                      <div className="text-xs opacity-60 mb-1">Amount to buy (smallest units)</div>
-                      <input
-                        type="range"
-                        min="1000000"
-                        max="50000000"
-                        step="1000000"
-                        value={flowData.buyAmt || 5000000}
-                        onChange={(e) => setFlowData({ ...flowData, buyAmt: parseInt(e.target.value) })}
-                        className="w-full accent-emerald-400"
-                      />
-                      <div className="font-mono text-xl mt-1 tabular-nums">{(flowData.buyAmt || 5000000).toLocaleString()} $MT</div>
+                  <div className="mt-6 space-y-6">
+                    <p className="opacity-80">
+                      Buy $MT <strong>directly on this page</strong> using your own wallet. No custody. No third-party handoff for the transaction.
+                    </p>
+
+                    {/* Wallet Connection */}
+                    {!walletAddress ? (
+                      <div>
+                        <div className="text-sm font-medium mb-3">Connect your wallet to buy</div>
+                        <div className="flex flex-wrap gap-3">
+                          <button 
+                            onClick={() => connectWallet('phantom')} 
+                            className="px-5 py-2.5 rounded-2xl border border-white/20 hover:bg-white/5 flex items-center gap-2"
+                          >
+                            👻 Phantom
+                          </button>
+                          <button 
+                            onClick={() => connectWallet('solflare')} 
+                            className="px-5 py-2.5 rounded-2xl border border-white/20 hover:bg-white/5 flex items-center gap-2"
+                          >
+                            ☀️ Solflare
+                          </button>
+                          <button 
+                            onClick={() => connectWallet('backpack')} 
+                            className="px-5 py-2.5 rounded-2xl border border-white/20 hover:bg-white/5 flex items-center gap-2"
+                          >
+                            🎒 Backpack
+                          </button>
+                        </div>
+                        <div className="text-[10px] mt-2 opacity-60">Only the three supported wallets. Your keys stay in your wallet.</div>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/5">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-xs opacity-60">Connected</div>
+                            <div className="font-mono text-sm">{connectedWallet} • {walletAddress.slice(0,6)}...{walletAddress.slice(-4)}</div>
+                          </div>
+                          <button onClick={disconnectWallet} className="text-xs px-3 py-1 border border-white/20 rounded-xl">Disconnect</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Buy Controls (only when connected) */}
+                    {walletAddress && (
+                      <div className="space-y-4">
+                        <div>
+                          <div className="text-xs opacity-60 mb-1">Amount to spend (SOL)</div>
+                          <input 
+                            type="range" 
+                            min="0.01" 
+                            max="10" 
+                            step="0.01" 
+                            value={buySolAmount} 
+                            onChange={(e) => { setBuySolAmount(parseFloat(e.target.value)); setJupQuote(null); }} 
+                            className="w-full accent-emerald-400" 
+                          />
+                          <div className="font-mono text-lg mt-1">{buySolAmount} SOL</div>
+                        </div>
+
+                        <button 
+                          onClick={getJupiterQuote} 
+                          disabled={isLoadingQuote}
+                          className="w-full py-3 rounded-2xl border border-white/20 hover:bg-white/5 disabled:opacity-50"
+                        >
+                          {isLoadingQuote ? 'Getting best price from Jupiter...' : 'Get Quote (Jupiter)'}
+                        </button>
+
+                        {jupQuote && (
+                          <div className="p-4 bg-white/5 rounded-2xl text-sm">
+                            You will receive approximately <span className="font-mono text-emerald-400">{(Number(jupQuote.outAmount) / 1_000_000).toFixed(0)} $MT</span><br />
+                            <span className="text-[10px] opacity-60">Price impact &amp; fees included in quote • Slippage 1%</span>
+                          </div>
+                        )}
+
+                        <button 
+                          onClick={executeRealBuy} 
+                          disabled={!jupQuote || isExecutingSwap}
+                          className="w-full py-4 rounded-2xl bg-emerald-400 text-black font-semibold tracking-wider disabled:opacity-40"
+                        >
+                          {isExecutingSwap ? 'Signing &amp; Sending Swap...' : `BUY $MT WITH ${connectedWallet?.toUpperCase() || 'WALLET'} (REAL ON-CHAIN)`}
+                        </button>
+
+                        <div className="text-center">
+                          <a 
+                            href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} 
+                            target="_blank" 
+                            className="text-sm text-emerald-400 hover:underline"
+                          >
+                            Or buy on Raydium instead →
+                          </a>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Always visible external option */}
+                    <div className="text-[10px] opacity-50 text-center pt-2 border-t border-white/10">
+                      Prefer to buy outside this page?{' '}
+                      <a href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} target="_blank" className="text-emerald-400 underline">Open Raydium Swap</a>
                     </div>
-                    <div className="text-xs opacity-60">Est. ~{((flowData.buyAmt || 5000000) * price).toFixed(2)} USD at current price (demo)</div>
-                    <button
-                      onClick={() => completeStep({ buyAmt: flowData.buyAmt || 5000000 })}
-                      className="w-full py-4 rounded-2xl bg-emerald-400 text-black font-semibold tracking-wider"
-                    >
-                      SIGN &amp; BUY $MT DIRECTLY (demo • adds to vault)
-                    </button>
-                    <div className="text-[10px] opacity-50 text-center">Real version would use on-chain purchase or our native issuance with your local keys only.</div>
                   </div>
                 )}
               </motion.div>

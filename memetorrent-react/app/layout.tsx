@@ -15,6 +15,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        {/* Font Awesome for social icons in original brand colors */}
+        <link 
+          rel="stylesheet" 
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" 
+          crossOrigin="anonymous" 
+        />
+      </head>
       <body className="bg-black text-white">
         <Navbar />
         <main className="min-h-screen">{children}</main>

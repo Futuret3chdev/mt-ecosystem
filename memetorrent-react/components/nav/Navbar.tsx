@@ -41,6 +41,20 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between text-sm">
         <div className="font-semibold tracking-tight flex items-center gap-2">
           <span className="text-emerald-400">MT</span> ECO SYSTEM
+          {/* Contract address up top */}
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump');
+              // simple feedback
+              const orig = (event?.currentTarget as HTMLElement)?.innerText;
+              // toast would be better but inline
+              alert('Contract copied: ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump');
+            }}
+            className="ml-2 text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 border border-white/10 hover:bg-white/10 active:bg-white/20"
+            title="Copy contract address"
+          >
+            ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump
+          </button>
         </div>
 
         <div className="flex items-center gap-6 text-sm">
@@ -75,20 +89,17 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Social icons row under the main nav links */}
+      {/* Social icons row under the main nav links - using original Font Awesome icons in brand colors */}
       <div className="border-t border-white/10">
-        <div className="max-w-7xl mx-auto px-6 py-2 flex items-center gap-x-6 text-sm">
-          <a href="https://discord.com/invite/FxT7q7fpkT" target="_blank" rel="noopener" className="flex items-center gap-1.5 opacity-70 hover:opacity-100 hover:text-white" title="Discord">
-            <span className="text-lg">💬</span>
-            <span className="text-xs tracking-widest">DISCORD</span>
+        <div className="max-w-7xl mx-auto px-6 py-2 flex items-center gap-x-6 text-sm social-row">
+          <a href="https://discord.gg/FxT7q7fpkT" target="_blank" rel="noopener" title="Discord" style={{ color: '#5865F2' }}>
+            <i className="fab fa-discord text-xl"></i>
           </a>
-          <a href="https://x.com/MemeTorrent" target="_blank" rel="noopener" className="flex items-center gap-1.5 opacity-70 hover:opacity-100 hover:text-white" title="X">
-            <span className="text-lg">𝕏</span>
-            <span className="text-xs tracking-widest">X</span>
+          <a href="https://twitter.com/MemeTorrent" target="_blank" rel="noopener" title="X / Twitter" style={{ color: '#1DA1F2' }}>
+            <i className="fab fa-twitter text-xl"></i>
           </a>
-          <a href="https://t.me/MemeTorrentPortal" target="_blank" rel="noopener" className="flex items-center gap-1.5 opacity-70 hover:opacity-100 hover:text-white" title="Telegram">
-            <span className="text-lg">✈️</span>
-            <span className="text-xs tracking-widest">TELEGRAM</span>
+          <a href="https://t.me/MemeTorrentPortal" target="_blank" rel="noopener" title="Telegram" style={{ color: '#26A5E4' }}>
+            <i className="fab fa-telegram text-xl"></i>
           </a>
           <div className="flex-1" />
           <span className="text-[10px] opacity-50">Direct $MT purchase in LIVE $MT + ONE-PLACE MANAGEMENT FLOWS</span>
