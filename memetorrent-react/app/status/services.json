@@ -1,0 +1,84 @@
+{
+  "success": true,
+  "generated_at": "2026-06-09T22:45:01.566064+00:00",
+  "overall_status": "online",
+  "services": [
+    {
+      "key": "message_bot",
+      "name": "Message Bot",
+      "status": "online",
+      "public_status": "Operational",
+      "checked_at": "2026-06-09T22:45:01.566064+00:00",
+      "details": {
+        "running": true,
+        "count": 1
+      }
+    },
+    {
+      "key": "verification_bot",
+      "name": "Verification Bot",
+      "status": "online",
+      "public_status": "Operational",
+      "checked_at": "2026-06-09T22:45:01.566064+00:00",
+      "details": {
+        "running": true,
+        "count": 1
+      }
+    },
+    {
+      "key": "tagme",
+      "name": "TagMe Bot",
+      "status": "online",
+      "public_status": "Operational",
+      "checked_at": "2026-06-09T22:45:01.566064+00:00",
+      "details": {
+        "running": true,
+        "count": 1
+      }
+    },
+    {
+      "key": "memetorrent_api",
+      "name": "MemeTorrent API",
+      "status": "online",
+      "public_status": "Operational",
+      "checked_at": "2026-06-09T22:45:01.566064+00:00",
+      "details": {
+        "running": true,
+        "count": 2
+      }
+    },
+    {
+      "key": "fetchmessages",
+      "name": "Fetch Messages",
+      "status": "online",
+      "public_status": "Operational",
+      "checked_at": "2026-06-09T22:45:01.566064+00:00",
+      "details": {
+        "running": true,
+        "count": 1
+      }
+    },
+    {
+      "key": "datasoul_bot",
+      "name": "DataSoul Bot",
+      "status": "online",
+      "public_status": "Operational",
+      "checked_at": "2026-06-09T22:45:01.566064+00:00",
+      "details": {
+        "running": true,
+        "count": 1
+      }
+    },
+    {
+      "key": "botv9",
+      "name": "Telegram Bot",
+      "status": "online",
+      "public_status": "Operational",
+      "checked_at": "2026-06-09T22:45:01.566064+00:00",
+      "details": {
+        "running": true,
+        "count": 1
+      }
+    }
+  ]
+}

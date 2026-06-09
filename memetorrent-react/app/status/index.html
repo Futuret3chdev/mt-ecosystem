@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MemeTorrent Ecosystem Command Center</title>
+  <style>
+    :root{
+      --bg:#060a12;
+      --bg2:#0b1220;
+      --panel:#0f1728;
+      --panel2:#131f36;
+      --panel3:#182742;
+      --line:rgba(255,255,255,0.08);
+      --text:#eef6ff;
+      --muted:#97a7c6;
+      --green:#19d37e;
+      --red:#ff5d5d;
+      --orange:#ffb020;
+      --blue:#4da3ff;
+      --cyan:#35e0ff;
+      --purple:#9a6bff;
+      --pink:#ff4fd8;
+      --shadow:0 12px 35px rgba(0,0,0,0.35);
+      --radius:20px;
+    }
+
+    *{box-sizing:border-box}
+    html,body{
+      margin:0;
+      padding:0;
+      min-height:100%;
+      font-family:Arial, Helvetica, sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(53,224,255,.10), transparent 28%),
+        radial-gradient(circle at top right, rgba(154,107,255,.10), transparent 24%),
+        radial-gradient(circle at bottom center, rgba(77,163,255,.07), transparent 28%),
+        linear-gradient(180deg, var(--bg), var(--bg2));
+    }
+
+    a{color:inherit;text-decoration:none}
+
+    .wrap{
+      max-width:1400px;
+      margin:0 auto;
+      padding:24px 16px 70px;
+    }
+
+    .hero{
+      position:relative;
+      overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:28px;
+      background:linear-gradient(135deg, rgba(19,31,54,.96), rgba(10,16,30,.96));
+      box-shadow:var(--shadow);
+      padding:28px;
+      margin-bottom:22px;
+    }
+
+    .hero:before{
+      content:"";
+      position:absolute;
+      width:380px;
+      height:380px;
+      top:-160px;
+      left:-120px;
+      border-radius:50%;
+      background:radial-gradient(circle, rgba(53,224,255,.16), transparent 62%);
+      pointer-events:none;
+    }
+
+    .hero:after{
+      content:"";
+      position:absolute;
+      width:420px;
+      height:420px;
+      right:-140px;
+      bottom:-220px;
+      border-radius:50%;
+      background:radial-gradient(circle, rgba(154,107,255,.16), transparent 62%);
+      pointer-events:none;
+    }
+
+    .hero-grid{
+      position:relative;
+      z-index:1;
+      display:grid;
+      grid-template-columns:1.5fr .9fr;
+      gap:18px;
+      align-items:start;
+    }
+
+    .eyebrow{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      color:var(--cyan);
+      font-size:12px;
+      letter-spacing:1.4px;
+      text-transform:uppercase;
+      font-weight:700;
+      margin-bottom:14px;
+    }
+
+    .eyebrow .dot{
+      width:9px;
+      height:9px;
+      border-radius:50%;
+      background:var(--cyan);
+      box-shadow:0 0 18px rgba(53,224,255,.9);
+    }
+
+    h1{
+      margin:0;
+      font-size:clamp(30px, 5vw, 52px);
+      line-height:1.02;
+      letter-spacing:-.04em;
+    }
+
+    .subtitle{
+      margin:14px 0 0;
+      color:var(--muted);
+      font-size:15px;
+      line-height:1.7;
+      max-width:800px;
+    }
+
+    .hero-actions{
+      margin-top:22px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .hero-btn{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:12px 16px;
+      border-radius:999px;
+      background:rgba(255,255,255,.04);
+      border:1px solid var(--line);
+      color:var(--text);
+      font-size:14px;
+      font-weight:700;
+    }
+
+    .hero-btn.primary{
+      background:linear-gradient(90deg, rgba(53,224,255,.14), rgba(77,163,255,.14));
+      border-color:rgba(53,224,255,.22);
+    }
+
+    .hero-side{
+      display:grid;
+      gap:12px;
+    }
+
+    .status-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      padding:12px 16px;
+      border-radius:999px;
+      font-size:14px;
+      font-weight:700;
+      width:fit-content;
+      border:1px solid transparent;
+    }
+
+    .status-pill.online{
+      color:#81efb9;
+      background:rgba(25,211,126,.12);
+      border-color:rgba(25,211,126,.24);
+    }
+
+    .status-pill.degraded{
+      color:#ffd17b;
+      background:rgba(255,176,32,.12);
+      border-color:rgba(255,176,32,.24);
+    }
+
+    .status-pill.offline{
+      color:#ffaaaa;
+      background:rgba(255,93,93,.12);
+      border-color:rgba(255,93,93,.24);
+    }
+
+    .status-light{
+      width:11px;
+      height:11px;
+      border-radius:50%;
+      background:currentColor;
+      box-shadow:0 0 16px currentColor;
+    }
+
+    .hero-box{
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:rgba(255,255,255,.03);
+      padding:16px;
+    }
+
+    .hero-box-label{
+      color:var(--muted);
+      font-size:12px;
+      letter-spacing:1px;
+      text-transform:uppercase;
+      margin-bottom:8px;
+    }
+
+    .hero-box-value{
+      font-size:24px;
+      font-weight:800;
+      letter-spacing:-.03em;
+    }
+
+    .mini{
+      margin-top:8px;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.6;
+    }
+
+    .stats-grid{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:14px;
+      margin-bottom:22px;
+    }
+
+    .stat-card{
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:linear-gradient(180deg, rgba(18,28,47,.95), rgba(12,19,33,.95));
+      padding:18px;
+      box-shadow:var(--shadow);
+    }
+
+    .stat-label{
+      color:var(--muted);
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:1.1px;
+      margin-bottom:8px;
+    }
+
+    .stat-value{
+      font-size:32px;
+      font-weight:800;
+      letter-spacing:-.04em;
+    }
+
+    .stat-sub{
+      margin-top:8px;
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    .section{
+      margin-top:26px;
+    }
+
+    .section-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:end;
+      gap:12px;
+      margin-bottom:14px;
+      flex-wrap:wrap;
+    }
+
+    .section-head h2{
+      margin:0;
+      font-size:24px;
+      letter-spacing:-.03em;
+    }
+
+    .section-head p{
+      margin:0;
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    .grid-3{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:16px;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1.2fr .8fr;
+      gap:16px;
+    }
+
+    .panel{
+      border:1px solid var(--line);
+      border-radius:22px;
+      background:linear-gradient(180deg, rgba(18,28,47,.95), rgba(11,19,33,.95));
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+
+    .panel-inner{
+      padding:18px;
+    }
+
+    .panel-title{
+      margin:0 0 14px;
+      font-size:20px;
+      letter-spacing:-.02em;
+    }
+
+    .service-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+      gap:14px;
+    }
+
+    .service-card{
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:16px;
+      background:rgba(255,255,255,.03);
+      position:relative;
+      overflow:hidden;
+    }
+
+    .service-card:after{
+      content:"";
+      position:absolute;
+      top:-30px;
+      right:-30px;
+      width:120px;
+      height:120px;
+      border-radius:50%;
+      background:radial-gradient(circle, rgba(77,163,255,.10), transparent 65%);
+      pointer-events:none;
+    }
+
+    .service-top{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:start;
+    }
+
+    .service-name{
+      margin:0;
+      font-size:18px;
+    }
+
+    .service-desc{
+      color:var(--muted);
+      font-size:13px;
+      margin-top:6px;
+      line-height:1.55;
+    }
+
+    .badge{
+      padding:8px 12px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+      border:1px solid transparent;
+      white-space:nowrap;
+    }
+
+    .badge.online{
+      color:#81efb9;
+      background:rgba(25,211,126,.12);
+      border-color:rgba(25,211,126,.24);
+    }
+
+    .badge.offline{
+      color:#ffaaaa;
+      background:rgba(255,93,93,.12);
+      border-color:rgba(255,93,93,.24);
+    }
+
+    .health{
+      margin-top:14px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    .pulse{
+      width:10px;
+      height:10px;
+      border-radius:50%;
+      position:relative;
+      flex:0 0 auto;
+    }
+
+    .pulse.online{
+      background:var(--green);
+      box-shadow:0 0 16px rgba(25,211,126,.85);
+    }
+
+    .pulse.offline{
+      background:var(--red);
+      box-shadow:0 0 16px rgba(255,93,93,.85);
+    }
+
+    .pulse.online:after{
+      content:"";
+      position:absolute;
+      inset:-6px;
+      border-radius:50%;
+      border:1px solid rgba(25,211,126,.5);
+      animation:pulse 1.8s infinite;
+    }
+
+    @keyframes pulse{
+      0%{transform:scale(.9);opacity:.55}
+      70%{transform:scale(1.85);opacity:0}
+      100%{transform:scale(1.85);opacity:0}
+    }
+
+    .meta-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+      margin-top:14px;
+    }
+
+    .meta{
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:rgba(255,255,255,.025);
+      padding:11px 12px;
+    }
+
+    .meta-label{
+      color:var(--muted);
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:1px;
+      margin-bottom:6px;
+    }
+
+    .meta-value{
+      font-size:14px;
+      font-weight:700;
+      word-break:break-word;
+    }
+
+    .progress-list{
+      display:grid;
+      gap:14px;
+    }
+
+    .progress-card{
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:rgba(255,255,255,.03);
+      padding:16px;
+    }
+
+    .progress-top{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      margin-bottom:10px;
+    }
+
+    .progress-name{
+      font-size:17px;
+      font-weight:700;
+    }
+
+    .progress-percent{
+      color:var(--cyan);
+      font-size:15px;
+      font-weight:800;
+    }
+
+    .progress-bar{
+      width:100%;
+      height:12px;
+      border-radius:999px;
+      background:rgba(255,255,255,.06);
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.04);
+    }
+
+    .progress-fill{
+      height:100%;
+      border-radius:999px;
+      background:linear-gradient(90deg, var(--cyan), var(--blue), var(--purple));
+      box-shadow:0 0 18px rgba(53,224,255,.35);
+    }
+
+    .progress-notes{
+      margin-top:10px;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.65;
+    }
+
+    .updates{
+      display:grid;
+      gap:12px;
+    }
+
+    .update-card{
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:rgba(255,255,255,.03);
+      padding:16px;
+    }
+
+    .update-top{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-bottom:8px;
+    }
+
+    .update-tag{
+      padding:7px 11px;
+      border-radius:999px;
+      background:rgba(53,224,255,.12);
+      border:1px solid rgba(53,224,255,.22);
+      color:var(--cyan);
+      font-size:12px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:1px;
+    }
+
+    .update-time{
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .update-title{
+      font-size:17px;
+      font-weight:800;
+      margin-bottom:8px;
+    }
+
+    .update-body{
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.65;
+    }
+
+    .timeline{
+      display:grid;
+      gap:12px;
+      position:relative;
+    }
+
+    .timeline-item{
+      display:grid;
+      grid-template-columns:22px 1fr;
+      gap:12px;
+      align-items:start;
+    }
+
+    .timeline-node{
+      width:14px;
+      height:14px;
+      border-radius:50%;
+      margin-top:4px;
+      background:var(--cyan);
+      box-shadow:0 0 16px rgba(53,224,255,.8);
+      position:relative;
+    }
+
+    .timeline-node:after{
+      content:"";
+      position:absolute;
+      left:6px;
+      top:18px;
+      width:2px;
+      height:calc(100% + 18px);
+      background:rgba(255,255,255,.10);
+    }
+
+    .timeline-item:last-child .timeline-node:after{display:none}
+
+    .timeline-card{
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:rgba(255,255,255,.03);
+      padding:14px 15px;
+    }
+
+    .timeline-stage{
+      color:var(--cyan);
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:1px;
+      font-weight:700;
+      margin-bottom:6px;
+    }
+
+    .timeline-title{
+      font-size:16px;
+      font-weight:800;
+      margin-bottom:6px;
+    }
+
+    .timeline-text{
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.6;
+    }
+
+    .roadmap-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:12px;
+    }
+
+    .roadmap-box{
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:rgba(255,255,255,.03);
+      padding:14px;
+    }
+
+    .roadmap-box h4{
+      margin:0 0 6px;
+      font-size:16px;
+    }
+
+    .roadmap-box p{
+      margin:0;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.6;
+    }
+
+    .footer{
+      margin-top:28px;
+      text-align:center;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.7;
+    }
+
+    .loading,.error{
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:18px;
+      text-align:center;
+      background:rgba(255,255,255,.03);
+      color:var(--muted);
+    }
+
+    .error{
+      color:#ffb2b2;
+      background:rgba(255,93,93,.08);
+      border-color:rgba(255,93,93,.18);
+    }
+
+    @media (max-width:1100px){
+      .hero-grid,.grid-2{grid-template-columns:1fr}
+      .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .grid-3{grid-template-columns:1fr}
+    }
+
+    @media (max-width:700px){
+      .wrap{padding:16px 12px 40px}
+      .hero{padding:20px 16px}
+      .stats-grid{grid-template-columns:1fr}
+      .roadmap-grid{grid-template-columns:1fr}
+      .meta-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <section class="hero">
+      <div class="hero-grid">
+        <div>
+          <div class="eyebrow">
+            <span class="dot"></span>
+            MemeTorrent Live Infrastructure
+          </div>
+          <h1>MemeTorrent Ecosystem Command Center</h1>
+          <p class="subtitle">
+            Public-facing command center for the MemeTorrent ecosystem, combining live service status,
+            infrastructure health, ecosystem rollout progress, and major project updates across bots,
+            APIs, P2E systems, bridging, Infinite Wallet, TAP modules and the broader MT ecosystem.
+          </p>
+
+          <div class="hero-actions">
+            <a class="hero-btn primary" href="/status/services.json" target="_blank">Open Live JSON Feed</a>
+            <a class="hero-btn" href="#serviceHealth">View Service Health</a>
+            <a class="hero-btn" href="#ecosystemProgress">View Ecosystem Progress</a>
+            <a class="hero-btn" href="#tapModules">View TAP Modules</a>
+			<a class="hero-btn" href="#gamesSoftware">View Games & Software</a>
+          </div>
+        </div>
+
+        <div class="hero-side">
+          <div id="overallPill" class="status-pill online">
+            <span class="status-light"></span>
+            Checking ecosystem status...
+          </div>
+
+          <div class="hero-box">
+            <div class="hero-box-label">Last Live Refresh</div>
+            <div class="hero-box-value" id="lastUpdated">--</div>
+            <div class="mini">Auto-refreshing from the live status feed every 30 seconds.</div>
+          </div>
+
+          <div class="hero-box">
+            <div class="hero-box-label">Current Focus</div>
+            <div class="hero-box-value">Expansion Phase</div>
+            <div class="mini">Core infrastructure, wallet progression, P2E development, TAP rollout and ecosystem-wide expansion layers.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Services</div>
+        <div class="stat-value" id="totalServices">0</div>
+        <div class="stat-sub">Tracked live services in the current public feed.</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Operational</div>
+        <div class="stat-value" id="onlineServices">0</div>
+        <div class="stat-sub">Services currently detected as active.</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Issues Detected</div>
+        <div class="stat-value" id="issueServices">0</div>
+        <div class="stat-sub">Services requiring attention or currently offline.</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Ecosystem Modules</div>
+        <div class="stat-value">12</div>
+        <div class="stat-sub">Core public ecosystem categories and rollout tracks shown on this page.</div>
+      </div>
+    </section>
+
+    <section class="section" id="serviceHealth">
+      <div class="section-head">
+        <h2>Live Service Health</h2>
+        <p id="serviceSummary">Monitoring active bots, APIs and runtime services</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-inner">
+          <div id="servicesContainer" class="service-grid">
+            <div class="loading">Loading live services...</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="ecosystemProgress">
+      <div class="section-head">
+        <h2>Ecosystem Progress Matrix</h2>
+        <p>Public snapshot of current build momentum across the MemeTorrent ecosystem</p>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-inner">
+            <h3 class="panel-title">Core Development Streams</h3>
+            <div class="progress-list">
+              <div class="progress-card">
+                <div class="progress-top">
+                  <div class="progress-name">MT Ecosystem Infrastructure</div>
+                  <div class="progress-percent">82%</div>
+                </div>
+                <div class="progress-bar"><div class="progress-fill" style="width:82%"></div></div>
+                <div class="progress-notes">Core bots, backend systems, process infrastructure, APIs and support services are in active operation and expansion.</div>
+              </div>
+
+              <div class="progress-card">
+                <div class="progress-top">
+                  <div class="progress-name">Infinite Wallet</div>
+                  <div class="progress-percent">65%</div>
+                </div>
+                <div class="progress-bar"><div class="progress-fill" style="width:65%"></div></div>
+                <div class="progress-notes">Secure wallet foundation, encryption direction, unlock flow handling, and ecosystem-aligned wallet integration path are progressing.</div>
+              </div>
+
+              <div class="progress-card">
+                <div class="progress-top">
+                  <div class="progress-name">P2E System</div>
+                  <div class="progress-percent">55%</div>
+                </div>
+                <div class="progress-bar"><div class="progress-fill" style="width:55%"></div></div>
+                <div class="progress-notes">Play-to-earn systems are now in active build mode, focused on mechanics, progression, utility and ecosystem reward alignment.</div>
+              </div>
+
+              <div class="progress-card">
+                <div class="progress-top">
+                  <div class="progress-name">Bridge Infrastructure</div>
+                  <div class="progress-percent">45%</div>
+                </div>
+                <div class="progress-bar"><div class="progress-fill" style="width:45%"></div></div>
+                <div class="progress-notes">Bridging remains an ecosystem expansion layer in progress, aimed at wider asset flow and future interoperability.</div>
+              </div>
+
+              <div class="progress-card">
+                <div class="progress-top">
+                  <div class="progress-name">MTES Layer</div>
+                  <div class="progress-percent">72%</div>
+                </div>
+                <div class="progress-bar"><div class="progress-fill" style="width:72%"></div></div>
+                <div class="progress-notes">The automation and systems layer continues evolving as a connective fabric between bots, APIs, services and execution logic.</div>
+              </div>
+
+              <div class="progress-card">
+                <div class="progress-top">
+                  <div class="progress-name">Games & Software Releases</div>
+                  <div class="progress-percent">58%</div>
+                </div>
+                <div class="progress-bar"><div class="progress-fill" style="width:58%"></div></div>
+                <div class="progress-notes">Public-facing games, utilities and software layers are moving from concept and systems groundwork toward structured rollout.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-inner">
+            <h3 class="panel-title">Launch Sequence</h3>
+            <div class="timeline">
+              <div class="timeline-item">
+                <div class="timeline-node"></div>
+                <div class="timeline-card">
+                  <div class="timeline-stage">Stage 01</div>
+                  <div class="timeline-title">Infrastructure Stabilisation</div>
+                  <div class="timeline-text">Live bots, message systems, verification tools, APIs and background services are forming the operational base.</div>
+                </div>
+              </div>
+
+              <div class="timeline-item">
+                <div class="timeline-node"></div>
+                <div class="timeline-card">
+                  <div class="timeline-stage">Stage 02</div>
+                  <div class="timeline-title">Wallet & Utility Expansion</div>
+                  <div class="timeline-text">Infinite Wallet and associated ecosystem interactions are being shaped into a broader utility layer.</div>
+                </div>
+              </div>
+
+              <div class="timeline-item">
+                <div class="timeline-node"></div>
+                <div class="timeline-card">
+                  <div class="timeline-stage">Stage 03</div>
+                  <div class="timeline-title">P2E Activation</div>
+                  <div class="timeline-text">Game progression, rewards logic and ecosystem participation mechanics are now entering active build scope.</div>
+                </div>
+              </div>
+
+              <div class="timeline-item">
+                <div class="timeline-node"></div>
+                <div class="timeline-card">
+                  <div class="timeline-stage">Stage 04</div>
+                  <div class="timeline-title">TAP Expansion</div>
+                  <div class="timeline-text">Tap Match, Tap Shop, Tap Actions and Tap Packages are being positioned as connected ecosystem modules for wider growth.</div>
+                </div>
+              </div>
+
+              <div class="timeline-item">
+                <div class="timeline-node"></div>
+                <div class="timeline-card">
+                  <div class="timeline-stage">Stage 05</div>
+                  <div class="timeline-title">Bridge & Expansion Paths</div>
+                  <div class="timeline-text">Cross-chain and ecosystem expansion systems continue as future-facing rollout tracks for MT growth.</div>
+                </div>
+              </div>
+
+              <div class="timeline-item">
+                <div class="timeline-node"></div>
+                <div class="timeline-card">
+                  <div class="timeline-stage">Stage 06</div>
+                  <div class="timeline-title">Full Ecosystem Convergence</div>
+                  <div class="timeline-text">Bots, APIs, wallet layers, TAP modules, games, software and public tools converge into a more unified MemeTorrent ecosystem experience.</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="height:14px"></div>
+
+            <h3 class="panel-title">Public Roadmap Notes</h3>
+            <div class="roadmap-grid">
+              <div class="roadmap-box">
+                <h4>Infinite Wallet</h4>
+                <p>Wallet progression remains a major pillar, focused on secure user experience, ecosystem interaction and integration maturity.</p>
+              </div>
+              <div class="roadmap-box">
+                <h4>P2E Systems</h4>
+                <p>Game-linked utility and earning structures are part of the active ecosystem build-out now underway.</p>
+              </div>
+              <div class="roadmap-box">
+                <h4>Bridging</h4>
+                <p>Bridge work is positioned as a strategic expansion track rather than only a technical add-on.</p>
+              </div>
+              <div class="roadmap-box">
+                <h4>MTES Layer</h4>
+                <p>Automation and systems orchestration continue to provide the connective tissue across services.</p>
+              </div>
+              <div class="roadmap-box">
+                <h4>TAP Modules</h4>
+                <p>Tap Match, Tap Shop, Tap Actions and Tap Packages sit inside the wider rollout as engagement and utility layers.</p>
+              </div>
+              <div class="roadmap-box">
+                <h4>Games & Software</h4>
+                <p>Public software tools and game-linked systems continue progressing toward broader ecosystem release readiness.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="tapModules">
+      <div class="section-head">
+        <h2>TAP Ecosystem Modules</h2>
+        <p>Connected rollout across Tap Match, Tap Shop, Tap Actions and Tap Packages</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-inner">
+          <div class="progress-list">
+            <div class="progress-card">
+              <div class="progress-top">
+                <div class="progress-name">Tap Match</div>
+                <div class="progress-percent">65%</div>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:60%"></div></div>
+              <div class="progress-notes">Match-based service and engagement layer designed to support ecosystem participation, user flow and platform utility.</div>
+            </div>
+
+            <div class="progress-card">
+              <div class="progress-top">
+                <div class="progress-name">Tap Shop</div>
+                <div class="progress-percent">52%</div>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:52%"></div></div>
+              <div class="progress-notes">Commerce and product utility layer for the broader ecosystem, intended to support digital offerings and future platform-linked transactions.</div>
+            </div>
+
+            <div class="progress-card">
+              <div class="progress-top">
+                <div class="progress-name">Tap Actions</div>
+                <div class="progress-percent">57%</div>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:57%"></div></div>
+              <div class="progress-notes">Action-based participation and interaction layer supporting tasks, user engagement, platform activity and ecosystem mechanics.</div>
+            </div>
+
+            <div class="progress-card">
+              <div class="progress-top">
+                <div class="progress-name">Tap Packages</div>
+                <div class="progress-percent">50%</div>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:50%"></div></div>
+              <div class="progress-notes">Structured package and bundle framework intended for future service combinations, modular offerings and wider rollout flexibility.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+	
+	<section class="section" id="gamesSoftware">
+  <div class="section-head">
+    <h2>Games & Software Division</h2>
+    <p>Live and upcoming releases across the MemeTorrent ecosystem</p>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-inner">
+        <h3 class="panel-title">Current Playable Games</h3>
+        <div class="updates">
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Live Game</div>
+              <div class="update-time">Playable</div>
+            </div>
+            <div class="update-title">🐶 /pet</div>
+            <div class="update-body">Pet-based interactive game layer within the MemeTorrent ecosystem.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Marketplace</div>
+              <div class="update-time">Live</div>
+            </div>
+            <div class="update-title">🛒 /petmarket</div>
+            <div class="update-body">Companion marketplace tied into the pet game system and broader ecosystem utility.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Sports</div>
+              <div class="update-time">Live</div>
+            </div>
+            <div class="update-title">⚽ /soccer</div>
+            <div class="update-body">Football-themed mini-game currently available in the MT ecosystem.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Arcade</div>
+              <div class="update-time">Live</div>
+            </div>
+            <div class="update-title">🏒 /puck</div>
+            <div class="update-body">Fast-paced puck game designed as a light competitive arcade experience.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Tap Game</div>
+              <div class="update-time">Live</div>
+            </div>
+            <div class="update-title">👆 /tap</div>
+            <div class="update-body">Tap-based interaction game supporting fast engagement and repeat play.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Arcade</div>
+              <div class="update-time">Live</div>
+            </div>
+            <div class="update-title">🍽️ /pacman</div>
+            <div class="update-body">Classic-inspired maze arcade gameplay integrated into the ecosystem.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Mobile</div>
+              <div class="update-time">Live</div>
+            </div>
+            <div class="update-title">📱 /tetrismob</div>
+            <div class="update-body">Mobile-friendly block puzzle gameplay for quick access and replayability.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Racing</div>
+              <div class="update-time">Live</div>
+            </div>
+            <div class="update-title">🏎️ /racer</div>
+            <div class="update-body">Arcade racing experience forming part of the active game lineup.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Puzzle</div>
+              <div class="update-time">Live</div>
+            </div>
+            <div class="update-title">🧱 /tetris</div>
+            <div class="update-body">Classic block-stacking gameplay available as part of the MT games suite.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Arcade</div>
+              <div class="update-time">Live</div>
+            </div>
+            <div class="update-title">🍎 /fruitninja</div>
+            <div class="update-body">Reaction-based fruit slicing arcade game built for quick interactive sessions.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Speed</div>
+              <div class="update-time">Live</div>
+            </div>
+            <div class="update-title">⚡ /dash</div>
+            <div class="update-body">Fast movement and reflex-based gameplay in the current active lineup.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Casual</div>
+              <div class="update-time">Live</div>
+            </div>
+            <div class="update-title">🐔 /chicken</div>
+            <div class="update-body">Casual game module included in the existing MemeTorrent ecosystem release set.</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-inner">
+        <h3 class="panel-title">Upcoming Games</h3>
+        <div class="updates">
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Coming Soon</div>
+              <div class="update-time">In Development</div>
+            </div>
+            <div class="update-title">Club Pool</div>
+            <div class="update-body">Portable billiards-style gameplay being added to expand the arcade and skill-based lineup. Multiplayer enabled. And live DJ music.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Strategy</div>
+              <div class="update-time">In Development</div>
+            </div>
+            <div class="update-title">Artillery</div>
+            <div class="update-body">Projectile and angle-based combat gameplay for tactical and competitive play sessions.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Arcade</div>
+              <div class="update-time">In Development</div>
+            </div>
+            <div class="update-title">Astroids</div>
+            <div class="update-body">Space arcade action inspired by classic asteroid-dodging and survival mechanics.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Cards</div>
+              <div class="update-time">Planned</div>
+            </div>
+            <div class="update-title">BlackJack</div>
+            <div class="update-body">Card-based gameplay module intended to add casino-style variety to the ecosystem.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Arcade</div>
+              <div class="update-time">In Development</div>
+            </div>
+            <div class="update-title">Block Kuzushi</div>
+            <div class="update-body">Brick-breaking arcade gameplay designed for fast sessions and progression-based scoring.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Action</div>
+              <div class="update-time">Planned</div>
+            </div>
+            <div class="update-title">GunaDuck</div>
+            <div class="update-body">Action-based arcade concept expanding the humor and variety of the MT games catalog.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Reaction</div>
+              <div class="update-time">In Development</div>
+            </div>
+            <div class="update-title">EmojiSaviour</div>
+            <div class="update-body">Emoji-based reaction and rescue gameplay aimed at mobile-friendly engagement.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Flagship</div>
+              <div class="update-time">Major Build</div>
+            </div>
+            <div class="update-title">MTCRAFT</div>
+            <div class="update-body">A larger-scale game concept positioned as a standout build within the MemeTorrent ecosystem roadmap.</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:16px"></div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-inner">
+        <h3 class="panel-title">Current Software</h3>
+        <div class="updates">
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Software</div>
+              <div class="update-time">Available</div>
+            </div>
+            <div class="update-title">FlipBooks</div>
+            <div class="update-body">Interactive digital flipbook software for content presentation, display and visual publishing use cases.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Creative Suite</div>
+              <div class="update-time">Available</div>
+            </div>
+            <div class="update-title">VirtualArtStudios</div>
+            <div class="update-body">Creative digital studio concept for visual design, art workflows and media-oriented ecosystem tooling.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">AI Tool</div>
+              <div class="update-time">Available</div>
+            </div>
+            <div class="update-title">Image2Sketch / Sketch2Image</div>
+            <div class="update-body">Image conversion tools for transforming art, sketches and image assets between creative formats.</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-inner">
+        <h3 class="panel-title">Software Expansion Ideas</h3>
+        <div class="updates">
+
+          <div class="update-card">
+            <div class="update-top">
+              <div class="update-tag">Development</div>
+              <div class="update-time">Design stage</div>
+            </div>
+            <div class="update-title">MT Skin Studio</div>
+            <div class="update-body">A creator tool for generating custom game skins, avatar items, icons and visual assets across the MT ecosystem.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+                      <div class="update-tag">Development</div>
+              <div class="update-time">Design stage</div>
+            </div>
+            <div class="update-title">MT Sound Forge</div>
+            <div class="update-body">A lightweight sound and music tool for generating game sounds, loops and effects for future titles and software products.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+                  <div class="update-tag">Development</div>
+              <div class="update-time">Design stage</div>
+            </div>
+            <div class="update-title">MT Meme Maker Pro</div>
+            <div class="update-body">A branded meme creation suite for image generation, sticker output, overlays and community content production.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+                   <div class="update-tag">Development</div>
+              <div class="update-time">Design stage</div>
+            </div>
+            <div class="update-title">MT Game Hub Launcher</div>
+            <div class="update-body">A central launcher where all MT games, software tools, updates and ecosystem releases can be browsed from one place.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+                    <div class="update-tag">Development</div>
+              <div class="update-time">Design stage</div>
+            </div>
+            <div class="update-title">MT Profile Builder</div>
+            <div class="update-body">A public profile and identity tool for users to track game progress, wallet activity, cosmetics, badges and ecosystem standing.</div>
+          </div>
+
+          <div class="update-card">
+            <div class="update-top">
+                 <div class="update-tag">Development</div>
+              <div class="update-time">Design stage</div>
+            </div>
+            <div class="update-title">MT AI Asset Generator</div>
+            <div class="update-body">A tool for creating icons, backgrounds, characters, items and promo art for both games and ecosystem software.</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Latest Ecosystem Updates</h2>
+        <p>Public-facing development highlights</p>
+      </div>
+
+      <div class="grid-3">
+        <div class="panel">
+          <div class="panel-inner">
+            <div class="updates">
+              <div class="update-card">
+                <div class="update-top">
+                  <div class="update-tag">P2E</div>
+                  <div class="update-time">Current</div>
+                </div>
+                <div class="update-title">Play-to-Earn development has begun</div>
+                <div class="update-body">The P2E layer is now part of the active ecosystem build, bringing game systems, rewards flow and engagement logic into the wider MT roadmap.</div>
+              </div>
+
+              <div class="update-card">
+                <div class="update-top">
+                  <div class="update-tag">Wallet</div>
+                  <div class="update-time">Active</div>
+                </div>
+                <div class="update-title">Infinite Wallet remains a core focus</div>
+                <div class="update-body">Secure wallet progression continues as a major utility pillar for MemeTorrent, supporting ecosystem interaction and future expansion.</div>
+              </div>
+
+              <div class="update-card">
+                <div class="update-top">
+                  <div class="update-tag">Bridging</div>
+                  <div class="update-time">In Progress</div>
+                </div>
+                <div class="update-title">Bridge expansion path is underway</div>
+                <div class="update-body">Bridging is being developed as part of the longer-range MT ecosystem strategy for interoperability and movement across connected systems.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-inner">
+            <div class="updates">
+              <div class="update-card">
+                <div class="update-top">
+                  <div class="update-tag">MTES</div>
+                  <div class="update-time">Operational</div>
+                </div>
+                <div class="update-title">Automation layer continues to expand</div>
+                <div class="update-body">MTES-related logic and service orchestration are helping bind together bots, infrastructure, automation and execution systems.</div>
+              </div>
+
+              <div class="update-card">
+                <div class="update-top">
+                  <div class="update-tag">Software</div>
+                  <div class="update-time">Building</div>
+                </div>
+                <div class="update-title">Games and software utilities are moving forward</div>
+                <div class="update-body">Public software layers and game-linked tools are being developed as part of the broader MemeTorrent ecosystem direction.</div>
+              </div>
+
+              <div class="update-card">
+                <div class="update-top">
+                  <div class="update-tag">Infrastructure</div>
+                  <div class="update-time">Live</div>
+                </div>
+                <div class="update-title">Core services are actively monitored</div>
+                <div class="update-body">The ecosystem is now backed by a live public status feed showing operational bots, APIs and backend runtime systems.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-inner">
+            <div class="updates">
+              <div class="update-card">
+                <div class="update-top">
+                  <div class="update-tag">TAP</div>
+                  <div class="update-time">Building</div>
+                </div>
+                <div class="update-title">TAP modules are part of the broader rollout</div>
+                <div class="update-body">Tap Match, Tap Shop, Tap Actions and Tap Packages are being developed as connected modules within the wider MemeTorrent ecosystem strategy.</div>
+              </div>
+
+              <div class="update-card">
+                <div class="update-top">
+                  <div class="update-tag">API</div>
+                  <div class="update-time">Operational</div>
+                </div>
+                <div class="update-title">API layer supports ecosystem growth</div>
+                <div class="update-body">The MemeTorrent API remains part of the public-facing technical stack and supports wider expansion into ecosystem features.</div>
+              </div>
+
+              <div class="update-card">
+                <div class="update-top">
+                  <div class="update-tag">Ecosystem</div>
+                  <div class="update-time">Expansion</div>
+                </div>
+                <div class="update-title">MemeTorrent is moving into broader rollout mode</div>
+                <div class="update-body">From infrastructure into wallet, TAP, game and bridge layers, the ecosystem is transitioning from groundwork to coordinated expansion.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      MemeTorrent Ecosystem Command Center • Live public dashboard fed by active service monitoring and curated ecosystem progress sections.
+    </div>
+  </div>
+
+  <script>
+    function formatDate(iso){
+      if(!iso) return "--";
+      const d = new Date(iso);
+      return d.toLocaleString();
+    }
+
+    function overallText(status){
+      if(status === "online") return "All MemeTorrent systems operational";
+      if(status === "degraded") return "Some MemeTorrent services are degraded";
+      return "MemeTorrent service disruption detected";
+    }
+
+    function overallClass(status){
+      if(status === "online") return "online";
+      if(status === "degraded") return "degraded";
+      return "offline";
+    }
+
+    function serviceDescription(key, name){
+      const map = {
+        message_bot: "Core messaging and interaction runtime.",
+        verification_bot: "Verification and access workflow service.",
+        tagme: "Tag and message utility processing service.",
+        memetorrent_api: "Primary API and backend endpoint layer.",
+        fetchmessages: "Background ingestion and fetch processor.",
+        datasoul_bot: "DataSoul bot service and live bot operations.",
+        botv9: "Primary command and bot runtime instance."
+      };
+      return map[key] || (name + " service monitoring");
+    }
+
+    async function loadStatus(){
+      const container = document.getElementById("servicesContainer");
+
+      try{
+        const res = await fetch("services.json?t=" + Date.now(), {cache:"no-store"});
+        if(!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+
+        const services = Array.isArray(data.services) ? data.services : [];
+        const onlineCount = services.filter(s => s.status === "online").length;
+        const issueCount = services.length - onlineCount;
+
+        document.getElementById("totalServices").textContent = services.length;
+        document.getElementById("onlineServices").textContent = onlineCount;
+        document.getElementById("issueServices").textContent = issueCount;
+        document.getElementById("lastUpdated").textContent = formatDate(data.generated_at);
+        document.getElementById("serviceSummary").textContent =
+          `${onlineCount} operational • ${issueCount} issue${issueCount === 1 ? "" : "s"} detected`;
+
+        const pill = document.getElementById("overallPill");
+        const overall = data.overall_status || "offline";
+        pill.className = "status-pill " + overallClass(overall);
+        pill.innerHTML = `<span class="status-light"></span>${overallText(overall)}`;
+
+        if(!services.length){
+          container.innerHTML = `<div class="error">No services were returned by the live status feed.</div>`;
+          return;
+        }
+
+        container.innerHTML = services.map(service => {
+          const status = service.status || "offline";
+          const badgeClass = status === "online" ? "online" : "offline";
+          const count = service.details && typeof service.details.count !== "undefined" ? service.details.count : 0;
+
+          return `
+            <article class="service-card">
+              <div class="service-top">
+                <div>
+                  <h3 class="service-name">${service.name}</h3>
+                  <div class="service-desc">${serviceDescription(service.key, service.name)}</div>
+                </div>
+                <div class="badge ${badgeClass}">${service.public_status || status}</div>
+              </div>
+
+              <div class="health">
+                <span class="pulse ${badgeClass}"></span>
+                <span>${status === "online" ? "Active and responding normally" : "Currently unavailable or not detected"}</span>
+              </div>
+
+              <div class="meta-grid">
+                <div class="meta">
+                  <div class="meta-label">Instances</div>
+                  <div class="meta-value">${count}</div>
+                </div>
+                <div class="meta">
+                  <div class="meta-label">Status</div>
+                  <div class="meta-value">${service.public_status || status}</div>
+                </div>
+                <div class="meta">
+                  <div class="meta-label">Service Key</div>
+                  <div class="meta-value">${service.key}</div>
+                </div>
+                <div class="meta">
+                  <div class="meta-label">Checked At</div>
+                  <div class="meta-value">${formatDate(service.checked_at)}</div>
+                </div>
+              </div>
+            </article>
+          `;
+        }).join("");
+
+      }catch(error){
+        container.innerHTML = `<div class="error">Unable to load live service feed. Error: ${error.message}</div>`;
+        const pill = document.getElementById("overallPill");
+        pill.className = "status-pill offline";
+        pill.innerHTML = `<span class="status-light"></span>Unable to load status`;
+      }
+    }
+
+    loadStatus();
+    setInterval(loadStatus, 30000);
+  </script>
+</body>
+</html>

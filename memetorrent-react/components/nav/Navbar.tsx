@@ -180,24 +180,24 @@ export default function Navbar() {
             <a href="/developers" className="opacity-70 hover:opacity-100">API</a>
           </div>
 
-          <a href={LINKS.wallet} target="_blank" className="font-medium px-3 sm:px-4 py-1 sm:py-1.5 rounded-xl border border-white/30 hover:bg-white/5 text-xs sm:text-sm">Launch</a>
+          {/* Status icon (replaces Launch) — pulls summary from /status page data for consistency */}
+          <a 
+            href="/status" 
+            className="flex items-center gap-1.5 text-xs sm:text-sm px-3 py-1 rounded-xl border border-white/20 hover:bg-white/5"
+            title="System Status"
+          >
+            <span className="inline-block w-2 h-2 rounded-full bg-[#19d37e]"></span>
+            <span>Status <span className="text-[#19d37e]">7/7</span></span>
+          </a>
 
-          {/* Small icons for Login and Register — clean and minimal */}
+          {/* Unified account icon (replaces separate Login + Register) */}
           <button 
             onClick={() => openAuth('login')} 
             className="opacity-70 hover:opacity-100 p-1 text-base" 
-            title="Login"
-            aria-label="Login"
+            title="Account"
+            aria-label="Account"
           >
             👤
-          </button>
-          <button 
-            onClick={() => openAuth('register')} 
-            className="opacity-70 hover:opacity-100 p-1 text-base" 
-            title="Register / Sign up"
-            aria-label="Register"
-          >
-            ✚
           </button>
 
           <ThemeToggle />
@@ -225,13 +225,14 @@ export default function Navbar() {
           <a href="/contact" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">CONTACT</a>
           <a href="/whitepaper" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">WHITEPAPER</a>
           <a href="/developers" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">API</a>
+          <a href="/status" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">Status</a>
           <button 
             onClick={() => { setMobileMenuOpen(false); setShowBuyPanel(true); }}
             className="py-1 text-left font-medium text-emerald-400 hover:opacity-100"
           >
             BUY $MT NOW
           </button>
-          <a href={LINKS.wallet} target="_blank" onClick={() => setMobileMenuOpen(false)} className="py-1 font-medium">Launch Infinite Wallet</a>
+          <a href={LINKS.wallet} target="_blank" onClick={() => setMobileMenuOpen(false)} className="py-1 font-medium">Infinite Wallet</a>
         </div>
       )}
 
