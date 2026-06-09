@@ -6,8 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ThemeToggle from '@/components/theme/ThemeToggle';
 import { LINKS } from '@/lib/constants';
 import { Connection, PublicKey, VersionedTransaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { useWallet } from '@solana/wallet-adapter-react';
-import type { WalletName } from '@solana/wallet-adapter-base';
 
 export default function Navbar() {
   const [authOpen, setAuthOpen] = useState(false);
@@ -56,173 +54,7 @@ export default function Navbar() {
     }
   }, []);
 
-  // Shared RPC for balance fetches (same as before)
-  const SOLANA_RPC_URL =
-    (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SOLANA_RPC_URL) ||
-    'https://api.mainnet-beta.solana.com';
-  const BUY_CONNECTION = new Connection(SOLANA_RPC_URL, 'confirmed');
 
-  // Official Solana Wallet Adapter (recommended over custom polling/deeplink hacks)
-  const { 
-    select, 
-    connect: adapterConnect, 
-    disconnect: adapterDisconnect, 
-    publicKey, 
-    signTransaction: adapterSignTransaction,
-    connected: adapterConnected,
-    connecting: adapterConnecting 
-  } = useWallet();
-
-  // Keep the old local state for minimal changes to the existing buy panel JSX / quick buy flow
-  const [connectedWallet, setConnectedWallet] = useState<{ address: string; provider: any } | null>(null);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
-
-  // Sync the adapter's publicKey into the buy panel's display state (balance + address)
-  useEffect(() => {
-    if (publicKey) {
-      const addr = publicKey.toBase58();
-      setConnectedWallet({ address: addr, provider: null as any });
-
-      (async () => {
-        try {
-          const lamports = await BUY_CONNECTION.getBalance(publicKey);
-          setWalletBalance(lamports / LAMPORTS_PER_SOL);
-        } catch {}
-      })();
-    } else {
-      setConnectedWallet(null);
-      setWalletBalance(null);
-    }
-  }, [publicKey]);
-
-  // ==================== REAL SOLANA WALLET CONNECTION (ported from your game) ====================
-  // No separate ugly "Open in ..." buttons. Click "Phantom" / "Solflare" / "Backpack" and it just connects (or deep links on mobile).
-
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [buying, setBuying] = useState(false);
-  const [buyResult, setBuyResult] = useState<{ signature?: string; error?: string } | null>(null);
-
-  // Thin wrapper around the official wallet adapter.
-  // The adapter handles all the hard parts: extension detection, mobile deeplinks (including correct Solflare v1 schema), retries, etc.
-  const connectWalletForBuy = async (walletType: 'phantom' | 'solflare' | 'backpack') => {
-    setIsConnecting(true);
-    setBuyResult(null);
-
-    try {
-      const adapterName = 
-        walletType === 'phantom' ? 'Phantom' : 
-        walletType === 'solflare' ? 'Solflare' : 
-        'Backpack';
-
-      // This is the key: select + connect. The adapter does the right thing for desktop + mobile.
-      select(adapterName as WalletName);
-      await adapterConnect();
-
-      // The hook (publicKey) will update reactively. We still fetch balance for the UI.
-    } catch (error: any) {
-      console.error('Wallet connection error (adapter):', error);
-      const msg = error?.message || 'Failed to connect wallet';
-      setBuyResult({ error: msg });
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  const disconnectWalletForBuy = async () => {
-    try {
-      await adapterDisconnect();
-    } catch (e) {
-      // ignore adapter disconnect errors
-    }
-    setBuyResult(null);
-  };
-
-  // Real self-custodial buy using Jupiter quote + swap API + manual sign (ported from game connect + signing pattern)
-  const quickBuyMT = async (solAmount: number) => {
-    const address = connectedWallet?.address;
-    if (!address) {
-      setBuyResult({ error: 'Connect a wallet first (use the Phantom / Solflare / Backpack buttons above)' });
-      return;
-    }
-
-    setBuying(true);
-    setBuyResult(null);
-
-    try {
-      const inputMint = 'So11111111111111111111111111111111111111112';
-      const outputMint = MT_MINT;
-      const amount = Math.floor(solAmount * 1_000_000_000);
-
-      // 1. Quote
-      const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=100&swapMode=ExactIn`;
-      const quoteResp = await fetch(quoteUrl);
-      if (!quoteResp.ok) throw new Error('Failed to get quote');
-      const quote = await quoteResp.json();
-
-      // 2. Build swap tx
-      const swapResp = await fetch('https://quote-api.jup.ag/v6/swap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          quoteResponse: quote,
-          userPublicKey: address,
-          wrapAndUnwrapSol: true,
-          dynamicComputeUnitLimit: true,
-          prioritizationFeeLamports: 10000,
-        }),
-      });
-      if (!swapResp.ok) throw new Error('Failed to build swap tx');
-      const { swapTransaction } = await swapResp.json();
-
-      // 3. Deserialize
-      const binary = atob(swapTransaction);
-      const txBuffer = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) txBuffer[i] = binary.charCodeAt(i);
-      const transaction = VersionedTransaction.deserialize(txBuffer);
-
-      // 4. Prefer the adapter's standardized signTransaction (this is why we switched to wallet-adapter)
-      let signedTx: any;
-      if (adapterSignTransaction) {
-        signedTx = await adapterSignTransaction(transaction);
-      } else {
-        // Fallback to the old polling logic only if adapter is not available
-        let signProvider = connectedWallet?.provider;
-        for (let i = 0; i < 8 && !signProvider; i++) {
-          const w = window as any;
-          signProvider = w.solflare || w.phantom?.solana || w.backpack;
-          if (signProvider && (typeof signProvider.signTransaction === 'function' || typeof signProvider.signAllTransactions === 'function')) break;
-          await new Promise(r => setTimeout(r, 150));
-        }
-
-        if (signProvider && typeof signProvider.signTransaction === 'function') {
-          signedTx = await signProvider.signTransaction(transaction);
-        } else if (signProvider && typeof signProvider.signAllTransactions === 'function') {
-          const signedArr = await signProvider.signAllTransactions([transaction]);
-          signedTx = signedArr[0];
-        } else {
-          throw new Error('Wallet did not expose signTransaction. Use the Jupiter widget below or try Phantom.');
-        }
-      }
-
-      // 6. Serialize + send
-      const raw = signedTx.serialize ? signedTx.serialize() : signedTx;
-      const signature = await BUY_CONNECTION.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 3 });
-      await BUY_CONNECTION.confirmTransaction(signature, 'confirmed');
-
-      setBuyResult({ signature });
-
-      // refresh balance
-      try {
-        const newLamports = await BUY_CONNECTION.getBalance(new PublicKey(address));
-        setWalletBalance(newLamports / LAMPORTS_PER_SOL);
-      } catch {}
-    } catch (e: any) {
-      const msg = e?.message || 'Swap failed';
-      setBuyResult({ error: msg.includes('signTransaction') || msg.includes('expose') ? msg : (msg + ' — try the Jupiter widget below or a different wallet.') });
-    } finally {
-      setBuying(false);
-    }
-  };
 
   // Jupiter Plugin init effect (replaces all previous custom buy logic that was erroring)
   useEffect(() => {
@@ -283,13 +115,6 @@ export default function Navbar() {
       document.removeEventListener('touchstart', handleClickOutside as any);
     };
   }, [showBuyPanel]);
-
-  // Wallet mobile app links
-  const walletApps = {
-    phantom: { label: 'Phantom', url: 'https://phantom.app/' },
-    solflare: { label: 'Solflare', url: 'https://solflare.com/' },
-    backpack: { label: 'Backpack', url: 'https://backpack.app/' },
-  };
 
   return (
     <header className="w-full border-b border-white/10">
@@ -422,68 +247,7 @@ export default function Navbar() {
               <button onClick={() => setShowBuyPanel(false)} className="text-xl leading-none opacity-60 hover:opacity-100 px-2" aria-label="Close buy panel">×</button>
             </div>
 
-            {/* MANUAL CONNECT SECTION — exactly like your game: three buttons, click to connect (deeplink handled inside on mobile) */}
-            <div className="mb-3">
-              {!connectedWallet ? (
-                <div className="flex flex-wrap gap-2">
-                  {(['phantom', 'solflare', 'backpack'] as const).map((name) => (
-                    <button
-                      key={name}
-                      disabled={isConnecting}
-                      onClick={() => connectWalletForBuy(name)}
-                      className="px-3 py-1.5 text-xs rounded-2xl border border-white/20 hover:bg-white/5 active:bg-white/10 disabled:opacity-50"
-                    >
-                      {isConnecting ? 'Connecting...' : (name === 'phantom' ? 'Phantom' : name === 'solflare' ? 'Solflare' : 'Backpack')}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/5 p-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-mono text-emerald-400">
-                        {connectedWallet.address.slice(0, 4)}...{connectedWallet.address.slice(-4)}
-                      </div>
-                      {walletBalance !== null && <div className="opacity-70">Balance: {walletBalance.toFixed(4)} SOL</div>}
-                    </div>
-                    <button onClick={disconnectWalletForBuy} className="text-[10px] underline opacity-70">Disconnect</button>
-                  </div>
 
-                  {/* Quick buy amounts + the big action button (down below) */}
-                  <div className="mt-3">
-                    <div className="text-[10px] opacity-60 mb-1">Quick Buy $MT — signs with your wallet</div>
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {[0.05, 0.1, 0.25, 0.5, 1].map((amt) => (
-                        <button
-                          key={amt}
-                          disabled={buying}
-                          onClick={() => quickBuyMT(amt)}
-                          className="px-2.5 py-1 text-xs rounded-xl border border-white/15 hover:bg-white/5 disabled:opacity-50"
-                        >
-                          {amt} SOL
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      disabled={buying}
-                      onClick={() => quickBuyMT(0.1)}
-                      className="w-full py-2 rounded-2xl bg-emerald-400 text-black text-sm font-medium disabled:opacity-60"
-                    >
-                      {buying ? 'Swapping & signing...' : 'Buy $MT with 0.1 SOL'}
-                    </button>
-                  </div>
-
-                  {buyResult?.signature && (
-                    <div className="mt-2 text-[10px] text-emerald-400 break-all">
-                      Success! <a href={`https://solscan.io/tx/${buyResult.signature}`} target="_blank" className="underline">View tx on Solscan</a>
-                    </div>
-                  )}
-                  {buyResult?.error && (
-                    <div className="mt-2 text-[10px] text-amber-400">{buyResult.error}</div>
-                  )}
-                </div>
-              )}
-            </div>
 
             {/* Desktop: Gateway (THE WALLET IS THE GATEWAY) on LEFT expanding to fill gap, Jupiter swap box on RIGHT.
                 Mobile: stacks naturally. */}
