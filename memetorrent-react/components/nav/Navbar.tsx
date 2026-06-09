@@ -7,6 +7,7 @@ import ThemeToggle from '@/components/theme/ThemeToggle';
 import { LINKS } from '@/lib/constants';
 import { Connection, PublicKey, VersionedTransaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
+import type { WalletName } from '@solana/wallet-adapter-base';
 
 export default function Navbar() {
   const [authOpen, setAuthOpen] = useState(false);
@@ -114,7 +115,7 @@ export default function Navbar() {
         'Backpack';
 
       // This is the key: select + connect. The adapter does the right thing for desktop + mobile.
-      select(adapterName);
+      select(adapterName as WalletName);
       await adapterConnect();
 
       // The hook (publicKey) will update reactively. We still fetch balance for the UI.
