@@ -54,53 +54,6 @@ export default function HeroSection() {
           </div>
         </div>
       </div>
-
-      {/* Portal Login — styled like the original memetorrent site */}
-      <div className="max-w-7xl mx-auto px-6 pb-16">
-        <div className="text-center mb-4">
-          <div className="inline-block px-3 py-0.5 rounded-full border border-white/20 text-xs tracking-[2px] text-emerald-400">PORTAL ACCESS</div>
-          <div className="text-2xl font-semibold tracking-tight mt-1">Enter the MT Eco System</div>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-          {/* Email only style */}
-          <form onSubmit={(e) => { e.preventDefault(); alert('Entered MT Eco System (demo login). Use INFINITE WALLET for full self-custodial access.'); }} className="rounded-3xl border border-white/10 bg-black/60 p-6">
-            <div className="text-sm font-semibold mb-4 tracking-widest opacity-80">Enter the MT Eco System</div>
-            <div className="space-y-4">
-              <div>
-                <div className="text-xs opacity-60 mb-1">Email:</div>
-                <input type="email" defaultValue="jason.c@futuret3ch.com.au" className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-emerald-400/50" />
-              </div>
-              <div>
-                <div className="text-xs opacity-60 mb-1">Password:</div>
-                <input type="password" defaultValue="•••••••••••" className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-emerald-400/50" />
-              </div>
-            </div>
-            <button type="submit" className="mt-5 w-full py-2.5 rounded-2xl border border-white/30 text-sm hover:bg-white/5">ENTER PORTAL</button>
-          </form>
-
-          {/* Username + Email style */}
-          <form onSubmit={(e) => { e.preventDefault(); alert('Entered MT Eco System (demo login). Use INFINITE WALLET for full self-custodial access.'); }} className="rounded-3xl border border-white/10 bg-black/60 p-6">
-            <div className="text-sm font-semibold mb-4 tracking-widest opacity-80">Enter the MT Eco System</div>
-            <div className="space-y-4">
-              <div>
-                <div className="text-xs opacity-60 mb-1">Username:</div>
-                <input type="text" defaultValue="testuser1" className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-emerald-400/50" />
-              </div>
-              <div>
-                <div className="text-xs opacity-60 mb-1">Email:</div>
-                <input type="email" defaultValue="wallet@email.com" className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-emerald-400/50" />
-              </div>
-              <div>
-                <div className="text-xs opacity-60 mb-1">Password:</div>
-                <input type="password" defaultValue="" placeholder="•••••••••••" className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-emerald-400/50" />
-              </div>
-            </div>
-            <button type="submit" className="mt-5 w-full py-2.5 rounded-2xl border border-white/30 text-sm hover:bg-white/5">ENTER PORTAL</button>
-          </form>
-        </div>
-        <div className="text-center text-[10px] mt-3 opacity-50">Demo only. Real access &amp; flows live in INFINITE WALLET.</div>
-      </div>
     </section>
   );
 }

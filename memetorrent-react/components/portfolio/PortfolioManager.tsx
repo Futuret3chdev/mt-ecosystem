@@ -67,6 +67,20 @@ export default function PortfolioManager() {
     }
   }, [activeFlow]);
 
+  // Auto open the direct "Buy $MT Directly" flow when user clicks "Buy directly on this page"
+  // links from Live $MT / hero area. Allows true on-page purchase with no third party.
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.toLowerCase();
+      if (hash.includes('buy') || hash.includes('management')) {
+        const t = setTimeout(() => {
+          startFlow('buy-mt');
+        }, 850);
+        return () => clearTimeout(t);
+      }
+    }
+  }, []);
+
   const totalValue = assets.reduce((sum, a) => {
     if (a.symbol === 'MT' || a.symbol === '$MT') return sum + a.balance * price;
     if (a.symbol === 'ROCKET') return sum + a.balance * 0.008; // mock rocket value
