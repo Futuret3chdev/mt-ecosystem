@@ -273,12 +273,30 @@ export default function Navbar() {
               </div>
             </div>
 
-            {/* Mobile tip for wallet detection (plugin works best in-app browser) */}
+            {/* Mobile tip + deeplink helpers (modeled on the SolanaReels game pattern you provided for true PC + mobile wallet support) */}
             {isMobile && (
               <div className="mt-1 text-[10px] opacity-70 text-center">
                 On mobile: open this page inside your wallet app's browser (Phantom, Solflare or Backpack) so wallets are detected.
               </div>
             )}
+
+            {/* Quick deeplink buttons — same universal link approach used in your full game for mobile/PC compatibility */}
+            <div className="mt-2 flex flex-wrap gap-1.5 justify-center">
+              {[
+                { name: 'Phantom', url: `https://phantom.app/ul/browse/${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : 'https://memetorrent.futuret3ch.com.au')}` },
+                { name: 'Solflare', url: `https://solflare.com/ul/browse/${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : 'https://memetorrent.futuret3ch.com.au')}` },
+              ].map((w) => (
+                <a
+                  key={w.name}
+                  href={w.url}
+                  target="_blank"
+                  className="text-[10px] px-2 py-0.5 rounded border border-white/15 hover:bg-white/5 opacity-80"
+                  onClick={() => { /* user will connect inside the opened wallet browser or use the Jupiter plugin there */ }}
+                >
+                  Open in {w.name} →
+                </a>
+              ))}
+            </div>
 
             {/* CSS vars to theme the Jupiter plugin to match the site's dark + emerald look */}
             <style>{`

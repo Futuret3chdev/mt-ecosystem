@@ -1,8 +1,271 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+
+// MT-Connect supported platforms for OAuth / API identity flows (as requested)
+const SOCIAL_PLATFORMS = [
+  { key: 'facebook', label: 'Facebook', icon: 'f', color: '#1877F2', authHint: 'Meta Graph API (public_profile, email)' },
+  { key: 'instagram', label: 'Instagram', icon: '📷', color: '#E1306C', authHint: 'Instagram Basic Display / Graph API' },
+  { key: 'tiktok', label: 'TikTok', icon: '♪', color: '#000000', authHint: 'TikTok Login Kit (user.info.basic)' },
+  { key: 'snapchat', label: 'Snapchat', icon: '👻', color: '#FFFC00', authHint: 'Snap Kit Login + Bitmoji (if enabled)' },
+  { key: 'google', label: 'Google', icon: 'G', color: '#4285F4', authHint: 'OpenID Connect (email, profile, openid)' },
+  { key: 'microsoft', label: 'Microsoft', icon: 'Ⓜ', color: '#00A4EF', authHint: 'Microsoft Identity (openid, profile, email)' },
+];
+
+type ConnectedSocial = {
+  connected: boolean;
+  profile?: { id: string; name: string; email?: string; handle?: string };
+  linkedAt?: string;
+};
+
+type WalletDemoState = {
+  address: string | null;
+  balance: number | null;
+  provider: string | null;
+  signature: string | null;
+};
+
+const SOLANA_RPC_URL = 'https://api.mainnet-beta.solana.com';
+const CONNECTION = new Connection(SOLANA_RPC_URL, 'confirmed');
 
 export default function DevelopersPage() {
+  // MT-Connect social identity state (simulates real OAuth roundtrips + backend API calls)
+  const [connectedSocials, setConnectedSocials] = useState<Record<string, ConnectedSocial>>({});
+  const [flowLog, setFlowLog] = useState<string>('');
+  const [lastApiResponse, setLastApiResponse] = useState<string>('');
+
+  // Wallet deeplink + injected demo (modeled directly on the SolanaReels game you provided)
+  const [walletDemo, setWalletDemo] = useState<WalletDemoState>({ address: null, balance: null, provider: null, signature: null });
+  const [walletConnecting, setWalletConnecting] = useState<string | null>(null);
+
+  // Simple activity / toast log for the page
+  const [activity, setActivity] = useState<string>('');
+
+  const showActivity = (msg: string) => {
+    setActivity(msg);
+    setTimeout(() => setActivity(''), 2600);
+  };
+
+  // ==================== MT-CONNECT: REALISTIC OAUTH + API FLOW ====================
+  const getAuthUrl = (platform: string): string => {
+    const redirect = encodeURIComponent('https://memetorrent.futuret3ch.com.au/api/oauth/callback');
+    switch (platform) {
+      case 'facebook':
+        return `https://www.facebook.com/v19.0/dialog/oauth?client_id=MT_DEMO_APP&redirect_uri=${redirect}&scope=public_profile,email&response_type=code`;
+      case 'instagram':
+        return `https://api.instagram.com/oauth/authorize?client_id=MT_DEMO_APP&redirect_uri=${redirect}&scope=user_profile,user_media&response_type=code`;
+      case 'tiktok':
+        return `https://www.tiktok.com/v2/auth/authorize?client_key=MT_DEMO_APP&scope=user.info.basic&redirect_uri=${redirect}&response_type=code`;
+      case 'snapchat':
+        return `https://accounts.snapchat.com/accounts/oauth2/auth?client_id=MT_DEMO_APP&redirect_uri=${redirect}&scope=https://auth.snapchat.com/oauth2/api/user.display_name&response_type=code`;
+      case 'google':
+        return `https://accounts.google.com/o/oauth2/v2/auth?client_id=MT_DEMO_APP&redirect_uri=${redirect}&scope=openid%20email%20profile&response_type=code`;
+      case 'microsoft':
+        return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=MT_DEMO_APP&redirect_uri=${redirect}&scope=openid%20profile%20email&response_type=code`;
+      default:
+        return 'https://example.com/oauth/start';
+    }
+  };
+
+  const connectSocial = (platformKey: string) => {
+    const p = SOCIAL_PLATFORMS.find(s => s.key === platformKey)!;
+    const authUrl = getAuthUrl(platformKey);
+
+    let log = `MT-Connect flow started for ${p.label}\n`;
+    log += `1. Opening provider OAuth consent screen (real URL):\n   ${authUrl}\n`;
+    log += `   (In production: register your app in the ${p.label} Developer Portal and set exact redirect_uri to your MT backend.)\n`;
+    setFlowLog(log);
+    showActivity(`Opening ${p.label} login...`);
+
+    // Open the real provider auth page (demo client_id will show error page or consent if you register it later)
+    window.open(authUrl, '_blank', 'noopener,noreferrer,width=520,height=680');
+
+    // Simulate the redirect + code exchange + profile fetch + MT linking (exactly like a real backend flow would do)
+    setTimeout(() => {
+      const demoProfile = {
+        id: `${platformKey}_demo_${Math.floor(Math.random() * 900000) + 100000}`,
+        name: platformKey === 'google' || platformKey === 'microsoft' ? 'Alex Rivera' : '@futuret3ch_demo',
+        email: platformKey === 'tiktok' || platformKey === 'snapchat' ? undefined : 'demo@futuret3ch.com.au',
+        handle: ['tiktok', 'snapchat', 'instagram'].includes(platformKey) ? '@futuret3ch' : undefined,
+      };
+
+      const newEntry: ConnectedSocial = {
+        connected: true,
+        profile: demoProfile,
+        linkedAt: new Date().toISOString(),
+      };
+
+      setConnectedSocials(prev => ({ ...prev, [platformKey]: newEntry }));
+
+      const step2 = `\n2. Authorization code received (simulated redirect back to /api/oauth/callback?code=...&state=mt_xxx)\n`;
+      const step3 = `3. Backend exchanges code for short-lived access_token via provider token endpoint (server-to-server, never exposed to browser).\n`;
+      const step4 = `4. Backend calls provider profile API (Graph / User Info) → received ${demoProfile.name}\n`;
+      const step5 = `5. MT identity service: link social ID + profile to INFINITE WALLET pubkey (or guest session) + issue MT-JWT for cross-game SSO.\n`;
+      const step6 = `6. Success. Rockets, NFTs and progress now travel with this identity across all MT titles.\n\nAPI response ready — click "Test MT API Call" below.`;
+
+      setFlowLog(log + step2 + step3 + step4 + step5 + step6);
+      showActivity(`${p.label} linked to MT identity ✓`);
+
+      // Also surface a realistic backend API call example immediately
+      setLastApiResponse(JSON.stringify({
+        ok: true,
+        provider: platformKey,
+        mt_identity: `mt_${demoProfile.id.slice(-8)}`,
+        linked_wallet: walletDemo.address || 'not-connected-yet',
+        session: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (MT-JWT)',
+        rockets_bonus: 12,
+        perks_unlocked: ['cross_game_progress', 'eco_badge'],
+      }, null, 2));
+    }, 1350);
+  };
+
+  const disconnectSocial = (platformKey: string) => {
+    setConnectedSocials(prev => {
+      const copy = { ...prev };
+      delete copy[platformKey];
+      return copy;
+    });
+    setFlowLog(prev => prev + `\n\n[Disconnected ${platformKey}] — MT identity unlinked for this session (on-chain assets remain).`);
+    showActivity('Social unlinked');
+  };
+
+  // "Real" API call simulation (what your backend / frontend SDK would actually POST after OAuth)
+  const testSocialApiCall = async (platformKey: string) => {
+    const entry = connectedSocials[platformKey];
+    if (!entry) return;
+
+    const p = SOCIAL_PLATFORMS.find(s => s.key === platformKey)!;
+    showActivity(`Calling MT backend for ${p.label}...`);
+
+    // This is exactly the kind of call a real integration would make after the OAuth roundtrip
+    const payload = {
+      provider: platformKey,
+      provider_user_id: entry.profile?.id,
+      provider_profile: entry.profile,
+      wallet_pubkey: walletDemo.address || 'GUEST_OR_LATER_LINKED',
+      action: 'link_identity',
+      client: 'mt-developer-sandbox',
+    };
+
+    // Simulate network + server work
+    await new Promise(r => setTimeout(r, 420));
+
+    const mockResponse = {
+      success: true,
+      mt_user_id: `mt_usr_${Math.random().toString(36).slice(2, 10)}`,
+      linked_providers: Object.keys(connectedSocials).concat(platformKey),
+      rockets_awarded: 8,
+      jwt: 'mt_eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.demo.sig',
+      message: 'Identity linked. Use this JWT for all subsequent /v1/game/* and /v1/wallet/* calls.',
+      cross_platform: ['pet', 'soccer', 'puck', 'tap', 'racer', 'blockcraft'],
+    };
+
+    setLastApiResponse(JSON.stringify({ request: payload, response: mockResponse }, null, 2));
+    setFlowLog(prev => prev + `\n\n[API] POST /v1/identity/connect  →  ${mockResponse.message}`);
+    showActivity('MT API response received');
+  };
+
+  // ==================== WALLET DEEPLINK + INJECTED (from your game code) ====================
+  const getProvider = (name: 'phantom' | 'solflare' | 'backpack') => {
+    if (typeof window === 'undefined') return null;
+    const w = window as any;
+    if (name === 'phantom') return w.phantom?.solana;
+    if (name === 'solflare') return w.solflare;
+    if (name === 'backpack') return w.backpack?.solana || w.backpack;
+    return null;
+  };
+
+  const connectWalletDemo = async (providerName: 'phantom' | 'solflare' | 'backpack') => {
+    setWalletConnecting(providerName);
+    setFlowLog(prev => prev + `\n\n[Wallet] Attempting ${providerName} connect (injected first, deeplink fallback)...`);
+
+    try {
+      const provider = getProvider(providerName);
+
+      // Injected path (desktop + in-app browser on mobile) — exactly like your SolanaReels game
+      if (provider) {
+        const resp = await provider.connect();
+        const pubkey = resp?.publicKey?.toString?.() || resp?.publicKey?.toBase58?.();
+        if (!pubkey) throw new Error('No public key returned');
+
+        const pk = new PublicKey(pubkey);
+        let bal = 0;
+        try {
+          bal = await CONNECTION.getBalance(pk);
+        } catch {}
+
+        setWalletDemo({
+          address: pubkey,
+          balance: bal / LAMPORTS_PER_SOL,
+          provider: providerName,
+          signature: null,
+        });
+        setFlowLog(prev => prev + `\n✓ Connected via injected ${providerName}: ${pubkey}\n  Balance: ${(bal / LAMPORTS_PER_SOL).toFixed(4)} SOL`);
+        showActivity(`Connected ${providerName}`);
+        return;
+      }
+
+      // Deeplink / universal link fallback (mobile + no injected) — this is the key point from your game
+      const currentUrl = encodeURIComponent(window.location.href);
+      let deeplink = '';
+
+      if (providerName === 'phantom') {
+        deeplink = `https://phantom.app/ul/browse/${currentUrl}?ref=mt-developers`;
+        // Alternative deeper connect deeplink: `phantom://v1/connect?dapp_encryption_public_key=...&app_url=...`
+      } else if (providerName === 'solflare') {
+        deeplink = `https://solflare.com/ul/browse/${currentUrl}`;
+      } else {
+        deeplink = `https://backpack.app/ul/browse/${currentUrl}`;
+      }
+
+      setFlowLog(prev => prev + `\nNo injected provider detected — opening deeplink / universal link for ${providerName}...\n${deeplink}`);
+      showActivity('Opening wallet app...');
+      window.open(deeplink, '_blank');
+
+      // Give user a hint to come back and try "Connect" again from inside the wallet browser
+      setTimeout(() => {
+        setFlowLog(prev => prev + `\nTip: After the wallet opens, choose "Connect" or "Browser" inside the app, then return here and press Connect ${providerName} again. Same pattern used in the SolanaReels game you shared.`);
+      }, 900);
+    } catch (e: any) {
+      setFlowLog(prev => prev + `\n✗ ${providerName} connect error: ${e?.message || e}`);
+      showActivity('Connect failed — see log');
+    } finally {
+      setWalletConnecting(null);
+    }
+  };
+
+  const signForMTIdentity = async () => {
+    if (!walletDemo.address) return;
+    const providerName = (walletDemo.provider || 'phantom') as any;
+    const provider = getProvider(providerName);
+    if (!provider || !provider.signMessage) {
+      setFlowLog(prev => prev + `\n[Sign] Provider does not expose signMessage or not re-connected in this tab. Re-connect and try again.`);
+      return;
+    }
+
+    try {
+      const message = new TextEncoder().encode(
+        `Sign to link this wallet to MT-Connect identity\nWallet: ${walletDemo.address}\nTimestamp: ${Date.now()}`
+      );
+      const sig = await provider.signMessage(message, 'utf8');
+      const sigStr = typeof sig === 'string' ? sig : (sig?.signature ? JSON.stringify(sig.signature) : 'signature-received');
+      setWalletDemo(prev => ({ ...prev, signature: sigStr }));
+      setFlowLog(prev => prev + `\n[Sign] Message signed successfully. Signature: ${sigStr.slice(0, 40)}...`);
+      showActivity('Message signed for MT identity link');
+    } catch (e: any) {
+      setFlowLog(prev => prev + `\n[Sign] Failed: ${e?.message || e}`);
+    }
+  };
+
+  const disconnectWalletDemo = () => {
+    setWalletDemo({ address: null, balance: null, provider: null, signature: null });
+    setFlowLog(prev => prev + `\n[Wallet] Disconnected demo session (on-chain state unchanged).`);
+  };
+
+  // ==================== END OF NEW FLOWS ====================
+
   const downloads = [
     { label: 'SOFTWARE', desc: 'Desktop tools & SDKs' },
     { label: 'ANDROID', desc: 'Mobile integration library' },
@@ -32,33 +295,186 @@ export default function DevelopersPage() {
           INFINITE WALLET, native $MT token, Rockets economy, and on-chain NFTs.
         </p>
 
-        {/* Licenses */}
+        {/* Draft description + full 1-4 breakdown exactly as requested */}
         <div className="rounded-3xl border border-white/10 bg-white/[0.015] p-6 sm:p-8 mb-10">
-          <div className="text-sm font-semibold tracking-tight mb-3">Licenses</div>
-          <p className="text-sm opacity-70 leading-relaxed mb-4">
-            To develop on MT-ECO SYSTEM you will need the appropriate licenses for the core components, 
-            node software, SDKs and integration modules. All development happens against our self-hosted infrastructure.
+          <div className="text-sm font-semibold tracking-tight mb-3">Developer Landing — Core Principle</div>
+          <p className="text-sm opacity-80 leading-relaxed mb-4">
+            To successfully build the MT ECO SYSTEM and support cross-platform development (Web, iOS, Android, Windows) alongside your virtual gallery experience, you need to balance Core Blockchain Infrastructure with a seamless Developer Experience (DX) Layer.
           </p>
-          <div className="text-xs opacity-60">Full license details and access requirements will be provided with the developer resources.</div>
+          <p className="text-xs opacity-70">Here is the breakdown of what you need to build and document.</p>
         </div>
 
-        {/* Getting Started */}
+        {/* 1. Core Infrastructure */}
         <div className="mb-10">
-          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">GETTING STARTED</div>
-          <h2 className="text-2xl font-semibold tracking-tight mb-4">Quick Start</h2>
-          <div className="prose prose-invert text-sm opacity-80 max-w-none">
-            <ol className="list-decimal pl-5 space-y-2">
-              <li>Install the MT SDK via npm: <code>npm install @mt-ecosystem/sdk</code></li>
-              <li>Connect your INFINITE WALLET or any self-custodial Solana/MT wallet.</li>
-              <li>Use the SDK to query balances, execute flows (bridge, swap, harvest), or build custom dApps.</li>
-            </ol>
-            <p>Example:</p>
-            <pre className="bg-black p-4 rounded text-xs overflow-auto"><code>{`import { MTClient } from '@mt-ecosystem/sdk';
+          <div className="uppercase text-xs tracking-[3px] text-emerald-400 mb-2">1. THE CORE INFRASTRUCTURE</div>
+          <h2 className="text-2xl font-semibold tracking-tight mb-3">Backend &amp; Nodes</h2>
+          <ul className="list-disc pl-5 text-sm opacity-80 space-y-1.5">
+            <li>Self-hosted Solana validator / custom MT L1 nodes</li>
+            <li>RPC endpoints, WebSocket feeds (live Rockets, NFT mints, bridge proofs, game states)</li>
+            <li>Indexers for holders, Rockets balances, NFTs, game progress, and cross-title achievements</li>
+            <li>Secure key management, program deployment pipelines, and audited upgrade authority flows</li>
+            <li>Direct on-chain execution (no third-party relayers for core value transfer)</li>
+          </ul>
+        </div>
 
-const client = new MTClient({ wallet: yourWallet });
-const balance = await client.getBalance('MT');
-console.log(balance); // 124567890 MT`}</code></pre>
+        {/* 2. Identity Bridge — THE NEW SOCIAL API FLOWS SECTION */}
+        <div className="mb-12 border border-white/10 rounded-3xl p-6 sm:p-8 bg-zinc-950/60">
+          <div className="uppercase text-xs tracking-[3px] text-emerald-400 mb-2">2. IDENTITY BRIDGE</div>
+          <h2 className="text-2xl font-semibold tracking-tight mb-2">MT-Connect (Social + Wallet SSO)</h2>
+          <p className="text-sm opacity-80 mb-4">
+            Wallet-native identity (INFINITE WALLET pubkey is the primary key). Optional social login (OAuth) for Facebook, Instagram, TikTok, Snapchat, Google, Microsoft.
+            These are used ONLY for username association, cross-device recovery hints, ecosystem perks and single-sign-on across games — never custody of keys.
+          </p>
+
+          <div className="text-xs opacity-60 mb-3">Click any platform to start a real OAuth consent flow + simulated (but realistic) backend API exchange exactly like production MT-Connect would perform.</div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+            {SOCIAL_PLATFORMS.map((p) => {
+              const isConnected = !!connectedSocials[p.key]?.connected;
+              return (
+                <div key={p.key} className="border border-white/10 rounded-2xl p-4 bg-black/40 flex flex-col">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl" style={{ color: p.color }}>{p.icon}</span>
+                    <div className="font-semibold">{p.label}</div>
+                  </div>
+                  <div className="text-[10px] opacity-60 mb-3 leading-tight">{p.authHint}</div>
+
+                  {!isConnected ? (
+                    <button
+                      onClick={() => connectSocial(p.key)}
+                      className="mt-auto w-full py-2 rounded-xl bg-white text-black text-sm font-medium active:opacity-90"
+                    >
+                      CONNECT &amp; LINK TO MT IDENTITY
+                    </button>
+                  ) : (
+                    <div className="mt-auto space-y-2">
+                      <div className="text-xs text-emerald-400">✓ LINKED — {connectedSocials[p.key].profile?.name}</div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => testSocialApiCall(p.key)}
+                          className="flex-1 py-1.5 rounded-xl border border-white/20 text-xs hover:bg-white/5"
+                        >
+                          TEST MT API CALL
+                        </button>
+                        <button
+                          onClick={() => disconnectSocial(p.key)}
+                          className="flex-1 py-1.5 rounded-xl border border-white/20 text-xs hover:bg-white/5"
+                        >
+                          DISCONNECT
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
+
+          {/* Live flow log + last API response */}
+          {(flowLog || lastApiResponse) && (
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {flowLog && (
+                <div>
+                  <div className="text-xs tracking-[2px] opacity-60 mb-1">MT-CONNECT FLOW LOG (real steps + simulated backend)</div>
+                  <pre className="bg-black p-3 rounded-xl text-[10px] opacity-80 overflow-auto max-h-56 whitespace-pre-wrap">{flowLog}</pre>
+                </div>
+              )}
+              {lastApiResponse && (
+                <div>
+                  <div className="text-xs tracking-[2px] opacity-60 mb-1">LAST MT BACKEND API RESPONSE</div>
+                  <pre className="bg-black p-3 rounded-xl text-[10px] opacity-80 overflow-auto max-h-56">{lastApiResponse}</pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-4 text-[10px] opacity-60">
+            Real implementation: your backend receives the OAuth code, exchanges it server-side for tokens (never expose secrets to browser), calls the provider userinfo/Graph endpoint, then calls internal MT identity service to create or link the record. The returned MT-JWT is then used for all subsequent game and wallet API calls.
+          </div>
+        </div>
+
+        {/* 3. Developer Documentation */}
+        <div className="mb-10">
+          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-2">3. DEVELOPER DOCUMENTATION</div>
+          <h2 className="text-2xl font-semibold tracking-tight mb-3">Quick Start • API Reference • Guides</h2>
+
+          <div className="space-y-6 text-sm">
+            <div className="border border-white/10 rounded-2xl p-5">
+              <div className="font-semibold mb-1">Quick Start</div>
+              <ol className="list-decimal pl-5 space-y-1 text-xs opacity-80">
+                <li>Install the MT SDK via npm: <code>npm install @mt-ecosystem/sdk</code></li>
+                <li>Connect your INFINITE WALLET or any self-custodial Solana/MT wallet (see live demo below — deeplink + injected, same as the SolanaReels game).</li>
+                <li>Use MT-Connect for optional social SSO (the 6 platforms above).</li>
+                <li>Call SDK methods or raw program instructions for swap, bridge, harvest, mint, etc.</li>
+              </ol>
+            </div>
+
+            <div className="border border-white/10 rounded-2xl p-5">
+              <div className="font-semibold mb-1">API Reference (selected)</div>
+              <ul className="text-xs opacity-80 space-y-0.5">
+                <li>GET /v1/wallet/:pubkey — balances + Rockets + linked socials</li>
+                <li>POST /v1/identity/connect — after OAuth (Facebook/IG/TikTok/Snapchat/Google/Microsoft)</li>
+                <li>POST /v1/transactions — submit signed tx (self-custodial)</li>
+                <li>GET /v1/games/:slug/progress — cross-game state</li>
+                <li>WS /ws — live Rockets, NFT events, bridge proofs</li>
+              </ul>
+            </div>
+
+            <div className="border border-white/10 rounded-2xl p-5">
+              <div className="font-semibold mb-1">Integration Guides by Platform</div>
+              <div className="text-xs opacity-80 grid sm:grid-cols-2 gap-x-4">
+                <div>• React / Next.js — useWallet + MTClient</div>
+                <div>• Unity / Unreal — native C# / C++ bindings + Solana RPC</div>
+                <div>• Swift (iOS) / Kotlin (Android) — direct RPC + MT-Connect deep links</div>
+                <div>• Flutter — single codebase with web3dart + custom channels</div>
+              </div>
+            </div>
+
+            <div className="border border-white/10 rounded-2xl p-5">
+              <div className="font-semibold mb-1">Error Handling &amp; Limits</div>
+              <div className="text-xs opacity-70">Standard JSON errors with code + message. Rate limits per IP + per wallet. Devnet has relaxed limits. All critical calls are idempotent where possible.</div>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Implementation Priority Map */}
+        <div className="mb-10">
+          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-2">4. IMPLEMENTATION PRIORITY MAP</div>
+          <div className="grid sm:grid-cols-3 gap-3 text-sm">
+            <div className="border border-white/10 rounded-2xl p-4">
+              <div className="font-semibold text-emerald-400 mb-1">CRITICAL</div>
+              <ul className="text-xs opacity-80 list-disc pl-4 space-y-0.5">
+                <li>Core node + RPC + basic SDK</li>
+                <li>SIWS (Sign-In with Solana) + MT-JWT auth</li>
+                <li>Basic swap / bridge / harvest endpoints</li>
+                <li>MT-Connect core (at least Google + wallet)</li>
+              </ul>
+            </div>
+            <div className="border border-white/10 rounded-2xl p-4">
+              <div className="font-semibold text-amber-400 mb-1">HIGH</div>
+              <ul className="text-xs opacity-80 list-disc pl-4 space-y-0.5">
+                <li>Full MT-Connect (all 6 platforms + deeplink support)</li>
+                <li>Game SDK hooks (Rockets, NFTs, progress sync)</li>
+                <li>Live WebSocket feeds</li>
+                <li>Analytics &amp; leaderboards</li>
+              </ul>
+            </div>
+            <div className="border border-white/10 rounded-2xl p-4">
+              <div className="font-semibold text-sky-400 mb-1">MEDIUM</div>
+              <ul className="text-xs opacity-80 list-disc pl-4 space-y-0.5">
+                <li>NFT mint templates + studio UI</li>
+                <li>Advanced routing / gasless options</li>
+                <li>Unity/Unreal/Flutter example repos</li>
+                <li>Public testnet faucet + explorer</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Recommended Next Steps */}
+        <div className="mb-10 text-sm opacity-90">
+          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-2">RECOMMENDED NEXT STEPS</div>
+          <p>1. Stand up the self-hosted RPC + indexer layer. 2. Implement MT-Connect backend (OAuth exchange + identity linking service). 3. Publish the first version of the @mt-ecosystem/sdk with wallet + MT-Connect helpers. 4. Build the live sandbox (this page) into a full interactive API explorer with real devnet calls. 5. Document every program instruction (like Raydium/Jupiter docs style — already partially included below).</p>
         </div>
 
         {/* SDK Reference (modeled after Raydium/Jupiter style) */}
@@ -101,7 +517,7 @@ console.log(balance); // 124567890 MT`}</code></pre>
           </div>
         </div>
 
-        {/* API Endpoints (modeled after Jupiter/Raydium docs) */}
+        {/* API Endpoints */}
         <div className="mb-10">
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">API ENDPOINTS</div>
           <h2 className="text-2xl font-semibold tracking-tight mb-4">REST &amp; On-Chain APIs</h2>
@@ -170,41 +586,80 @@ const report = await client.generateAuditReport({
           </div>
         </div>
 
-        {/* Resources & Downloads */}
-        <div>
-          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">RESOURCES &amp; DOWNLOADS</div>
-          <h2 className="text-2xl font-semibold tracking-tight mb-6">SDKs, Tools &amp; Docs</h2>
+        {/* Live Wallet Connect Demo — deeplink + injected, modeled on the game you pasted */}
+        <div className="mb-10 border border-emerald-400/30 rounded-3xl p-6 sm:p-8 bg-black/60">
+          <div className="uppercase text-xs tracking-[3px] text-emerald-400 mb-1">LIVE DEMO — EXACTLY LIKE YOUR SOLANAREELS GAME</div>
+          <h2 className="text-2xl font-semibold tracking-tight mb-2">Wallet Connect (Injected + Mobile Deeplink)</h2>
+          <p className="text-sm opacity-80 mb-4">
+            This uses the same manual provider detection + connect + sign pattern from the SolanaReels game you shared (window.phantom?.solana, solflare, backpack). On desktop it uses the injected provider. On mobile (or when no provider detected) it opens the proper universal/deeplink so the user can connect inside Phantom, Solflare or Backpack and return.
+          </p>
 
-          {/* Downloads disabled per request */}
-          <div className="text-xs opacity-50 mb-6">
+          <div className="flex flex-wrap gap-2 mb-4">
+            {(['phantom', 'solflare', 'backpack'] as const).map((prov) => (
+              <button
+                key={prov}
+                disabled={!!walletConnecting}
+                onClick={() => connectWalletDemo(prov)}
+                className="px-4 py-2 rounded-2xl border border-white/20 hover:bg-white/5 text-sm disabled:opacity-50"
+              >
+                {walletConnecting === prov ? 'Connecting...' : `Connect ${prov[0].toUpperCase() + prov.slice(1)}`}
+              </button>
+            ))}
+            {walletDemo.address && (
+              <button onClick={disconnectWalletDemo} className="px-4 py-2 rounded-2xl border border-white/20 text-sm">Disconnect</button>
+            )}
+          </div>
+
+          {walletDemo.address && (
+            <div className="mb-4 p-4 rounded-2xl bg-white/[0.015] text-sm">
+              <div><span className="opacity-60">Connected via:</span> {walletDemo.provider}</div>
+              <div className="font-mono text-emerald-400 break-all mt-0.5">{walletDemo.address}</div>
+              {walletDemo.balance !== null && <div className="text-xs opacity-70 mt-0.5">Balance: {walletDemo.balance.toFixed(4)} SOL</div>}
+              <div className="mt-3 flex gap-2">
+                <button onClick={signForMTIdentity} className="px-3 py-1 text-xs rounded-xl border border-white/20 hover:bg-white/5">Sign Message (Link to MT Identity)</button>
+              </div>
+              {walletDemo.signature && (
+                <div className="mt-2 text-[10px] opacity-70 break-all">Signature: {walletDemo.signature}</div>
+              )}
+            </div>
+          )}
+
+          <div className="text-[10px] opacity-60">Mobile tip: If injected is not available the buttons open a deeplink / universal link (https://phantom.app/ul/... etc). Once inside the wallet browser, tap Connect again — identical pattern to the full game you provided.</div>
+        </div>
+
+        {/* Resources & Downloads (disabled per request) */}
+        <div className="mb-10">
+          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">RESOURCES &amp; DOWNLOADS</div>
+          <h2 className="text-2xl font-semibold tracking-tight mb-3">SDKs, Tools &amp; Docs</h2>
+
+          <div className="text-xs opacity-50 mb-3">
             Downloads (SDKs, mobile libs, browser extensions) are currently disabled / coming soon. Check back or contact for access.
           </div>
-
-          <div className="mt-6 text-xs opacity-50">
-            All packages are open for licensed developers. Full source and more examples in the MT GitHub org (coming soon).
-            Join the developer Telegram or email Support@MemeTorrent.com for early access keys.
+          <div className="text-xs opacity-50">
+            All packages are open for licensed developers. Full source and more examples in the MT GitHub org (coming soon). Email Support@MemeTorrent.com for early access keys.
           </div>
         </div>
 
-        <div className="mt-10 pt-8 border-t border-white/10 text-sm">
-          <a href="/whitepaper" className="text-emerald-400 hover:underline">Read the $MT Whitepaper →</a>
-          <div className="mt-2 opacity-60">Core architecture, token mechanics and integration concepts are documented there.</div>
-        </div>
+        {/* Expanded Sandbox — now includes MT-Connect + wallet flows + original endpoints */}
+        <div className="mb-10 p-6 border border-white/10 rounded-3xl">
+          <h3 className="font-semibold mb-2">Sandbox (Devnet + MT-Connect)</h3>
+          <p className="text-xs opacity-70 mb-3">Test endpoints safely. Social OAuth flows above already exercise the real identity API pattern. These are additional mocks.</p>
 
-        {/* Simple Sandbox mock */}
-        <div className="mt-8 p-6 border border-white/10 rounded-3xl">
-          <h3 className="font-semibold mb-3">Sandbox (Devnet) — Try it now</h3>
-          <p className="text-xs opacity-70 mb-3">Test endpoints safely. (Mock responses for demo.)</p>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => alert('Response: { "balance": "124567890", "mint": "ELyw...pump" }')} className="px-3 py-1 text-xs border border-white/20 rounded hover:bg-white/5">GET /v1/wallet</button>
-            <button onClick={() => alert('Response: { "txId": "simulated-123", "status": "confirmed" }')} className="px-3 py-1 text-xs border border-white/20 rounded hover:bg-white/5">POST /v1/transactions</button>
-            <button onClick={() => alert('Response: { "nftId": "new-456", "owner": "your-wallet" }')} className="px-3 py-1 text-xs border border-white/20 rounded hover:bg-white/5">POST /v1/nft/mint</button>
+          <div className="flex flex-wrap gap-2 mb-3">
+            <button onClick={() => { setLastApiResponse('{"balance":"124567890","mint":"ELyw...pump","rockets":1240}'); showActivity('GET /v1/wallet'); }} className="px-3 py-1 text-xs border border-white/20 rounded hover:bg-white/5">GET /v1/wallet</button>
+            <button onClick={() => { setLastApiResponse('{"txId":"simulated-123","status":"confirmed","rocketsEarned":18}'); showActivity('POST /v1/transactions'); }} className="px-3 py-1 text-xs border border-white/20 rounded hover:bg-white/5">POST /v1/transactions</button>
+            <button onClick={() => { setLastApiResponse('{"nftId":"new-456","owner":"your-wallet","collection":"MT-PETS"}'); showActivity('POST /v1/nft/mint'); }} className="px-3 py-1 text-xs border border-white/20 rounded hover:bg-white/5">POST /v1/nft/mint</button>
+            <button onClick={() => { setLastApiResponse('{"status":"ok","linked":["facebook","google"],"rockets":32}'); showActivity('POST /v1/identity/status'); }} className="px-3 py-1 text-xs border border-white/20 rounded hover:bg-white/5">POST /v1/identity/status</button>
           </div>
-          <p className="text-[10px] opacity-50 mt-2">Real Devnet coming soon. Use the whitepaper for full spec.</p>
+
+          {lastApiResponse && (
+            <pre className="bg-black p-3 rounded-xl text-[10px] opacity-80 overflow-auto">{lastApiResponse}</pre>
+          )}
+          <p className="text-[10px] opacity-50 mt-2">Real Devnet + production MT-Connect endpoints coming soon. Use the whitepaper for program specs.</p>
         </div>
 
-        {/* Get Started & Jupiter-style Docs (added per request) */}
-        <div className="mt-12 pt-8 border-t border-white/10">
+        {/* Full Get Started / Docs / Swap / Advanced / Guides (Jupiter + Raydium style as requested) */}
+        <div className="mt-6 pt-8 border-t border-white/10">
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">GET STARTED</div>
           <h2 className="text-2xl font-semibold tracking-tight mb-4">Docs</h2>
 
@@ -224,7 +679,6 @@ const report = await client.generateAuditReport({
               <p>Track updates to the SDK, APIs, and on-chain features. Full changelog coming soon in the MT GitHub.</p>
             </div>
 
-            {/* Full pasted Jupiter-style content for Get Started / Swap / Advanced / Guides / Migration */}
             <div className="mt-6 pt-4 border-t border-white/10 text-xs opacity-80">
               <h4 className="font-semibold mb-1">Get Started</h4>
               <p>AI • Tool Kits • Changelog • Resources</p>
@@ -253,7 +707,6 @@ const report = await client.generateAuditReport({
               <p>Whitepaper, token info, and integration guides. See links above and the main site sections for LIVE $MT, flows, and TAP.</p>
             </div>
 
-            {/* Swap section modeled on provided Jupiter docs */}
             <div>
               <h3 className="font-semibold mb-2">Swap</h3>
               <p className="mb-2">Overview: One API for all swap use cases on MT-ECO SYSTEM (inspired by Meta-Aggregator patterns).</p>
@@ -291,10 +744,7 @@ const report = await client.generateAuditReport({
               </div>
             </div>
 
-            <div className="text-[10px] opacity-50">Full interactive docs and live API explorer coming soon. See the Jupiter and Raydium docs style for reference on structure.</div>
-
-            {/* Additional pasted Jupiter-style content for Get Started / Swap / Advanced / Guides / Migration */}
-            <div className="mt-8 pt-4 border-t border-white/10 text-xs opacity-80">
+            <div className="mt-6 pt-4 border-t border-white/10 text-xs opacity-80">
               <h4 className="font-semibold mb-1">Order &amp; Execute</h4>
               <p>The Swap API unifies Jupiter’s swap capabilities into a single entry point at https://api.jup.ag/swap/v2. Two paths cover every use case: Meta-Aggregator (all routing engines compete for the best price. You get a fully assembled transaction, sign it, and Jupiter handles landing) and Router (Metis onchain routing only. You get raw swap instructions with full transaction control for custom builds, CPI, and composability).</p>
 
@@ -309,7 +759,19 @@ const report = await client.generateAuditReport({
             </div>
           </div>
         </div>
+
+        <div className="mt-10 pt-8 border-t border-white/10 text-sm">
+          <a href="/whitepaper" className="text-emerald-400 hover:underline">Read the $MT Whitepaper →</a>
+          <div className="mt-2 opacity-60">Core architecture, token mechanics and integration concepts are documented there.</div>
+        </div>
       </div>
+
+      {/* Small live activity banner */}
+      {activity && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] px-4 py-1.5 rounded-2xl bg-emerald-400 text-black text-xs shadow-xl">
+          {activity}
+        </div>
+      )}
 
       <div className="border-t border-white/10 py-8 text-center text-[10px] opacity-40">
         <Link href="/" className="hover:text-white">← Back to MT ECO SYSTEM</Link>
