@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
@@ -18,6 +18,10 @@ export default function DonationsPage() {
   const [status, setStatus] = useState<string>('');
   const [txSignature, setTxSignature] = useState<string>('');
 
+  // MT Cards counter state
+  const [totalCards, setTotalCards] = useState(10);
+  const [totalValueAUD, setTotalValueAUD] = useState(0);
+
   const addresses = {
     SOL: SOL_ADDRESS,
     BTC: BTC_ADDRESS,
@@ -28,6 +32,51 @@ export default function DonationsPage() {
     navigator.clipboard.writeText(text);
     alert(`${label} address copied!`);
   };
+
+  // Live calculation for MT Cards based on donation wallet values in AUD
+  useEffect(() => {
+    const fetchDonationValue = async () => {
+      try {
+        // SOL balance
+        const solLamports = await connection.getBalance(new PublicKey(SOL_ADDRESS));
+        const solBal = solLamports / LAMPORTS_PER_SOL;
+
+        // BTC balance via Blockstream (public, no key needed)
+        const btcRes = await fetch(`https://blockstream.info/api/address/${BTC_ADDRESS}`);
+        const btcData = await btcRes.json();
+        const btcBal = (btcData.chain_stats.funded_txo_sum - btcData.chain_stats.spent_txo_sum) / 1e8;
+
+        // ETH balance via Blockscout (public)
+        const ethRes = await fetch(`https://eth.blockscout.com/api?module=account&action=balance&address=${ETH_ADDRESS}`);
+        const ethData = await ethRes.json();
+        const ethBal = parseInt(ethData.result || '0') / 1e18;
+
+        // Prices in AUD from CoinGecko
+        const priceRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana,bitcoin,ethereum&vs_currencies=aud');
+        const prices = await priceRes.json();
+
+        const solAud = solBal * (prices.solana?.aud || 0);
+        const btcAud = btcBal * (prices.bitcoin?.aud || 0);
+        const ethAud = ethBal * (prices.ethereum?.aud || 0);
+
+        const combinedAUD = solAud + btcAud + ethAud;
+        setTotalValueAUD(combinedAUD);
+
+        const cardsFromDonations = Math.floor(combinedAUD / 100);
+        setTotalCards(10 + Math.max(0, cardsFromDonations));
+      } catch (e) {
+        console.error('Failed to calculate live donation value for MT Cards counter', e);
+        // fallback to minimum 10
+        setTotalCards(10);
+        setTotalValueAUD(0);
+      }
+    };
+
+    fetchDonationValue();
+    // Refresh every 5 minutes
+    const interval = setInterval(fetchDonationValue, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [connection]);
 
   const handleTransfer = async () => {
     if (!connected || !publicKey || !sendTransaction) {
@@ -94,6 +143,24 @@ export default function DonationsPage() {
           Help keep the MT Ecosystem fully self-built and self-hosted. All contributions go directly to infrastructure and development. 
           You can send directly or buy $MT as an alternative.
         </p>
+
+        {/* MT Cards for those in need - new section with live counter */}
+        <div className="bg-white/[0.015] border border-white/10 rounded-2xl p-8 mb-10">
+          <div className="text-emerald-400 text-sm mb-2">MT CARDS FOR THOSE IN NEED</div>
+          <p className="mb-4">
+            For every $100 donated (combined AUD value across the SOL, BTC, and ETH donation wallets), we will give away one free MT Card later this year to people in need — pre-loaded with $MT tokens and exclusive NFT goodies.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-6 items-start">
+            <div>
+              <div className="text-5xl font-semibold text-emerald-400">{totalCards}</div>
+              <div className="text-sm">MT Cards distributed so far<br />(including 10 seeded by us)</div>
+            </div>
+            <div className="text-xs text-[#97a7c6] max-w-xs">
+              Current combined value in the donation wallets: <span className="font-medium text-white">~${totalValueAUD.toFixed(0)} AUD</span><br />
+              Counter updates live from on-chain balances (refreshes every few minutes).
+            </div>
+          </div>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-8">
           {/* Addresses with copy */}
