@@ -175,22 +175,9 @@ const report = await client.generateAuditReport({
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">RESOURCES &amp; DOWNLOADS</div>
           <h2 className="text-2xl font-semibold tracking-tight mb-6">SDKs, Tools &amp; Docs</h2>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            {downloads.map((item, i) => (
-              <div 
-                key={i} 
-                className="rounded-2xl border border-white/10 bg-white/[0.01] p-5 hover:border-emerald-400/30 transition"
-              >
-                <div className="font-semibold tracking-tight mb-1">{item.label}</div>
-                <div className="text-sm opacity-70 mb-4">{item.desc}</div>
-                <a 
-                  href="#" 
-                  className="inline-block px-4 py-2 text-xs rounded-xl border border-emerald-400/40 text-emerald-400 hover:bg-emerald-400/10"
-                >
-                  Download / Docs →
-                </a>
-              </div>
-            ))}
+          {/* Downloads disabled per request */}
+          <div className="text-xs opacity-50 mb-6">
+            Downloads (SDKs, mobile libs, browser extensions) are currently disabled / coming soon. Check back or contact for access.
           </div>
 
           <div className="mt-6 text-xs opacity-50">
@@ -202,6 +189,74 @@ const report = await client.generateAuditReport({
         <div className="mt-10 pt-8 border-t border-white/10 text-sm">
           <a href="/whitepaper" className="text-emerald-400 hover:underline">Read the $MT Whitepaper →</a>
           <div className="mt-2 opacity-60">Core architecture, token mechanics and integration concepts are documented there.</div>
+        </div>
+
+        {/* Get Started & Jupiter-style Docs (added per request) */}
+        <div className="mt-12 pt-8 border-t border-white/10">
+          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">GET STARTED</div>
+          <h2 className="text-2xl font-semibold tracking-tight mb-4">Docs</h2>
+
+          <div className="space-y-8 text-sm opacity-90">
+            <div>
+              <h3 className="font-semibold mb-2">AI</h3>
+              <p>Our AI assistant (powered by on-site Grok-like responses) helps with questions about $MT, wallet, utilities, and more. See the contact page for the live chat.</p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-2">Tool Kits</h3>
+              <p>SDKs and toolkits for integrating with MT-ECO SYSTEM. (Downloads currently disabled.)</p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-2">Changelog</h3>
+              <p>Track updates to the SDK, APIs, and on-chain features. Full changelog coming soon in the MT GitHub.</p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-2">Resources</h3>
+              <p>Whitepaper, token info, and integration guides. See links above and the main site sections for LIVE $MT, flows, and TAP.</p>
+            </div>
+
+            {/* Swap section modeled on provided Jupiter docs */}
+            <div>
+              <h3 className="font-semibold mb-2">Swap</h3>
+              <p className="mb-2">Overview: One API for all swap use cases on MT-ECO SYSTEM (inspired by Meta-Aggregator patterns).</p>
+
+              <div className="mb-4">
+                <p className="font-medium">Meta-Aggregator</p>
+                <p className="text-xs opacity-80">All routers compete for best price. Get a fully assembled transaction, sign it, and MT handles landing. Best for most integrations.</p>
+              </div>
+
+              <div className="mb-4">
+                <p className="font-medium">Router</p>
+                <p className="text-xs opacity-80">On-chain routing only. Get raw swap instructions with full transaction control for custom builds, CPI, and composability.</p>
+              </div>
+
+              <div className="text-xs opacity-70 mb-2">Choosing a path: Start with Meta-Aggregator for best price and simplicity. Use Router only if you need to modify the transaction.</div>
+
+              <div className="mb-4">
+                <p className="font-medium mb-1">Endpoints (example structure)</p>
+                <ul className="list-disc pl-5 text-xs space-y-1 opacity-80">
+                  <li>GET /swap/order — Get a quote and assembled transaction</li>
+                  <li>POST /swap/execute — Execute a signed transaction with managed landing</li>
+                  <li>GET /swap/build — Get a quote and raw swap instructions</li>
+                  <li>POST /tx/submit — Submit signed transaction</li>
+                </ul>
+              </div>
+
+              <div>
+                <p className="font-medium">Advanced</p>
+                <p className="text-xs opacity-80">Gasless swaps, compute unit estimation, reducing transaction size and latency, slippage estimation, priority fees.</p>
+              </div>
+
+              <div className="mt-2">
+                <p className="font-medium">Guides</p>
+                <p className="text-xs opacity-80">Embed Swap Widget, Migration guides (e.g. from older flows to new router/meta-aggregator), Integrate DEX into MT routing, Market Listing.</p>
+              </div>
+            </div>
+
+            <div className="text-[10px] opacity-50">Full interactive docs and live API explorer coming soon. See the Jupiter and Raydium docs style for reference on structure.</div>
+          </div>
         </div>
       </div>
 

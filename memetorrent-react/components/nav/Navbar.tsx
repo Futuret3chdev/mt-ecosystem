@@ -247,12 +247,12 @@ export default function Navbar() {
               <div className="text-xs sm:text-sm font-medium">Direct on-chain buy — self-custodial</div>
               <button onClick={() => setShowBuyPanel(false)} className="text-xl leading-none opacity-60 hover:opacity-100 px-2" aria-label="Close buy panel">×</button>
             </div>
-            {/* Desktop: THE WALLET IS THE GATEWAY on LEFT, Jupiter swap box on RIGHT (under BUY button area).
-                Mobile: stacks (gateway on top). Reduced gap. Smaller overall panel. */}
+            {/* Desktop: Gateway (THE WALLET IS THE GATEWAY) on LEFT expanding to fill gap, Jupiter swap box on RIGHT.
+                Mobile: stacks naturally. Reduced gap. */}
             <div className="flex flex-col md:flex-row gap-2 md:gap-3">
-              {/* Gateway block on left on desktop */}
-              <div className="md:w-2/5">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-2 sm:p-3 text-xs sm:text-sm">
+              {/* Gateway block on left, flex-1 to expand and fill left/center space on desktop */}
+              <div className="md:flex-1">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-2 sm:p-3 text-xs sm:text-sm h-full">
                   <div className="text-emerald-400 text-[10px] sm:text-xs tracking-[3px]">THE WALLET IS THE GATEWAY</div>
                   <div className="font-semibold tracking-tight mt-0.5 text-sm sm:text-base">INFINITE WALLET<br />For infinite possibilities.<br />Truly ours.</div>
                   <ul className="mt-1 space-y-0.5 text-[10px] sm:text-xs opacity-80">
@@ -265,8 +265,8 @@ export default function Navbar() {
                 </div>
               </div>
 
-              {/* Swap box (Jupiter plugin) on right on desktop */}
-              <div className="md:w-3/5">
+              {/* Swap box (Jupiter plugin) on right, fixed reasonable width */}
+              <div className="md:w-[320px]">
                 <div id="jupiter-buy-container" style={{ width: '100%', height: '380px', borderRadius: '12px', overflow: 'hidden', background: '#000' }} />
               </div>
             </div>
