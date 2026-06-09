@@ -782,45 +782,15 @@ export default function MTWalletApp() {
     };
   }
 
-  // Social login handler - uses real auth flow with demo social accounts for seamless experience.
-  // Creates on-the-fly demo accounts using the mt-auth backend so social sign-ins actually "work" with the existing cross-device system.
+  function showComingSoonAuth() {
+    setAuthError('Email, phone and social sign-in are coming soon for the public launch.');
+    setStatus('Account sign-in coming soon — local guest wallets are fully available now');
+  }
+
+  // Social login disabled in the coming-soon preview copy
   async function handleSocialSignIn(platform) {
-    setAuthError('');
-    setStatus(`Connecting to ${platform}...`);
-    const slug = platform.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const email = `social-${slug}@infinite.mt`;
-    const pass = 'social-login-demo-2026';
-    try {
-      let data;
-      try {
-        data = await login(email, pass);
-      } catch (loginErr) {
-        // New social account - signup then auto-verify with the demo code the backend returns
-        const fakePhone = `+1${Math.floor(100000000 + Math.random() * 900000000)}`;
-        const signupRes = await signup(email, fakePhone, pass);
-        if (signupRes && signupRes.demoVerificationCode) {
-          await verifyAccount(email, signupRes.demoVerificationCode);
-        }
-        data = await login(email, pass);
-      }
-      setIsLoggedIn(true);
-      setCurrentUser(data.user || { email, socialProvider: platform, name: `Demo ${platform} User` });
-      setMasterPassword(pass);
-      setStatus(`Signed in with ${platform}! Loading your wallets...`);
-      setGuestMode(false);
-      setShowSocialDrawer(false);
-      await loadMyWallets();
-    } catch (e) {
-      console.warn('Social auth flow issue, falling back to demo logged-in state:', e);
-      // Graceful demo fallback so the beautiful UI always "just works" even if mt-auth is in demo/offline mode
-      setIsLoggedIn(true);
-      setCurrentUser({ email, socialProvider: platform, name: `Demo ${platform} User` });
-      setMasterPassword(pass);
-      setMyWallets( (getLocalWallets() || []).map(normalizeWalletEntry) );
-      setStatus(`Connected via ${platform} (demo mode)`);
-      setGuestMode(false);
-      setShowSocialDrawer(false);
-    }
+    showComingSoonAuth();
+    setShowSocialDrawer(false);
   }
 
   async function saveWalletCustomization(id, newName, newColor) {
@@ -968,15 +938,21 @@ export default function MTWalletApp() {
           <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-8 shadow-xl">
             {!guestMode ? (
               <>
-                {/* ACCOUNT MODE (email + phone for cross device) */}
+                {/* ACCOUNT MODE - COMING SOON in this preview copy */}
                 <div className="text-center mb-4">
-                  <div className="font-semibold text-xl">Sign in or create account</div>
-                  <div className="text-xs text-zinc-500">Email + phone for access from any device + multiple wallets</div>
+                  <div className="font-semibold text-xl">Email / Phone accounts</div>
+                  <div className="text-xs text-zinc-500">Cross-device sync &amp; multiple wallets per account</div>
                 </div>
 
-                {/* Quick Social Logins - prominent, beautiful buttons */}
-                <div className="mb-6">
-                  <div className="text-[10px] uppercase tracking-[2px] text-zinc-500 text-center mb-3">Or sign in instantly with</div>
+                <div className="mb-6 rounded-2xl border border-yellow-500/40 bg-yellow-500/10 p-5 text-center">
+                  <div className="text-yellow-400 font-semibold tracking-wider text-sm mb-1">COMING SOON</div>
+                  <div className="text-sm">Sign up, sign in, and encrypted cloud backups for your wallets are not yet open to the public.</div>
+                  <div className="text-[11px] mt-2 text-yellow-400/80">We are finalizing the public launch. Use the local (guest) wallet mode below for now — your keys never leave this browser.</div>
+                </div>
+
+                {/* Social logins disabled in coming-soon preview */}
+                <div className="mb-6 opacity-60">
+                  <div className="text-[10px] uppercase tracking-[2px] text-zinc-500 text-center mb-3">Social sign-in (coming soon)</div>
                   <div className="grid grid-cols-3 gap-3">
                     {[
                       { name: 'Facebook', emoji: '📘', color: '#1877F2' },
@@ -985,101 +961,39 @@ export default function MTWalletApp() {
                     ].map((p) => (
                       <button
                         key={p.name}
-                        onClick={() => handleSocialSignIn(p.name)}
-                        className="flex flex-col items-center justify-center gap-1.5 py-3 rounded-2xl border border-zinc-800 hover:border-zinc-700 active:scale-[0.985] transition-all"
-                        style={{ background: p.color + '15' }}
+                        onClick={() => showComingSoonAuth()}
+                        className="flex flex-col items-center justify-center gap-1.5 py-3 rounded-2xl border border-zinc-800 cursor-not-allowed"
+                        style={{ background: p.color + '10' }}
+                        disabled
                       >
                         <span className="text-2xl">{p.emoji}</span>
                         <span className="text-xs font-medium tracking-wide">{p.name}</span>
                       </button>
                     ))}
                   </div>
-                  <button
-                    onClick={() => setShowSocialDrawer(true)}
-                    className="mt-3 w-full text-xs py-2.5 rounded-2xl border border-zinc-800 hover:bg-zinc-900 text-emerald-400/80 hover:text-emerald-400 flex items-center justify-center gap-2"
-                  >
-                    Browse 30+ more social platforms <span>→</span>
-                  </button>
                 </div>
 
-                {/* LOGIN */}
-                {authMode === 'login' && (
-                  <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    setAuthError('');
-                    try {
-                      const res = await login(accountEmail || accountPhone, accountPassword);
-                      setIsLoggedIn(true);
-                      setCurrentUser(res.user || getUserProfile());
-                      setMasterPassword(accountPassword);
-                      setStatus('Logged in • Loading your wallets...');
-                      await loadMyWallets();
-                      setAccountPassword('');
-                    } catch (err) {
-                      setAuthError(err.message || 'Login failed');
-                    }
-                  }} className="space-y-4">
-                    <input type="text" placeholder="Email or Phone" value={accountEmail || accountPhone} onChange={(e) => { const v = e.target.value; if (v.includes('@')) setAccountEmail(v); else setAccountPhone(v); }} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
-                    <input type="password" autoComplete="current-password" placeholder="Password" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" required />
-                    {authError && <div className="text-red-400 text-xs">{authError}</div>}
-                    <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider mt-2">SIGN IN</button>
-                    <div className="text-center text-xs">
-                      No account? <button type="button" onClick={() => { setAuthMode('signup'); setAuthError(''); }} className="text-emerald-400 underline">Create with email + phone</button>
-                    </div>
-                  </form>
+                {/* LOGIN / SIGNUP forms disabled in this preview (coming soon) */}
+                {(authMode === 'login' || authMode === 'signup') && (
+                  <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-5 text-center space-y-3">
+                    <div className="font-semibold text-yellow-400">Sign-in coming soon</div>
+                    <div className="text-sm">Creating real accounts and signing in with email or phone is not available in this preview.</div>
+                    <button
+                      onClick={() => { setGuestMode(true); setAuthError(''); }}
+                      className="mt-2 w-full py-3 rounded-2xl bg-white text-black font-bold text-sm tracking-wider"
+                    >
+                      Use local wallet (guest mode) instead →
+                    </button>
+                    <div className="text-xs text-zinc-500">You can still fully create, import, send, mint NFTs and use the wallet locally on this device.</div>
+                  </div>
                 )}
 
-                {/* SIGNUP */}
-                {authMode === 'signup' && (
-                  <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    setAuthError('');
-                    if (!accountEmail || !accountPhone || accountPassword.length < 6) {
-                      setAuthError('Email, phone and password (6+ chars) required');
-                      return;
-                    }
-                    try {
-                      const res = await signup(accountEmail, accountPhone, accountPassword);
-                      setAuthMode('verify');
-                      if (res.demoVerificationCode) setVerifyCode(res.demoVerificationCode);
-                      setStatus('Account created. Enter the verification code.');
-                    } catch (err) {
-                      setAuthError(err.message || 'Signup failed');
-                    }
-                  }} className="space-y-4">
-                    <input type="email" placeholder="Email address" value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
-                    <input type="tel" placeholder="Phone number" value={accountPhone} onChange={(e) => setAccountPhone(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm" required />
-                    <input type="password" autoComplete="new-password" placeholder="Password (min 6)" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-sm font-mono" required />
-                    {authError && <div className="text-red-400 text-xs">{authError}</div>}
-                    <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider">CREATE ACCOUNT</button>
-                    <div className="text-center text-xs">
-                      Already have an account? <button type="button" onClick={() => { setAuthMode('login'); setAuthError(''); }} className="text-emerald-400 underline">Sign in</button>
-                    </div>
-                  </form>
-                )}
-
-                {/* VERIFY */}
+                {/* VERIFY (also disabled in preview) */}
                 {authMode === 'verify' && (
-                  <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    setAuthError('');
-                    try {
-                      const res = await verifyAccount(accountEmail, verifyCode);
-                      setIsLoggedIn(true);
-                      setCurrentUser(res.user);
-                      setMasterPassword(accountPassword);
-                      setStatus('Verified! You can now create wallets.');
-                      await loadMyWallets();
-                    } catch (err) {
-                      setAuthError(err.message || 'Verification failed');
-                    }
-                  }} className="space-y-4">
-                    <div className="text-center text-sm">Enter verification code for {accountEmail}</div>
-                    <input type="text" placeholder="123456" value={verifyCode} onChange={(e) => setVerifyCode(e.target.value)} className="w-full bg-black border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-center font-mono text-lg tracking-[4px]" maxLength={6} />
-                    {authError && <div className="text-red-400 text-xs text-center">{authError}</div>}
-                    <button type="submit" className="w-full py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm tracking-wider">VERIFY</button>
-                    <div className="text-[10px] text-center text-emerald-400/70">Demo: use the code shown after signup</div>
-                  </form>
+                  <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-5 text-center">
+                    <div className="font-semibold text-yellow-400 mb-2">Account verification coming soon</div>
+                    <button onClick={() => { setGuestMode(true); setAuthMode('login'); setAuthError(''); }} className="w-full py-3 rounded-2xl bg-white text-black font-bold text-sm">Switch to local guest wallets</button>
+                  </div>
                 )}
 
                 <div className="mt-6 pt-4 border-t border-zinc-800 text-center">
@@ -1090,10 +1004,10 @@ export default function MTWalletApp() {
               </>
             ) : (
               <>
-                {/* GUEST / LOCAL ONLY MODE - restored old flows */}
+                {/* GUEST / LOCAL ONLY MODE — fully working in this preview */}
                 <div className="text-center mb-4">
-                  <div className="font-semibold text-lg">Local only (this device)</div>
-                  <div className="text-xs text-zinc-500">No email, no sync. Pure self-custodial on this browser.</div>
+                  <div className="font-semibold text-lg text-emerald-400">Local wallets (fully working)</div>
+                  <div className="text-xs text-zinc-500">Keys stay only on this device. Create, import, send, receive, mint NFTs — everything works.</div>
                 </div>
 
                 <div className="space-y-3">
@@ -1156,7 +1070,7 @@ export default function MTWalletApp() {
                 )}
 
                 <div className="mt-4 text-center">
-                  <button onClick={() => { setGuestMode(false); setShowCreate(false); setShowImport(false); setAuthError(''); }} className="text-xs text-emerald-400 underline">Back to account login</button>
+                  <button onClick={() => { setGuestMode(false); setShowCreate(false); setShowImport(false); setAuthError(''); }} className="text-xs text-yellow-400/80 underline">Back to account sign-in (coming soon)</button>
                 </div>
               </>
             )}
@@ -1230,6 +1144,13 @@ export default function MTWalletApp() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col selection:bg-emerald-400 selection:text-black">
+      {/* COMING SOON BANNER - this entire copy is the preview for mt.futuret3ch.com.au */}
+      <div className="w-full bg-yellow-500 text-black text-center py-2 text-sm font-semibold tracking-[1.5px] z-[70] flex items-center justify-center gap-2">
+        <span>🚀</span>
+        <span>INFINITE WALLET PREVIEW — Email, phone &amp; cross-device sign-in coming soon. Local wallets on this device work fully today.</span>
+        <span>🚀</span>
+      </div>
+
       {/* TOP NAV */}
       <nav className="border-b border-zinc-800 bg-[#0a0a0a]/95 backdrop-blur sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -1243,7 +1164,7 @@ export default function MTWalletApp() {
                 <div className="text-[10px] text-emerald-400/90 -mt-0.5 font-mono tracking-[1px]">MT-ECO SYSTEM</div>
               </div>
             </div>
-            <div className="ml-3 px-3 py-1 rounded-full bg-emerald-950 text-emerald-400 text-[10px] font-mono border border-emerald-900">LIVE • SELF BUILT • MT-ECO SYSTEM</div>
+            <div className="ml-3 px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400 text-[10px] font-mono border border-yellow-500/40">PREVIEW • SIGN-IN COMING SOON</div>
           </div>
 
           <div className="flex items-center gap-3 text-sm">

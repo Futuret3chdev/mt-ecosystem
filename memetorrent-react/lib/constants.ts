@@ -5,7 +5,7 @@ export const LINKS = {
   raydium: `https://raydium.io/swap/?inputMint=sol&outputMint=${MT_CONTRACT}`,
   jupiter: `https://jup.ag/swap/SOL-${MT_CONTRACT}`,
   pumpfun: `https://pump.fun/coin/${MT_CONTRACT}`,
-  wallet: 'https://wallet.futuret3ch.com.au/', // custom domain for the infinite-wallet vercel project; falls back to vercel.app if needed
+  wallet: 'https://mt.futuret3ch.com.au/', // second copy / preview domain (coming-soon wallet version). Main live wallet remains at wallet.futuret3ch.com.au
   whitepaper: '/whitepaper.pdf',
   // Future self-hosted
   docs: '#',
