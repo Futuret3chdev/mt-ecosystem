@@ -113,7 +113,21 @@ export default function Navbar() {
 
       // 3. Connection Logic
       const resp = await provider.connect();
-      const publicKey = resp.publicKey.toString();
+
+      // Robust public key extraction with retry (critical for Solflare on desktop — wallets can be slow to expose publicKey)
+      let pk = null;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        pk = resp?.publicKey || provider?.publicKey;
+        if (pk) break;
+        await new Promise(r => setTimeout(r, 250));
+      }
+
+      if (!pk) {
+        const walletName = walletType.charAt(0).toUpperCase() + walletType.slice(1);
+        throw new Error(`Failed to get public key from ${walletName}. Please try clicking the button again, or use Phantom instead.`);
+      }
+
+      const publicKey = typeof pk.toString === 'function' ? pk.toString() : String(pk);
 
       // Fetch real SOL balance
       let bal = 0;
@@ -444,8 +458,6 @@ export default function Navbar() {
 
             {/* MANUAL CONNECT SECTION — exactly like your game: three buttons, click to connect (deeplink handled inside on mobile) */}
             <div className="mb-3">
-              <div className="text-[10px] tracking-[2px] opacity-60 mb-1.5">CONNECT WALLET</div>
-
               {!connectedWallet ? (
                 <div className="flex flex-wrap gap-2">
                   {(['phantom', 'solflare', 'backpack'] as const).map((name) => (
@@ -463,13 +475,15 @@ export default function Navbar() {
                 <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/5 p-3 text-xs">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-mono text-emerald-400 break-all">{connectedWallet.address}</div>
+                      <div className="font-mono text-emerald-400">
+                        {connectedWallet.address.slice(0, 4)}...{connectedWallet.address.slice(-4)}
+                      </div>
                       {walletBalance !== null && <div className="opacity-70">Balance: {walletBalance.toFixed(4)} SOL</div>}
                     </div>
                     <button onClick={disconnectWalletForBuy} className="text-[10px] underline opacity-70">Disconnect</button>
                   </div>
 
-                  {/* Quick buy amounts + execute button using the manually connected wallet (from game pattern) */}
+                  {/* Quick buy amounts + the big action button (down below) */}
                   <div className="mt-3">
                     <div className="text-[10px] opacity-60 mb-1">Quick Buy $MT — signs with your wallet</div>
                     <div className="flex flex-wrap gap-1.5 mb-2">
