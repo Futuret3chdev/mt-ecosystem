@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const TELEGRAM_BOT_TOKEN = '7899518581:AAGWGghZCOSN_Dyoi-7GDNAJYQBvPvR5ozk';
-const TELEGRAM_CHAT_ID = '-1003635190156';
-
 export async function POST(request: NextRequest) {
   try {
     const { message } = await request.json();
@@ -12,56 +9,62 @@ export async function POST(request: NextRequest) {
     }
 
     const msg = message.trim();
-
-    // Forward every message to the Telegram group for human review / help
-    const telegramText = `🌐 New message from MT ECO SYSTEM website contact:\n\n"${msg}"\n\nPlease respond to the user (via this group or by DMing them if possible).`;
-
-    try {
-      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_CHAT_ID,
-          text: telegramText,
-          parse_mode: 'HTML',
-        }),
-      });
-    } catch (tgErr) {
-      console.error('Telegram forward failed:', tgErr);
-      // Still try to give user a reply even if Telegram fails
-    }
-
-    // Simple rule-based AI responder for immediate chat experience
     const lower = msg.toLowerCase();
     let reply = '';
 
-    if (lower.includes('help') || lower.includes('support') || lower.includes('ticket') || lower.includes('contact team')) {
-      reply = "I've forwarded your request to the MT team on Telegram (group -1003635190156). They will get back to you as soon as possible. In the meantime, what specifically do you need help with?";
-    } else if (lower.includes('price') || lower.includes('$mt') || lower.includes('token')) {
-      reply = "$MT live stats (price, market cap, volume) are shown on the homepage under LIVE $MT. The contract is ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump. You can buy directly on this site using the BUY $MT NOW button.";
-    } else if (lower.includes('wallet') || lower.includes('infinite')) {
-      reply = "INFINITE WALLET is our self-custodial wallet at https://wallet.futuret3ch.com.au/. It supports native MT, Solana $MT, NFTs, Rockets, and all the management flows. Keys never leave your device.";
-    } else if (lower.includes('bridge') || lower.includes('swap')) {
-      reply = "You can bridge Native MT ↔ SPL $MT and do swaps inside INFINITE WALLET (Jupiter routing). Demo flows are available on the homepage under ONE-PLACE MANAGEMENT FLOWS.";
-    } else if (lower.includes('whitepaper') || lower.includes('docs')) {
-      reply = "The interactive MT ECO SYSTEM Whitepaper is at /whitepaper. Full PDF: https://memetorrent.futuret3ch.com.au/whitepaper.pdf";
-    } else if (lower.includes('develop') || lower.includes('sdk') || lower.includes('api')) {
-      reply = "Developer resources, SDKs and downloads are coming soon at /developers. Licenses will be required for core components. Check back or message here for updates.";
-    } else if (lower.includes('buy') || lower.includes('purchase')) {
-      reply = "Use the BUY $MT NOW button in the top bar. Connect Phantom, Solflare or Backpack (best in-app browser on mobile) and follow the on-page flow. See Raydium fundamentals for best practices: https://docs.raydium.io/solana-fundamentals";
-    } else if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
+    // Enhanced Grok-style MT ECO SYSTEM assistant - answers directly on site
+    if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey') || lower.includes('greet')) {
       reply = "Hello! I'm the MT ECO SYSTEM assistant. Ask me about $MT, the wallet, utilities, bridges, or how to get involved.";
-    } else if (lower.includes('futuret3ch') || lower.includes('future t3ch') || lower.includes('the team') || lower.includes('who built') || lower.includes('company behind') || lower.includes('developed by')) {
-      reply = "Futuret3ch is the Australian technology company behind the MT ECO SYSTEM and MemeTorrent. We design and build self-hosted blockchain infrastructure, the INFINITE WALLET, bridges, and real-utility projects with full transparency. Learn more at https://www.futuret3ch.com.au. I've also forwarded your question to the team on Telegram.";
+    } else if (lower.includes('help') || lower.includes('support') || lower.includes('how do i') || lower.includes('guide')) {
+      reply = "I'm here to help! You can explore the site for LIVE $MT stats, use the BUY $MT NOW panel (self-custodial wallet connect), check the interactive whitepaper at /whitepaper, or run the management flows on the homepage. What specifically do you need?";
+    } else if (lower.includes('price') || lower.includes('$mt') || lower.includes('token price') || lower.includes('how much')) {
+      reply = "$MT live stats (price, market cap, volume) are shown on the homepage under LIVE $MT. The contract address is ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump. You can buy directly using the BUY $MT NOW button with your own wallet.";
+    } else if (lower.includes('wallet') || lower.includes('infinite') || lower.includes('infinite wallet')) {
+      reply = "INFINITE WALLET is our fully self-custodial wallet at https://wallet.futuret3ch.com.au/. It supports native MT, Solana $MT, minting NFTs, earning/spending Rockets, and all the real management flows. Your keys never leave your device.";
+    } else if (lower.includes('bridge') || lower.includes('swap') || lower.includes('cross chain')) {
+      reply = "You can bridge Native MT ↔ SPL $MT and perform swaps inside INFINITE WALLET. Real on-chain flows (with demo versions) are available right on the homepage under ONE-PLACE MANAGEMENT FLOWS.";
+    } else if (lower.includes('whitepaper') || lower.includes('docs') || lower.includes('paper')) {
+      reply = "The official interactive MT ECO SYSTEM Whitepaper (flipbook style) is at /whitepaper. Full PDF available there too: https://memetorrent.futuret3ch.com.au/whitepaper.pdf";
+    } else if (lower.includes('develop') || lower.includes('sdk') || lower.includes('api') || lower.includes('build') || lower.includes('developer')) {
+      reply = "Developer resources, SDKs, and downloads are coming soon at /developers. We are building self-hosted infrastructure with a focus on transparency. Check the page for updates or ask me more specific questions.";
+    } else if (lower.includes('buy') || lower.includes('purchase') || lower.includes('get $mt') || lower.includes('how to buy')) {
+      reply = "Use the BUY $MT NOW button in the top navigation bar. Connect your self-custodial wallet (Phantom, Solflare, or Backpack), enter the SOL amount, and sign the on-chain transaction directly. Everything stays in your control. See the Raydium fundamentals for how Solana swaps work: https://docs.raydium.io/solana-fundamentals";
+    } else if (lower.includes('futuret3ch') || lower.includes('future t3ch') || lower.includes('the team') || lower.includes('who built') || lower.includes('company') || lower.includes('developed by')) {
+      reply = "Futuret3ch is the Australian technology company behind the MT ECO SYSTEM and MemeTorrent. We build self-hosted blockchain infrastructure, the INFINITE WALLET, and real-utility projects with complete transparency. No third parties. More at https://www.futuret3ch.com.au.";
+    } else if (lower.includes('about me') || lower.includes('tell me about me') || lower.includes('tell me about mt') || lower.includes('what is mt') || lower.includes('about mt') || lower.includes('ecosystem')) {
+      reply = "The MT ECO SYSTEM is a self-built, self-hosted on-chain network powered by the native $MT token. We have the INFINITE WALLET, P2E utilities with Rockets, NFTs, bridges, and real management flows — all without third parties. Own your keys, own your assets. Explore the homepage for LIVE $MT, tokenomics, utilities, and flows.";
+    } else if (lower.includes('tokenomics') || lower.includes('supply') || lower.includes('how many')) {
+      reply = "Total supply is 1,000,000,000 $MT. Breakdown: 18% Presale, 10% Liquidity, 20% Staking, 45% Mining, 4% Airdrops, 2.5% Development, 0.5% Team. Full details and vesting in the whitepaper at /whitepaper.";
+    } else if (lower.includes('utility') || lower.includes('utilities') || lower.includes('what can i do') || lower.includes('use $mt for')) {
+      reply = "$MT is the universal key: P2E Mining (earn Rockets), NFT Digital Identity, Physical/Digital Store access, future MT-CHAIN features, Launchpad, Vault rewards, and more. Real utility across the ecosystem. See the full list on the homepage under CORE UTILITIES.";
+    } else if (lower.includes('safety') || lower.includes('security') || lower.includes('keys') || lower.includes('seed')) {
+      reply = "Safety is core: Client-side key generation, local encryption (AES-GCM + PBKDF2), ed25519 signing on-device, and no seeds ever leave your machine. See the SAFETY section on the homepage for full details.";
+    } else if (lower.includes('constellation') || lower.includes('map') || lower.includes('ecosystem map')) {
+      reply = "The MT-ECO SYSTEM CONSTELLATION on the homepage is an interactive visual map showing MT Core, INFINITE WALLET, TAP, bridges, and more — all self-built and connected.";
+    } else if (lower.includes('tap') || lower.includes('games') || lower.includes('p2e') || lower.includes('rockets')) {
+      reply = "TAP is our gaming & utility layer: TAP Shop, Match, Transport, and Studio. Earn Rockets in games like Cosmic Dash and Neon Salvage. Rockets and NFTs live in your INFINITE WALLET. See the TAP section on the homepage.";
+    } else if (lower.includes('contact') || lower.includes('reach') || lower.includes('overlords')) {
+      reply = "You can reach the Meme Overlords via the emails on this page (Support@MemeTorrent.com or Michael@MemeTorrent.com), the InnoBot chat here, or the social links in the main navbar. We reply fast.";
     } else {
-      reply = `Thanks for your message about "${msg}". I've notified the team via Telegram (they can reply here or in the group). In the meantime, you can explore LIVE $MT stats, the interactive whitepaper at /whitepaper, or the management flows on the homepage. What else would you like to know?`;
+      // Grok-style helpful fallback - actually answers instead of generic team notification
+      reply = `Thanks for asking about "${msg}". I'm the MT ECO SYSTEM assistant built to help directly here on the site. 
+
+Key areas I can tell you about:
+• $MT token, price, and how to buy on-chain (use the BUY $MT NOW button)
+• INFINITE WALLET features and self-custody
+• Utilities, Rockets, NFTs, and P2E with TAP
+• Bridges, swaps, and the ONE-PLACE MANAGEMENT FLOWS
+• The interactive whitepaper at /whitepaper
+• Safety, tokenomics, and the self-built constellation
+
+What would you like to know more about?`;
     }
 
     return NextResponse.json({ reply });
   } catch (error) {
     console.error('grokchat error:', error);
     return NextResponse.json({ 
-      reply: "Sorry, something went wrong processing your message. The team has still been notified via Telegram." 
+      reply: "Sorry, something went wrong. Try asking again about $MT, the wallet, utilities, or the whitepaper." 
     }, { status: 500 });
   }
 }
