@@ -158,7 +158,6 @@ export default function TokenStats() {
           <div className="mt-5 sm:mt-6 pt-5 sm:pt-6 border-t border-white/10 flex flex-col sm:flex-row flex-wrap gap-x-4 gap-y-1 text-xs opacity-70">
             <div>24h Buy Vol: {safeStats.total_buy_volume}</div>
             <div>24h Sell Vol: {safeStats.total_sell_volume}</div>
-            <a href="#management" className="sm:ml-auto font-medium text-emerald-400 hover:underline">Buy $MT directly on this page (no third party) →</a>
           </div>
 
           {/* Pure icon logos marquee - only actual logos, no names. Very slow floating + gentle dancing bobs */}

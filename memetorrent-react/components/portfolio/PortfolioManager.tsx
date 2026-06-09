@@ -45,6 +45,10 @@ export default function PortfolioManager() {
   const [nftPreview, setNftPreview] = useState({ color: '#10b981', type: 'Rocket', accessory: 'Wings' }); // for NFT designer
   const [stakedRockets, setStakedRockets] = useState(0); // for staking preview (demo only)
 
+  // Expanded details for specialty wallets
+  const [expandedCouples, setExpandedCouples] = useState(false);
+  const [expandedBusiness, setExpandedBusiness] = useState(false);
+
   // Ref for the active flow panel so we can scroll it directly under the clicked flow launcher
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -670,12 +674,42 @@ export default function PortfolioManager() {
               <div className="text-purple-400 text-xs tracking-widest">FOR COUPLES</div>
               <div className="font-semibold text-xl mt-1">Our Couples Wallet</div>
               <p className="text-sm opacity-70 mt-2">Shared vault with dual control options, joint Rockets earnings, private NFTs, and seamless handoff. The first dedicated couples product in self-custody.</p>
+              <button 
+                onClick={() => setExpandedCouples(!expandedCouples)} 
+                className="mt-3 text-sm text-purple-400 hover:underline flex items-center gap-1"
+              >
+                {expandedCouples ? 'Hide details' : 'More details'} {expandedCouples ? '↑' : '↓'}
+              </button>
+              {expandedCouples && (
+                <div className="mt-3 text-xs opacity-80 space-y-2 border-t border-white/10 pt-3">
+                  <p>Dual control uses multi-sig like approvals for transfers over a set threshold — both partners must confirm large moves for security.</p>
+                  <p>Joint Rockets earnings can be auto-split 50/50 or pooled into shared goals, with transparent on-chain tracking visible only to the couple.</p>
+                  <p>Private NFTs are end-to-end encrypted and access-gated; only the couple (or designated heirs) can view or transfer them.</p>
+                  <p>Seamless handoff includes configurable inactivity timers that trigger encrypted key shares or full transfer to a beneficiary, with optional legal templates for probate.</p>
+                  <p>This is the first true self-custodial couples product — no bank, no trustee, no single point of failure or third-party access.</p>
+                </div>
+              )}
               <a href="https://wallet.futuret3ch.com.au/" target="_blank" className="mt-4 inline-block text-sm text-purple-400 hover:underline">Create in INFINITE WALLET →</a>
             </div>
             <div className="rounded-3xl border border-blue-400/30 bg-white/[0.01] p-6">
               <div className="text-blue-400 text-xs tracking-widest">FOR BUSINESSES</div>
               <div className="font-semibold text-xl mt-1">Business Vault</div>
               <p className="text-sm opacity-70 mt-2">Team-managed with role-based views, on-chain audit reports, bulk bridges/swaps, and dedicated support flows. Enterprise-ready self-custody.</p>
+              <button 
+                onClick={() => setExpandedBusiness(!expandedBusiness)} 
+                className="mt-3 text-sm text-blue-400 hover:underline flex items-center gap-1"
+              >
+                {expandedBusiness ? 'Hide details' : 'More details'} {expandedBusiness ? '↑' : '↓'}
+              </button>
+              {expandedBusiness && (
+                <div className="mt-3 text-xs opacity-80 space-y-2 border-t border-white/10 pt-3">
+                  <p>Role-based views use on-chain permission labels (Admin, Trader, Auditor, Viewer) enforced at the vault level — team members see only what their role allows.</p>
+                  <p>On-chain audit reports are auto-generated with cryptographic proofs (merkle trees) covering all tx, bridges, and NFT activity for compliance or investor updates.</p>
+                  <p>Bulk bridges/swaps let you prepare and sign one transaction that batches dozens or hundreds of operations across chains or tokens, saving gas and time.</p>
+                  <p>Dedicated support flows include priority routing in the wallet, direct line to engineering for custom integrations, and on-chain governance proposals for the business vault.</p>
+                  <p>Fully enterprise-ready and self-custodial: the master seed stays with the company, sub-accounts are derived, and no external custodian or platform ever touches the keys.</p>
+                </div>
+              )}
               <a href="https://wallet.futuret3ch.com.au/" target="_blank" className="mt-4 inline-block text-sm text-blue-400 hover:underline">Create in INFINITE WALLET →</a>
             </div>
           </div>

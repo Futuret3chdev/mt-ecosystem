@@ -238,8 +238,8 @@ export default function Navbar() {
       {/* Compact buy form panel - shows just below BUY $MT NOW, hides on click off.
           Form (connect) first, then the full THE WALLET IS THE GATEWAY block below it. */}
       {showBuyPanel && (
-        <div ref={buyPanelRef} className="border-t border-white/10 bg-zinc-950/95 backdrop-blur">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 text-sm">
+        <div ref={buyPanelRef} className="border-t border-white/10 bg-zinc-950/95 backdrop-blur max-w-[480px] ml-auto mr-4 shadow-2xl rounded-b-xl z-50">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 text-sm">
             {/* Header with close for mobile/desktop */}
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs sm:text-sm font-medium">Direct on-chain buy — self-custodial</div>

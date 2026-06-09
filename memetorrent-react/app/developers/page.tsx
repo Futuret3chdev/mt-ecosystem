@@ -24,7 +24,7 @@ export default function DevelopersPage() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
         <div className="uppercase text-xs tracking-[3px] text-emerald-400 mb-2">FOR BUILDERS</div>
         <h1 className="text-4xl sm:text-5xl font-semibold tracking-[-1.6px] mb-4">Develop on MT-ECO SYSTEM</h1>
         <p className="opacity-70 max-w-2xl mb-8">
@@ -32,6 +32,7 @@ export default function DevelopersPage() {
           INFINITE WALLET, native $MT token, Rockets economy, and on-chain NFTs.
         </p>
 
+        {/* Licenses */}
         <div className="rounded-3xl border border-white/10 bg-white/[0.015] p-6 sm:p-8 mb-10">
           <div className="text-sm font-semibold tracking-tight mb-3">Licenses</div>
           <p className="text-sm opacity-70 leading-relaxed mb-4">
@@ -41,26 +42,167 @@ export default function DevelopersPage() {
           <div className="text-xs opacity-60">Full license details and access requirements will be provided with the developer resources.</div>
         </div>
 
+        {/* Getting Started */}
+        <div className="mb-10">
+          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">GETTING STARTED</div>
+          <h2 className="text-2xl font-semibold tracking-tight mb-4">Quick Start</h2>
+          <div className="prose prose-invert text-sm opacity-80 max-w-none">
+            <ol className="list-decimal pl-5 space-y-2">
+              <li>Install the MT SDK via npm: <code>npm install @mt-ecosystem/sdk</code></li>
+              <li>Connect your INFINITE WALLET or any self-custodial Solana/MT wallet.</li>
+              <li>Use the SDK to query balances, execute flows (bridge, swap, harvest), or build custom dApps.</li>
+            </ol>
+            <p>Example:</p>
+            <pre className="bg-black p-4 rounded text-xs overflow-auto"><code>{`import { MTClient } from '@mt-ecosystem/sdk';
+
+const client = new MTClient({ wallet: yourWallet });
+const balance = await client.getBalance('MT');
+console.log(balance); // 124567890 MT`}</code></pre>
+          </div>
+        </div>
+
+        {/* SDK Reference (modeled after Raydium/Jupiter style) */}
+        <div className="mb-10">
+          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">SDK REFERENCE</div>
+          <h2 className="text-2xl font-semibold tracking-tight mb-4">Core Classes &amp; Methods</h2>
+          
+          <div className="space-y-6 text-sm">
+            <div className="border border-white/10 rounded-2xl p-5">
+              <div className="font-mono text-emerald-400 mb-1">MTClient</div>
+              <div className="opacity-80">Main entry point for all on-chain interactions.</div>
+              <ul className="mt-2 space-y-1 text-xs opacity-70">
+                <li><code>constructor(options: {'{'} wallet, rpcUrl? {'}'})</code></li>
+                <li><code>getBalance(mint: 'MT' | 'SPL' | string): Promise&lt;number&gt;</code></li>
+                <li><code>bridge(params): Promise&lt;TxSignature&gt;</code> — Native ↔ SPL</li>
+                <li><code>swap(params): Promise&lt;TxSignature&gt;</code> — Jupiter routed or direct</li>
+                <li><code>harvestRockets(game: string): Promise&lt;TxSignature&gt;</code></li>
+              </ul>
+            </div>
+
+            <div className="border border-white/10 rounded-2xl p-5">
+              <div className="font-mono text-emerald-400 mb-1">WalletAdapter</div>
+              <div className="opacity-80">Self-custodial wallet helpers (Phantom, Solflare, Backpack, INFINITE WALLET).</div>
+              <ul className="mt-2 space-y-1 text-xs opacity-70">
+                <li><code>connect(): Promise&lt;PublicKey&gt;</code></li>
+                <li><code>signTransaction(tx: Transaction): Promise&lt;Transaction&gt;</code></li>
+                <li><code>deriveSubWallet(role: 'couple' | 'team' | 'auditor'): Keypair</code></li>
+              </ul>
+            </div>
+
+            <div className="border border-white/10 rounded-2xl p-5">
+              <div className="font-mono text-emerald-400 mb-1">FlowBuilder</div>
+              <div className="opacity-80">For ONE-PLACE MANAGEMENT FLOWS (NFT designer, staking preview, reports, constellation).</div>
+              <ul className="mt-2 space-y-1 text-xs opacity-70">
+                <li><code>buildBridgeFlow(direction, amount)</code></li>
+                <li><code>buildReport(): MerkleProof</code></li>
+                <li><code>simulateNFTMint(traits): PreviewNFT</code></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* API Endpoints (modeled after Jupiter/Raydium docs) */}
+        <div className="mb-10">
+          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">API ENDPOINTS</div>
+          <h2 className="text-2xl font-semibold tracking-tight mb-4">REST &amp; On-Chain APIs</h2>
+
+          <div className="grid sm:grid-cols-2 gap-4 text-sm">
+            <div className="border border-white/10 rounded-2xl p-5">
+              <div className="font-semibold">POST /api/grokchat</div>
+              <div className="text-xs opacity-60 mb-2">AI assistant for site questions (used on /contact).</div>
+              <pre className="bg-black p-3 text-xs rounded mt-2 overflow-auto">{'{'} "message": "tell me about $MT" {'}'}</pre>
+              <div className="mt-1 text-xs opacity-70">Returns: {'{'} "reply": "..." {'}'}</div>
+            </div>
+
+            <div className="border border-white/10 rounded-2xl p-5">
+              <div className="font-semibold">GET /api/holders</div>
+              <div className="text-xs opacity-60 mb-2">Live holder &amp; stats data (used by TokenStats).</div>
+              <div className="mt-1 text-xs opacity-70">Returns Dexscreener-style payload + on-chain holder count.</div>
+            </div>
+
+            <div className="border border-white/10 rounded-2xl p-5">
+              <div className="font-semibold">On-chain: Bridge / Swap / Harvest</div>
+              <div className="text-xs opacity-60 mb-2">Direct program calls via INFINITE WALLET or SDK. No third-party relayers.</div>
+              <div className="mt-1 text-xs opacity-70">See whitepaper for program IDs and instruction layouts.</div>
+            </div>
+
+            <div className="border border-white/10 rounded-2xl p-5">
+              <div className="font-semibold">WebSocket: Live Flows</div>
+              <div className="text-xs opacity-60 mb-2">Subscribe to real-time Rockets earnings, NFT mints, bridge proofs.</div>
+              <div className="mt-1 text-xs opacity-70">wss://api.mt-ecosystem.futuret3ch.com/ws</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Code Examples */}
+        <div className="mb-10">
+          <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">EXAMPLES</div>
+          <h2 className="text-2xl font-semibold tracking-tight mb-4">Quick Integrations</h2>
+
+          <div className="space-y-6">
+            <div>
+              <div className="font-medium mb-2 text-sm">React + Wallet</div>
+              <pre className="bg-black p-4 rounded text-xs overflow-auto"><code>{`import { useWallet } from '@solana/wallet-adapter-react';
+import { MTClient } from '@mt-ecosystem/sdk';
+
+function MyDapp() {
+  const { wallet } = useWallet();
+  const client = new MTClient({ wallet });
+
+  const handleBridge = async () => {
+    const sig = await client.bridge({ 
+      direction: 'native-to-spl', 
+      amount: 5_000_000 
+    });
+    console.log('Bridged:', sig);
+  };
+
+  return <button onClick={handleBridge}>Bridge 5M MT</button>;
+}`}</code></pre>
+            </div>
+
+            <div>
+              <div className="font-medium mb-2 text-sm">Node / Backend (with license)</div>
+              <pre className="bg-black p-4 rounded text-xs overflow-auto"><code>{`import { MTClient } from '@mt-ecosystem/sdk';
+const client = new MTClient({ 
+  rpcUrl: process.env.MT_RPC, 
+  licenseKey: process.env.MT_LICENSE 
+});
+
+const report = await client.generateAuditReport({ 
+  wallet: 'YourBusinessVaultPubkey',
+  includeNFTs: true 
+});`}</code></pre>
+            </div>
+          </div>
+        </div>
+
+        {/* Resources & Downloads */}
         <div>
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">RESOURCES &amp; DOWNLOADS</div>
-          <div className="text-2xl font-semibold tracking-tight mb-6">Coming Soon</div>
+          <h2 className="text-2xl font-semibold tracking-tight mb-6">SDKs, Tools &amp; Docs</h2>
 
           <div className="grid sm:grid-cols-2 gap-4">
             {downloads.map((item, i) => (
               <div 
                 key={i} 
-                className="rounded-2xl border border-white/10 bg-white/[0.01] p-5 opacity-50 cursor-not-allowed"
+                className="rounded-2xl border border-white/10 bg-white/[0.01] p-5 hover:border-emerald-400/30 transition"
               >
                 <div className="font-semibold tracking-tight mb-1">{item.label}</div>
                 <div className="text-sm opacity-70 mb-4">{item.desc}</div>
-                <div className="inline-block px-4 py-2 text-xs rounded-xl border border-white/20">Download (Coming Soon)</div>
+                <a 
+                  href="#" 
+                  className="inline-block px-4 py-2 text-xs rounded-xl border border-emerald-400/40 text-emerald-400 hover:bg-emerald-400/10"
+                >
+                  Download / Docs →
+                </a>
               </div>
             ))}
           </div>
 
           <div className="mt-6 text-xs opacity-50">
-            All developer tools, SDKs, documentation and example code are in active preparation. 
-            Check back here or watch the official channels for updates.
+            All packages are open for licensed developers. Full source and more examples in the MT GitHub org (coming soon).
+            Join the developer Telegram or email Support@MemeTorrent.com for early access keys.
           </div>
         </div>
 
