@@ -72,69 +72,48 @@ export default function Navbar() {
     setBuyResult(null);
 
     try {
+      // 1. Handle Mobile Deep Linking First (using correct schemas)
+      if (/iPhone|Android/i.test(navigator.userAgent)) {
+        const currentUrl = window.location.href;
+
+        if (walletType === 'solflare') {
+          // Correct Solflare mobile universal link pattern (v1 as recommended)
+          window.location.href = `https://solflare.com/ul/v1/browse/${encodeURIComponent(currentUrl)}`;
+          throw new Error('Opening Solflare app...');
+        }
+        if (walletType === 'phantom') {
+          window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
+          throw new Error('Opening Phantom app...');
+        }
+        if (walletType === 'backpack') {
+          window.location.href = `https://backpack.app/ul/browse/${encodeURIComponent(currentUrl)}`;
+          throw new Error('Opening Backpack app...');
+        }
+      }
+
+      // 2. Desktop / In-App Browser Provider Retrieval with polling
+      // (providers can take a few milliseconds to inject, even inside in-app browser)
       let provider: any = null;
 
-      if (walletType === 'phantom') {
-        provider = (window as any).phantom?.solana;
+      for (let i = 0; i < 10; i++) {
+        if (walletType === 'phantom') provider = (window as any).phantom?.solana;
+        if (walletType === 'solflare') provider = (window as any).solflare;
+        if (walletType === 'backpack') provider = (window as any).backpack;
 
-        // Mobile support: if no extension, redirect with deep link (like your game)
-        if (!provider && /iPhone|Android/i.test(navigator.userAgent)) {
-          const url = window.location.href;
-          window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(url)}`;
-          throw new Error('Opening Phantom mobile...');
-        }
-
-        if (!provider?.isPhantom) {
-          window.open('https://phantom.app/', '_blank');
-          throw new Error('Phantom not installed');
-        }
-      } else if (walletType === 'solflare') {
-        provider = (window as any).solflare;
-
-        if (!provider && /iPhone|Android/i.test(navigator.userAgent)) {
-          const url = window.location.href;
-          window.location.href = `https://solflare.com/ul/browse/${encodeURIComponent(url)}`;
-          throw new Error('Opening Solflare mobile...');
-        }
-
-        if (!provider) {
-          window.open('https://solflare.com/', '_blank');
-          throw new Error('Solflare not installed');
-        }
-      } else if (walletType === 'backpack') {
-        provider = (window as any).backpack;
-        if (!provider) {
-          window.open('https://backpack.app/', '_blank');
-          throw new Error('Backpack not installed');
-        }
+        if (provider) break;
+        await new Promise(r => setTimeout(r, 200));
       }
 
-      if (!provider) throw new Error('Wallet not found');
-
-      let resp;
-      try {
-        resp = await provider.connect();
-      } catch (e) {
-        console.warn('Initial connect attempt warning:', e);
+      if (!provider) {
+        // Fallback: truly not installed / injected
+        const installUrl = walletApps[walletType]?.url || 'https://solana.com/ecosystem/wallets';
+        window.open(installUrl, '_blank');
+        throw new Error(`${walletType.charAt(0).toUpperCase() + walletType.slice(1)} not found.`);
       }
 
-      // Robust public key extraction with retry (critical for Solflare — wallets can be slow to expose publicKey)
-      let pk = null;
-
-      for (let attempt = 0; attempt < 5; attempt++) {
-        pk = resp?.publicKey || provider?.publicKey;
-
-        if (pk) break;
-
-        await new Promise(r => setTimeout(r, 250));
-      }
-
-      if (!pk) {
-        const walletName = walletType.charAt(0).toUpperCase() + walletType.slice(1);
-        throw new Error(`Failed to get public key from ${walletName}. Please try clicking the button again, or use Phantom instead.`);
-      }
-
-      const publicKey = typeof pk.toString === 'function' ? pk.toString() : String(pk);
+      // 3. Connection Logic
+      const resp = await provider.connect();
+      const publicKey = resp.publicKey.toString();
 
       // Fetch real SOL balance
       let bal = 0;
@@ -152,8 +131,8 @@ export default function Navbar() {
       console.error('Wallet connection error:', error);
       const msg = error.message || 'Unknown wallet error';
 
-      if (msg.includes('Opening ') || msg.includes('mobile...')) {
-        // Deep link navigation happened — don't show scary error
+      if (msg.includes('Opening ') && msg.includes('app...')) {
+        // Deep link navigation in progress — user is being sent to the wallet
         setBuyResult({ error: 'Switching to wallet app...' });
       } else {
         setBuyResult({ error: msg });
@@ -180,10 +159,8 @@ export default function Navbar() {
 
   // Real self-custodial buy using Jupiter quote + swap API + manual sign (ported from game connect + signing pattern)
   const quickBuyMT = async (solAmount: number) => {
-    const provider = connectedWallet?.provider;
     const address = connectedWallet?.address;
-
-    if (!provider || !address) {
+    if (!address) {
       setBuyResult({ error: 'Connect a wallet first (use the Phantom / Solflare / Backpack buttons above)' });
       return;
     }
@@ -202,7 +179,7 @@ export default function Navbar() {
       if (!quoteResp.ok) throw new Error('Failed to get quote');
       const quote = await quoteResp.json();
 
-      // 2. Build swap tx (server returns base64 serialized VersionedTransaction)
+      // 2. Build swap tx
       const swapResp = await fetch('https://quote-api.jup.ag/v6/swap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -223,18 +200,31 @@ export default function Navbar() {
       for (let i = 0; i < binary.length; i++) txBuffer[i] = binary.charCodeAt(i);
       const transaction = VersionedTransaction.deserialize(txBuffer);
 
-      // 4. Sign — defensive (some Solflare mobile sessions only expose sign after connect, or via signAllTransactions)
-      let signedTx: any;
-      if (typeof provider.signTransaction === 'function') {
-        signedTx = await provider.signTransaction(transaction);
-      } else if (typeof provider.signAllTransactions === 'function') {
-        const signedArr = await provider.signAllTransactions([transaction]);
-        signedTx = signedArr[0];
-      } else {
-        throw new Error('This wallet did not expose signTransaction in the current context. Use the Jupiter widget below or try Phantom.');
+      // 4. Get a fresh provider reference with short polling before signing
+      // (this helps when the stored provider ref from connect doesn't have the method yet)
+      let signProvider = connectedWallet.provider;
+      for (let i = 0; i < 8; i++) {
+        const w = window as any;
+        const p = w.solflare || w.phantom?.solana || w.backpack;
+        if (p && (typeof p.signTransaction === 'function' || typeof p.signAllTransactions === 'function')) {
+          signProvider = p;
+          break;
+        }
+        await new Promise(r => setTimeout(r, 150));
       }
 
-      // 5. Serialize + send (user fully controls the signature)
+      // 5. Sign — defensive for Solflare etc.
+      let signedTx: any;
+      if (signProvider && typeof signProvider.signTransaction === 'function') {
+        signedTx = await signProvider.signTransaction(transaction);
+      } else if (signProvider && typeof signProvider.signAllTransactions === 'function') {
+        const signedArr = await signProvider.signAllTransactions([transaction]);
+        signedTx = signedArr[0];
+      } else {
+        throw new Error('Wallet did not expose signTransaction in this context. Use the Jupiter widget below or try Phantom.');
+      }
+
+      // 6. Serialize + send
       const raw = signedTx.serialize ? signedTx.serialize() : signedTx;
       const signature = await BUY_CONNECTION.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 3 });
       await BUY_CONNECTION.confirmTransaction(signature, 'confirmed');
@@ -248,7 +238,7 @@ export default function Navbar() {
       } catch {}
     } catch (e: any) {
       const msg = e?.message || 'Swap failed';
-      setBuyResult({ error: msg.includes('signTransaction') ? msg : (msg + ' — try the Jupiter widget below or a different wallet.') });
+      setBuyResult({ error: msg.includes('signTransaction') || msg.includes('expose') ? msg : (msg + ' — try the Jupiter widget below or a different wallet.') });
     } finally {
       setBuying(false);
     }
