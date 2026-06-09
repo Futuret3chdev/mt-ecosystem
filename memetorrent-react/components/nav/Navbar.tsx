@@ -40,6 +40,8 @@ export default function Navbar() {
   const [showBuyPanel, setShowBuyPanel] = useState(false);
   const buyPanelRef = useRef<HTMLDivElement>(null);
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   // Buy states and logic (duplicated here for top panel to work independently; real Jupiter buy)
   const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -150,25 +152,29 @@ export default function Navbar() {
 
   return (
     <header className="w-full border-b border-white/10">
-      <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between text-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-5 flex items-center justify-between text-sm">
         <div className="font-semibold tracking-tight flex items-center gap-2">
           <span className="text-emerald-400">MT</span> ECO SYSTEM
         </div>
 
-        <div className="flex items-center gap-6 text-sm">
-          <a href="#stats" className="opacity-70 hover:opacity-100">LIVE $MT</a>
-          <a href="#tokenomics" className="opacity-70 hover:opacity-100">TOKENOMICS</a>
-          <a href="#utilities" className="opacity-70 hover:opacity-100">UTILITIES</a>
-          <a href="#tap" className="opacity-70 hover:opacity-100">TAP</a>
-          <a href="#tap" className="opacity-70 hover:opacity-100">P2E</a>
-          <a href="#safety" className="opacity-70 hover:opacity-100">SAFETY</a>
-          <a href="/contact" className="opacity-70 hover:opacity-100">CONTACT</a>
-          <a href={LINKS.wallet} target="_blank" className="font-medium px-4 py-1.5 rounded-xl border border-white/30 hover:bg-white/5">Launch Infinite Wallet</a>
+        <div className="flex items-center gap-3 sm:gap-6 text-sm">
+          {/* Desktop nav links */}
+          <div className="hidden md:flex items-center gap-6">
+            <a href="#stats" className="opacity-70 hover:opacity-100">LIVE $MT</a>
+            <a href="#tokenomics" className="opacity-70 hover:opacity-100">TOKENOMICS</a>
+            <a href="#utilities" className="opacity-70 hover:opacity-100">UTILITIES</a>
+            <a href="#tap" className="opacity-70 hover:opacity-100">TAP</a>
+            <a href="#tap" className="opacity-70 hover:opacity-100">P2E</a>
+            <a href="#safety" className="opacity-70 hover:opacity-100">SAFETY</a>
+            <a href="/contact" className="opacity-70 hover:opacity-100">CONTACT</a>
+          </div>
+
+          <a href={LINKS.wallet} target="_blank" className="font-medium px-3 sm:px-4 py-1 sm:py-1.5 rounded-xl border border-white/30 hover:bg-white/5 text-xs sm:text-sm">Launch</a>
 
           {/* Small icons for Login and Register — clean and minimal */}
           <button 
             onClick={() => openAuth('login')} 
-            className="opacity-70 hover:opacity-100 p-1" 
+            className="opacity-70 hover:opacity-100 p-1 text-base" 
             title="Login"
             aria-label="Login"
           >
@@ -176,7 +182,7 @@ export default function Navbar() {
           </button>
           <button 
             onClick={() => openAuth('register')} 
-            className="opacity-70 hover:opacity-100 p-1" 
+            className="opacity-70 hover:opacity-100 p-1 text-base" 
             title="Register / Sign up"
             aria-label="Register"
           >
@@ -184,38 +190,66 @@ export default function Navbar() {
           </button>
 
           <ThemeToggle />
+
+          {/* Mobile hamburger */}
+          <button 
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
+            className="md:hidden p-2 text-xl leading-none"
+            aria-label="Toggle menu"
+          >
+            ☰
+          </button>
         </div>
       </div>
 
+      {/* Mobile nav menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-white/10 bg-black px-4 py-3 flex flex-col gap-2 text-sm">
+          <a href="#stats" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">LIVE $MT</a>
+          <a href="#tokenomics" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">TOKENOMICS</a>
+          <a href="#utilities" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">UTILITIES</a>
+          <a href="#tap" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">TAP</a>
+          <a href="#tap" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">P2E</a>
+          <a href="#safety" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">SAFETY</a>
+          <a href="/contact" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">CONTACT</a>
+          <button 
+            onClick={() => { setMobileMenuOpen(false); setShowBuyPanel(true); }}
+            className="py-1 text-left font-medium text-emerald-400 hover:opacity-100"
+          >
+            BUY $MT NOW
+          </button>
+          <a href={LINKS.wallet} target="_blank" onClick={() => setMobileMenuOpen(false)} className="py-1 font-medium">Launch Infinite Wallet</a>
+        </div>
+      )}
+
       {/* Social icons row under the main nav links - using original Font Awesome icons in brand colors */}
       <div className="border-t border-white/10">
-        <div className="max-w-7xl mx-auto px-6 py-2 flex items-center gap-x-6 text-sm social-row">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-3 sm:gap-x-5 text-xs sm:text-sm social-row">
           <a href="https://discord.gg/FxT7q7fpkT" target="_blank" rel="noopener" title="Discord" style={{ color: '#5865F2' }}>
-            <i className="fab fa-discord text-xl"></i>
+            <i className="fab fa-discord text-lg sm:text-xl"></i>
           </a>
           <a href="https://twitter.com/MemeTorrent" target="_blank" rel="noopener" title="X / Twitter" style={{ color: '#1DA1F2' }}>
-            <i className="fab fa-twitter text-xl"></i>
+            <i className="fab fa-twitter text-lg sm:text-xl"></i>
           </a>
           <a href="https://t.me/MemeTorrentPortal" target="_blank" rel="noopener" title="Telegram" style={{ color: '#26A5E4' }}>
-            <i className="fab fa-telegram text-xl"></i>
+            <i className="fab fa-telegram text-lg sm:text-xl"></i>
           </a>
 
-          {/* Contract address near social icons, slightly away */}
-          <div className="ml-4 pl-4 border-l border-white/20 flex items-center gap-2 text-[11px]">
-            <span className="opacity-60">Contract Address:</span>
+          {/* Contract address near social icons - short display on mobile to avoid overflow, full on copy/title */}
+          <div className="ml-1 sm:ml-3 pl-2 sm:pl-3 border-l border-white/20 flex items-center gap-1 text-[10px] sm:text-[11px] min-w-0">
+            <span className="opacity-60 shrink-0">Contract:</span>
             <button
-              onClick={() => {
+              onClick={(e) => {
                 navigator.clipboard.writeText('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump');
-                // Fallback feedback
-                const btn = event?.currentTarget as HTMLElement;
+                const btn = e.currentTarget as HTMLElement;
                 const origText = btn?.innerText;
                 if (btn) btn.innerText = 'Copied!';
                 setTimeout(() => { if (btn) btn.innerText = origText || 'ELyw...pump'; }, 1500);
               }}
-              className="font-mono text-emerald-400 hover:text-emerald-300 active:text-white transition"
-              title="Copy $MT contract address"
+              className="font-mono text-emerald-400 hover:text-emerald-300 active:text-white transition truncate max-w-[110px] sm:max-w-none"
+              title="ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump — tap to copy"
             >
-              ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump
+              ELyw...pump
             </button>
           </div>
 
@@ -224,7 +258,7 @@ export default function Navbar() {
           {/* BUY $MT NOW - toggles the compact form panel just below */}
           <button 
             onClick={() => setShowBuyPanel(!showBuyPanel)}
-            className="font-medium text-emerald-400 hover:text-emerald-300 transition cursor-pointer"
+            className="font-medium text-emerald-400 hover:text-emerald-300 transition cursor-pointer text-xs sm:text-sm px-2 py-1 border border-emerald-400/30 rounded whitespace-nowrap"
           >
             BUY $MT NOW
           </button>
@@ -235,47 +269,47 @@ export default function Navbar() {
           Form (connect) first, then the full THE WALLET IS THE GATEWAY block below it. */}
       {showBuyPanel && (
         <div ref={buyPanelRef} className="border-t border-white/10 bg-zinc-950/95 backdrop-blur">
-          <div className="max-w-7xl mx-auto px-6 py-4">
-            {/* Compact form: Connect your wallet to buy */}
-            <div className="mb-4">
-              <div className="text-sm font-medium mb-2">Connect your wallet to buy</div>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => connectWallet('phantom')} className="px-3 py-1.5 text-xs rounded-xl border border-white/20 hover:bg-white/5">👻 Phantom</button>
-                <button onClick={() => connectWallet('solflare')} className="px-3 py-1.5 text-xs rounded-xl border border-white/20 hover:bg-white/5">☀️ Solflare</button>
-                <button onClick={() => connectWallet('backpack')} className="px-3 py-1.5 text-xs rounded-xl border border-white/20 hover:bg-white/5">🎒 Backpack</button>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 text-sm">
+            {/* Compact form: Connect your wallet to buy - stacked on mobile for touch */}
+            <div className="mb-3 sm:mb-4">
+              <div className="text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Connect your wallet to buy</div>
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+                <button onClick={() => connectWallet('phantom')} className="px-4 py-2 min-h-[44px] text-sm rounded-xl border border-white/20 hover:bg-white/5 active:bg-white/10">👻 Phantom</button>
+                <button onClick={() => connectWallet('solflare')} className="px-4 py-2 min-h-[44px] text-sm rounded-xl border border-white/20 hover:bg-white/5 active:bg-white/10">☀️ Solflare</button>
+                <button onClick={() => connectWallet('backpack')} className="px-4 py-2 min-h-[44px] text-sm rounded-xl border border-white/20 hover:bg-white/5 active:bg-white/10">🎒 Backpack</button>
               </div>
               {walletAddress && (
-                <div className="mt-2 text-xs">Connected: {connectedWallet} {walletAddress.slice(0,6)}... <button onClick={disconnectWallet} className="underline">Disconnect</button></div>
+                <div className="mt-2 text-xs">Connected: {connectedWallet} {walletAddress.slice(0,6)}... <button onClick={disconnectWallet} className="underline ml-1">Disconnect</button></div>
               )}
-              <div className="text-[10px] opacity-60 mt-1">Best in wallet browser on mobile.</div>
+              <div className="text-[10px] opacity-60 mt-1">On mobile: open this page inside your wallet app's browser for connection to work.</div>
             </div>
 
-            {/* THE WALLET IS THE GATEWAY block just below the form in the panel */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-sm">
-              <div className="text-emerald-400 text-xs tracking-[3px]">THE WALLET IS THE GATEWAY</div>
-              <div className="font-semibold tracking-tight mt-1">INFINITE WALLET<br />For infinite possibilities.<br />Truly ours.</div>
-              <ul className="mt-2 space-y-0.5 text-xs opacity-80">
+            {/* THE WALLET IS THE GATEWAY block just below the form in the panel - full original text */}
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 sm:p-4 text-xs sm:text-sm">
+              <div className="text-emerald-400 text-[10px] sm:text-xs tracking-[3px]">THE WALLET IS THE GATEWAY</div>
+              <div className="font-semibold tracking-tight mt-0.5 sm:mt-1 text-sm sm:text-base">INFINITE WALLET<br />For infinite possibilities.<br />Truly ours.</div>
+              <ul className="mt-1 sm:mt-2 space-y-0.5 text-[10px] sm:text-xs opacity-80">
                 <li>• 100% self-built. No injected providers.</li>
                 <li>• Create, import, send, mint NFTs, earn &amp; spend Rockets.</li>
                 <li>• Native MT chain + Solana $MT + future bridges.</li>
                 <li>• Keys encrypted locally. Seed never leaves your device.</li>
               </ul>
-              <a href={LINKS.wallet} target="_blank" className="mt-3 inline-block text-xs text-emerald-400 hover:underline">OPEN INFINITE WALLET →</a>
+              <a href={LINKS.wallet} target="_blank" className="mt-2 sm:mt-3 inline-block text-xs sm:text-sm text-emerald-400 hover:underline">OPEN INFINITE WALLET →</a>
             </div>
 
-            {/* Buy controls if connected */}
+            {/* Buy controls if connected - responsive */}
             {walletAddress && (
-              <div className="mt-4">
+              <div className="mt-3 sm:mt-4">
                 <div className="flex items-center gap-2 text-xs mb-1">
                   <span>Amount (SOL)</span>
                   <input type="range" min="0.01" max="5" step="0.01" value={buySolAmount} onChange={e => setBuySolAmount(parseFloat(e.target.value))} className="flex-1 accent-emerald-400" />
-                  <span className="font-mono">{buySolAmount}</span>
+                  <span className="font-mono text-xs sm:text-sm">{buySolAmount}</span>
                 </div>
-                <button onClick={getJupiterQuote} disabled={isLoadingQuote} className="w-full py-2 text-xs border border-white/20 rounded-xl mb-2">Get Quote</button>
+                <button onClick={getJupiterQuote} disabled={isLoadingQuote} className="w-full py-2.5 min-h-[44px] text-xs sm:text-sm border border-white/20 rounded-xl mb-2 active:bg-white/5">Get Quote (Jupiter)</button>
                 {jupQuote && <div className="text-xs mb-2">~{(Number(jupQuote.outAmount)/1e6).toFixed(0)} $MT</div>}
-                <button onClick={executeRealBuy} disabled={!jupQuote || isExecutingSwap} className="w-full py-2 bg-emerald-400 text-black text-xs font-semibold rounded-xl">BUY REAL $MT (Jupiter)</button>
+                <button onClick={executeRealBuy} disabled={!jupQuote || isExecutingSwap} className="w-full py-2.5 min-h-[44px] bg-emerald-400 text-black text-xs sm:text-sm font-semibold rounded-xl active:opacity-90">BUY REAL $MT (Jupiter)</button>
                 <div className="text-center mt-1">
-                  <a href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} target="_blank" className="text-xs text-emerald-400 underline">Or Raydium</a>
+                  <a href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} target="_blank" className="text-xs sm:text-sm text-emerald-400 underline">Or buy on Raydium instead</a>
                 </div>
               </div>
             )}

@@ -19,13 +19,13 @@ export default function EcosystemSection() {
   ];
 
   return (
-    <section id="ecosystem" className="py-24">
-      <div className="max-w-7xl mx-auto px-6">
-        <h2 className="text-3xl font-semibold mb-12">
+    <section id="ecosystem" className="py-12 sm:py-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <h2 className="text-2xl sm:text-3xl font-semibold mb-8 sm:mb-12">
           Ecosystem
         </h2>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {items.map((item) => (
             <div
               key={item.title}

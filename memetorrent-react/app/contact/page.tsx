@@ -40,27 +40,24 @@ export default function ContactPage() {
   return (
     <main className="min-h-screen bg-black text-white">
       <div className="border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between text-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
           <Link href="/" className="font-semibold tracking-tight flex items-center gap-2">
             <span className="text-emerald-400">MT</span> ECO SYSTEM
           </Link>
-          <div className="flex items-center gap-6 text-sm">
+          <div className="flex items-center gap-3 sm:gap-6 text-sm">
             <Link href="/" className="opacity-70 hover:opacity-100">Back to Home</Link>
-            <a href="https://wallet.futuret3ch.com.au/" target="_blank" className="font-medium px-4 py-1.5 rounded-xl border border-white/30 hover:bg-white/5">Launch Infinite Wallet</a>
+            <a href="https://wallet.futuret3ch.com.au/" target="_blank" className="font-medium px-3 sm:px-4 py-1 sm:py-1.5 rounded-xl border border-white/30 hover:bg-white/5 text-xs sm:text-sm">Launch Infinite Wallet</a>
           </div>
         </div>
-      </div>
-
-      {/* Social icons on contact page for consistency */}
-      <div className="border-t border-white/10">
-        <div className="max-w-7xl mx-auto px-6 py-2 flex items-center gap-x-6 text-sm">
-          <a href="https://discord.gg/FxT7q7fpkT" target="_blank" rel="noopener" title="Discord" style={{ color: '#5865F2' }}><i className="fab fa-discord text-xl"></i></a>
-          <a href="https://twitter.com/MemeTorrent" target="_blank" rel="noopener" title="X / Twitter" style={{ color: '#1DA1F2' }}><i className="fab fa-twitter text-xl"></i></a>
-          <a href="https://t.me/MemeTorrentPortal" target="_blank" rel="noopener" title="Telegram" style={{ color: '#26A5E4' }}><i className="fab fa-telegram text-xl"></i></a>
-          <div className="flex-1" />
-          <span className="text-[10px] opacity-50">Contract: ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump</span>
-        </div>
-      </div>
+        {/* Social icons on contact page for consistency */}
+        <div className="border-t border-white/10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <a href="https://discord.gg/FxT7q7fpkT" target="_blank" rel="noopener" title="Discord" style={{ color: '#5865F2' }}><i className="fab fa-discord text-lg sm:text-xl"></i></a>
+            <a href="https://twitter.com/MemeTorrent" target="_blank" rel="noopener" title="X / Twitter" style={{ color: '#1DA1F2' }}><i className="fab fa-twitter text-lg sm:text-xl"></i></a>
+            <a href="https://t.me/MemeTorrentPortal" target="_blank" rel="noopener" title="Telegram" style={{ color: '#26A5E4' }}><i className="fab fa-telegram text-lg sm:text-xl"></i></a>
+            <div className="flex-1" />
+            <span className="text-[10px] opacity-50">Contract: ELyw...pump</span>
+          </div>
         </div>
       </div>
 
@@ -93,17 +90,17 @@ export default function ContactPage() {
             ))}
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <input
               value={botInput}
               onChange={(e) => setBotInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') sendToBot(); }}
               placeholder="Type your message to the Overlords..."
-              className="flex-1 bg-white/5 border border-white/15 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-emerald-400/60"
+              className="flex-1 bg-white/5 border border-white/15 rounded-2xl px-4 sm:px-5 py-3 text-sm focus:outline-none focus:border-emerald-400/60 min-h-[44px]"
             />
             <button
               onClick={sendToBot}
-              className="px-8 rounded-2xl border border-emerald-400/40 hover:bg-emerald-400/10 font-medium"
+              className="px-6 sm:px-8 rounded-2xl border border-emerald-400/40 hover:bg-emerald-400/10 font-medium min-h-[44px]"
             >
               SEND
             </button>

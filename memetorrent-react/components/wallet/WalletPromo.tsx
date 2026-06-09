@@ -4,20 +4,20 @@ import { LINKS } from '@/lib/constants';
 
 export default function WalletPromo() {
   return (
-    <section className="py-20 border-t border-white/10 bg-black">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="grid md:grid-cols-2 gap-x-16 gap-y-10 items-center">
+    <section className="py-12 sm:py-20 border-t border-white/10 bg-black">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="grid md:grid-cols-2 gap-x-8 md:gap-x-16 gap-y-8 sm:gap-y-10 items-center">
           <div>
             <div className="uppercase text-emerald-400 text-xs tracking-[3px] mb-2">START HERE</div>
-            <div className="text-5xl font-semibold tracking-[-1.8px] leading-none">Your keys.<br />Your chain.<br />Your wallet.</div>
-            <p className="mt-6 text-lg opacity-70 max-w-md">INFINITE WALLET is the official gateway. Full control. Built from the ground up for the MT-ECO SYSTEM by Futuret3ch and MemeTorrent. Looks and feels like the best — because we made it. Infinite possibilities.</p>
+            <div className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-[-1.8px] leading-none">Your keys.<br />Your chain.<br />Your wallet.</div>
+            <p className="mt-5 sm:mt-6 text-base sm:text-lg opacity-70 max-w-md">INFINITE WALLET is the official gateway. Full control. Built from the ground up for the MT-ECO SYSTEM by Futuret3ch and MemeTorrent. Looks and feels like the best — because we made it. Infinite possibilities.</p>
 
-            <a href={LINKS.wallet} target="_blank" className="mt-8 inline-block px-9 py-4 rounded-2xl bg-white text-black font-semibold text-sm tracking-wider">LAUNCH INFINITE WALLET</a>
+            <a href={LINKS.wallet} target="_blank" className="mt-6 sm:mt-8 inline-block px-6 sm:px-9 py-3 sm:py-4 rounded-2xl bg-white text-black font-semibold text-sm tracking-wider min-h-[44px] flex items-center">LAUNCH INFINITE WALLET</a>
             <div className="text-xs mt-3 opacity-50">Opens the production INFINITE WALLET at https://wallet.futuret3ch.com.au/</div> {/* all memetorrent-react wallet launch links updated */}
           </div>
 
-          <div className="rounded-3xl border border-white/10 p-8 bg-zinc-950/60 text-sm">
-            <div className="grid grid-cols-2 gap-6 text-sm">
+          <div className="rounded-3xl border border-white/10 p-5 sm:p-8 bg-zinc-950/60 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6 text-sm">
               <div>
                 <div className="font-mono text-emerald-400 text-xs mb-1">CORE</div>
                 <ul className="space-y-1.5 opacity-80">

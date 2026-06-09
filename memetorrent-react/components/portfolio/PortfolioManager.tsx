@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getTokenStats, MTStatsRaw } from '@/lib/api';
 import { LINKS } from '@/lib/constants';
-import { Connection, Transaction } from '@solana/web3.js';
 
 type Asset = {
   symbol: string;
@@ -45,9 +44,6 @@ export default function PortfolioManager() {
   const [message, setMessage] = useState<string | null>(null);
   const [nftPreview, setNftPreview] = useState({ color: '#10b981', type: 'Rocket', accessory: 'Wings' }); // for NFT designer
   const [stakedRockets, setStakedRockets] = useState(0); // for staking preview (demo only)
-
-  // Whitepaper flip state
-  const [whitepaperFlipped, setWhitepaperFlipped] = useState(false);
 
   // Ref for the active flow panel so we can scroll it directly under the clicked flow launcher
   const panelRef = useRef<HTMLDivElement>(null);
@@ -94,139 +90,6 @@ export default function PortfolioManager() {
   const showToast = (text: string) => {
     setMessage(text);
     setTimeout(() => setMessage(null), 2400);
-  };
-
-  const MT_MINT = 'ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump';
-
-  // === Real Wallet Connection (Phantom / Solflare / Backpack) ===
-  const connectWallet = async (walletType: 'phantom' | 'solflare' | 'backpack') => {
-    try {
-      let provider: any = null;
-
-      if (walletType === 'phantom') {
-        provider = (window as any).phantom?.solana;
-      } else if (walletType === 'solflare') {
-        provider = (window as any).solflare;
-      } else if (walletType === 'backpack') {
-        provider = (window as any).backpack?.solana;
-      }
-
-      if (!provider) {
-        showToast(`Please install the ${walletType.charAt(0).toUpperCase() + walletType.slice(1)} wallet extension.`);
-        return;
-      }
-
-      const resp = await provider.connect();
-      const address = resp.publicKey?.toString() || resp.publicKey;
-
-      setWalletAddress(address);
-      setConnectedWallet(walletType);
-      showToast(`Connected ${walletType} wallet`);
-    } catch (err: any) {
-      console.error(err);
-      showToast('Failed to connect wallet: ' + (err?.message || 'Unknown error'));
-    }
-  };
-
-  const disconnectWallet = () => {
-    setWalletAddress(null);
-    setConnectedWallet(null);
-    setJupQuote(null);
-    showToast('Wallet disconnected');
-  };
-
-  // === Jupiter Quote for real buy ===
-  const getJupiterQuote = async () => {
-    if (!buySolAmount || buySolAmount <= 0) return;
-
-    setIsLoadingQuote(true);
-    try {
-      const inputMint = 'So11111111111111111111111111111111111111112'; // Wrapped SOL
-      const amountLamports = Math.floor(buySolAmount * 1_000_000_000);
-
-      const url = `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint}&outputMint=${MT_MINT}&amount=${amountLamports}&slippageBps=100&onlyDirectRoutes=false`;
-
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Quote failed');
-
-      const data = await res.json();
-      setJupQuote(data);
-      showToast(`Quote ready: ~${(Number(data.outAmount) / 1e6).toFixed(0)} $MT for ${buySolAmount} SOL`);
-    } catch (e: any) {
-      console.error(e);
-      showToast('Failed to fetch quote from Jupiter. Using external link instead?');
-      setJupQuote(null);
-    }
-    setIsLoadingQuote(false);
-  };
-
-  // === Execute real swap using connected wallet + Jupiter ===
-  const executeRealBuy = async () => {
-    if (!walletAddress || !jupQuote || !connectedWallet) {
-      showToast('Connect a wallet and get a quote first.');
-      return;
-    }
-
-    setIsExecutingSwap(true);
-
-    try {
-      // 1. Get swap transaction from Jupiter
-      const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          quoteResponse: jupQuote,
-          userPublicKey: walletAddress,
-          wrapAndUnwrapSol: true,
-          // feeAccount can be added later for referrals if wanted
-        }),
-      });
-
-      if (!swapRes.ok) {
-        const err = await swapRes.text();
-        throw new Error('Jupiter swap failed: ' + err);
-      }
-
-      const { swapTransaction } = await swapRes.json();
-
-      // 2. Prepare and sign the transaction
-      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-      const transaction = Transaction.from(Buffer.from(swapTransaction, 'base64'));
-
-      let provider: any = null;
-      if (connectedWallet === 'phantom') provider = (window as any).phantom?.solana;
-      else if (connectedWallet === 'solflare') provider = (window as any).solflare;
-      else if (connectedWallet === 'backpack') provider = (window as any).backpack?.solana;
-
-      if (!provider || !provider.signTransaction) {
-        throw new Error('Wallet provider not available for signing');
-      }
-
-      const signedTx = await provider.signTransaction(transaction);
-
-      // 3. Send the transaction
-      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
-      });
-
-      // 4. Confirm
-      await connection.confirmTransaction(signature, 'confirmed');
-
-      showToast(`✅ Buy successful! Signature: ${signature.slice(0, 12)}... Check your wallet.`);
-      setJupQuote(null); // reset quote after success
-
-      // Optional: you can still update local demo balance for the UI to reflect
-      // (kept for visual continuity)
-      const estimatedMT = Number(jupQuote.outAmount) / 1_000_000;
-      updateCurrentWallet({ balanceSPL: currentWallet.balanceSPL + Math.floor(estimatedMT) });
-
-    } catch (err: any) {
-      console.error('Swap error:', err);
-      showToast('Swap failed: ' + (err.message || 'Please try the external Raydium link below.'));
-    }
-
-    setIsExecutingSwap(false);
   };
 
   // Flow handlers — real-feeling self-custodial management flows
@@ -368,33 +231,33 @@ export default function PortfolioManager() {
 
   return (
     <section id="management" className="py-20 border-t border-white/10 bg-black/40">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex items-end justify-between mb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-6 sm:mb-8">
           <div>
             <div className="text-xs tracking-[3px] text-emerald-400 mb-2">MANAGEMENT, NOT JUST TRACKING</div>
-            <div className="text-4xl md:text-5xl font-semibold tracking-[-1.6px]">Infinite Portfolio.<br />Real flows. Real ownership.</div>
-            <p className="mt-3 max-w-xl text-lg opacity-70">
+            <div className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-[-1.6px]">Infinite Portfolio.<br />Real flows. Real ownership.</div>
+            <p className="mt-3 max-w-xl text-base sm:text-lg opacity-70">
               Real command-center flows that actually move your assets, earn utility, and prove everything on-chain — all inside INFINITE WALLET.
             </p>
           </div>
-          <div className="text-right hidden md:block">
-            <div className="text-xs opacity-60">LIVE DEMO • SELF-CUSTODIAL</div>
+          <div className="text-left md:text-right md:block text-xs opacity-60">
+            <div>LIVE DEMO • SELF-CUSTODIAL</div>
             <div className="text-emerald-400 font-mono text-sm mt-1">No seed ever leaves your device</div>
           </div>
         </div>
 
         {/* Live summary bar */}
-        <div className="rounded-3xl border border-white/10 bg-white/[0.015] p-6 mb-8">
-          <div className="flex flex-wrap items-center gap-x-10 gap-y-3">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.015] p-4 sm:p-6 mb-6 sm:mb-8">
+          <div className="flex flex-wrap items-center gap-x-6 sm:gap-x-10 gap-y-3">
             <div>
               <div className="text-xs uppercase tracking-widest opacity-60">Unified Value</div>
-              <div className="text-4xl font-semibold tabular-nums tracking-tight">${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+              <div className="text-3xl sm:text-4xl font-semibold tabular-nums tracking-tight">${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </div>
             <div className="text-sm opacity-70">
               {nativeMT.balance.toLocaleString()} Native MT (PRIMARY)<br />
               + {splMT.balance.toLocaleString()} SPL • {assets.find(a => a.symbol === 'ROCKET')!.balance} Rockets • {assets.find(a => a.symbol === 'NFT')!.balance} NFTs
             </div>
-            <div className="flex-1" />
+            <div className="flex-1 basis-full sm:basis-auto" />
             <button
               onClick={() => {
                 // Switch to a "top holder" style wallet (multi-wallet demo)
@@ -402,7 +265,7 @@ export default function PortfolioManager() {
                 updateCurrentWallet({ balanceMT: 215818000, balanceSPL: 89000000, rockets: 2840, nfts: 19 });
                 showToast('Switched to Top Holder sample vault. All flows work on it.');
               }}
-              className="px-5 py-2 rounded-xl border border-white/20 text-sm hover:bg-white/5 active:bg-white/10"
+              className="px-4 sm:px-5 py-2 min-h-[44px] rounded-xl border border-white/20 text-sm hover:bg-white/5 active:bg-white/10"
             >
               Load Top Holder Sample
             </button>
@@ -412,7 +275,7 @@ export default function PortfolioManager() {
                 updateCurrentWallet({ balanceMT: newBal });
                 showToast('Received 25M Native MT from faucet (demo)');
               }}
-              className="px-5 py-2 rounded-xl border border-emerald-400/40 text-sm text-emerald-400 hover:bg-emerald-400/5"
+              className="px-4 sm:px-5 py-2 min-h-[44px] rounded-xl border border-emerald-400/40 text-sm text-emerald-400 hover:bg-emerald-400/5"
             >
               + Receive Native MT
             </button>
@@ -420,9 +283,9 @@ export default function PortfolioManager() {
         </div>
 
         {/* Multi-wallet switcher — cool feature: strict isolation like real accounts */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <div className="text-xs uppercase tracking-[3px] opacity-60 mb-2">MULTI-WALLET SWITCHER (STRICT ISOLATION)</div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             {wallets.map((w) => (
               <button
                 key={w.id}
@@ -431,7 +294,7 @@ export default function PortfolioManager() {
                   setStakedRockets(0); // reset demo stake per wallet
                   showToast(`Switched to ${w.name}`);
                 }}
-                className={`px-4 py-2 rounded-2xl border text-sm transition ${currentWalletId === w.id ? 'border-emerald-400 bg-emerald-400/10 text-emerald-400' : 'border-white/15 hover:bg-white/5'}`}
+                className={`px-3 sm:px-4 py-2 min-h-[40px] rounded-2xl border text-sm transition ${currentWalletId === w.id ? 'border-emerald-400 bg-emerald-400/10 text-emerald-400' : 'border-white/15 hover:bg-white/5'}`}
               >
                 {w.name} <span className="opacity-50 text-xs">({w.rockets + stakedRockets} R)</span>
               </button>
@@ -441,12 +304,12 @@ export default function PortfolioManager() {
         </div>
 
         {/* Asset breakdown — clean management view */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8 sm:mb-10">
           {assets.map((asset, i) => (
             <motion.div
               key={i}
               whileHover={{ y: -2 }}
-              className="rounded-3xl border border-white/10 bg-white/[0.015] p-6 flex flex-col"
+              className="rounded-3xl border border-white/10 bg-white/[0.015] p-4 sm:p-6 flex flex-col"
             >
               <div className="flex items-center gap-3">
                 {asset.logo ? (
@@ -460,8 +323,8 @@ export default function PortfolioManager() {
                 </div>
               </div>
 
-              <div className="mt-auto pt-6">
-                <div className="font-mono text-3xl tracking-[-1.2px] tabular-nums">
+              <div className="mt-auto pt-5 sm:pt-6">
+                <div className="font-mono text-2xl sm:text-3xl tracking-[-1.2px] tabular-nums">
                   {asset.balance.toLocaleString()}
                 </div>
                 <div className="text-xs opacity-60 mt-1">
@@ -475,11 +338,11 @@ export default function PortfolioManager() {
         </div>
 
         {/* Constellation visual of the ecosystem — cool interactive feature */}
-        <div className="mb-10">
+        <div className="mb-8 sm:mb-10">
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-2">THE MT-ECO SYSTEM CONSTELLATION</div>
-          <div className="text-2xl font-semibold tracking-tight mb-4">Everything connected. Tap a node.</div>
+          <div className="text-xl sm:text-2xl font-semibold tracking-tight mb-3 sm:mb-4">Everything connected. Tap a node.</div>
 
-          <div className="relative h-[240px] sm:h-[220px] rounded-3xl border border-white/10 bg-black/60 overflow-hidden flex items-center justify-center">
+          <div className="relative h-[200px] sm:h-[220px] rounded-3xl border border-white/10 bg-black/60 overflow-hidden flex items-center justify-center">
             <svg width="100%" height="100%" className="absolute inset-0" viewBox="0 0 800 220">
               {/* Connections (lines between nodes) */}
               <g stroke="#10b981" strokeOpacity="0.25" strokeWidth="1">
@@ -526,9 +389,9 @@ export default function PortfolioManager() {
         </div>
 
         {/* Tokenomics — restored full from old site https://memetorrent.futuret3ch.com.au/token.html */}
-        <div id="tokenomics" className="mb-10">
+        <div id="tokenomics" className="mb-8 sm:mb-10">
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-2">TOKENOMICS $MT</div>
-          <div className="text-3xl font-semibold tracking-tight mb-4">1,000,000,000 TOTAL SUPPLY</div>
+          <div className="text-2xl sm:text-3xl font-semibold tracking-tight mb-3 sm:mb-4">1,000,000,000 TOTAL SUPPLY</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { icon: '🚀', pct: '18%', label: 'PRESALE', amt: '180 Million Tokens', note: '🎯' },
@@ -559,25 +422,21 @@ export default function PortfolioManager() {
         <div>
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">ONE-PLACE MANAGEMENT FLOWS</div>
           <div className="text-2xl font-semibold tracking-tight mb-6">Command-center actions. Real ownership.</div>
-
-
-
-          <a href="/whitepaper" className="inline-block mt-3 text-xs text-emerald-400 hover:underline">📄 READ $MT WHITEPAPER (interactive)</a>
         </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {flows.map((f) => {
               const isActive = activeFlow === f.key;
               return (
                 <button
                   key={f.key}
                   onClick={() => startFlow(f.key)}
-                  className={`group text-left rounded-3xl border bg-white/[0.015] p-6 hover:border-emerald-400/40 hover:bg-white/[0.025] transition-all active:scale-[0.985] ${isActive ? 'border-emerald-400 ring-2 ring-emerald-400/30' : 'border-white/10'}`}
+                  className={`group text-left rounded-3xl border bg-white/[0.015] p-4 sm:p-6 hover:border-emerald-400/40 hover:bg-white/[0.025] transition-all active:scale-[0.985] min-h-[120px] ${isActive ? 'border-emerald-400 ring-2 ring-emerald-400/30' : 'border-white/10'}`}
                 >
-                  <div className="text-2xl mb-4">{f.icon}</div>
-                  <div className="font-semibold tracking-tight text-lg mb-1.5 group-hover:text-emerald-400 transition">{f.title}</div>
-                  <p className="text-sm opacity-70 leading-relaxed">{f.desc}</p>
-                  <div className={`mt-4 text-[10px] tracking-widest ${isActive ? 'text-emerald-400' : 'text-emerald-400/70 group-hover:text-emerald-400'}`}>
+                  <div className="text-2xl mb-3 sm:mb-4">{f.icon}</div>
+                  <div className="font-semibold tracking-tight text-base sm:text-lg mb-1 group-hover:text-emerald-400 transition">{f.title}</div>
+                  <p className="text-xs sm:text-sm opacity-70 leading-relaxed">{f.desc}</p>
+                  <div className={`mt-3 sm:mt-4 text-[10px] tracking-widest ${isActive ? 'text-emerald-400' : 'text-emerald-400/70 group-hover:text-emerald-400'}`}>
                     {isActive ? 'DETAILS BELOW ↓' : 'RUN FLOW →'}
                   </div>
                 </button>
@@ -593,7 +452,7 @@ export default function PortfolioManager() {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="mt-6 rounded-3xl border border-white/10 bg-zinc-950/70 p-8 overflow-hidden"
+                className="mt-6 rounded-3xl border border-white/10 bg-zinc-950/70 p-4 sm:p-8 overflow-hidden"
               >
                 <div className="flex justify-between items-start">
                   <div>
@@ -608,11 +467,11 @@ export default function PortfolioManager() {
                 {/* Bridge flow */}
                 {activeFlow === 'bridge' && (
                   <div className="mt-6 space-y-6">
-                    <div className="flex gap-4">
-                      <button onClick={() => setFlowData({ direction: 'native-to-spl' })} className={`flex-1 rounded-2xl p-4 border ${flowData.direction === 'native-to-spl' ? 'border-emerald-400 bg-emerald-400/5' : 'border-white/10'}`}>
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                      <button onClick={() => setFlowData({ direction: 'native-to-spl' })} className={`flex-1 rounded-2xl p-3 sm:p-4 border text-sm sm:text-base ${flowData.direction === 'native-to-spl' ? 'border-emerald-400 bg-emerald-400/5' : 'border-white/10'}`}>
                         Native MT → SPL $MT
                       </button>
-                      <button onClick={() => setFlowData({ direction: 'spl-to-native' })} className={`flex-1 rounded-2xl p-4 border ${flowData.direction === 'spl-to-native' ? 'border-emerald-400 bg-emerald-400/5' : 'border-white/10'}`}>
+                      <button onClick={() => setFlowData({ direction: 'spl-to-native' })} className={`flex-1 rounded-2xl p-3 sm:p-4 border text-sm sm:text-base ${flowData.direction === 'spl-to-native' ? 'border-emerald-400 bg-emerald-400/5' : 'border-white/10'}`}>
                         SPL $MT → Native MT
                       </button>
                     </div>
@@ -679,7 +538,7 @@ export default function PortfolioManager() {
                   <div className="mt-6">
                     <div className="mb-4 text-sm opacity-80">Live NFT designer for MT Companions / Cosmic Rockets. Changes update the preview instantly.</div>
 
-                    <div className="flex flex-col md:flex-row gap-8 items-center">
+                    <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center">
                       {/* Live preview */}
                       <div className="w-48 h-48 rounded-3xl border border-white/10 flex items-center justify-center text-6xl relative overflow-hidden" style={{ background: nftPreview.color + '22' }}>
                         <div style={{ color: nftPreview.color }} className="text-[120px] drop-shadow">🚀</div>
@@ -826,7 +685,6 @@ export default function PortfolioManager() {
           <a href="https://wallet.futuret3ch.com.au/" target="_blank" className="inline-block text-sm px-8 py-3 rounded-2xl border border-white/30 hover:bg-white/5">LAUNCH INFINITE WALLET TO RUN THESE FLOWS FOR REAL →</a>
           <div className="text-[10px] mt-3 opacity-50">All balances, NFTs, and Rockets live forever in your self-custodial vault. No third parties. Infinite possibilities.</div>
         </div>
-      </div>
 
       {/* Toast */}
       <AnimatePresence>

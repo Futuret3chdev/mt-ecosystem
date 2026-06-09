@@ -1,11 +1,11 @@
 export default function Safety() {
   return (
-    <section id="safety" className="py-20 border-t border-white/10">
-      <div className="max-w-5xl mx-auto px-6 text-center">
+    <section id="safety" className="py-12 sm:py-20 border-t border-white/10">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
         <div className="text-emerald-400 text-xs tracking-[4px]">SAFETY IS NON-NEGOTIABLE</div>
-        <h2 className="text-4xl font-semibold tracking-tight mt-3">Built for people who actually care about self-custody.</h2>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight mt-3">Built for people who actually care about self-custody.</h2>
 
-        <div className="grid sm:grid-cols-3 gap-6 mt-12 text-left">
+        <div className="grid sm:grid-cols-3 gap-4 sm:gap-6 mt-8 sm:mt-12 text-left">
           {[
             ['Client-side only keys', 'Mnemonics are generated in your browser. The only thing ever stored encrypted is the seed using AES-GCM + 210k PBKDF2. Password never leaves your machine.'],
             ['Signing where it belongs', 'Every transaction signature is produced locally using the same ed25519 scheme as the MT node. The node only receives a signature + public fields.'],

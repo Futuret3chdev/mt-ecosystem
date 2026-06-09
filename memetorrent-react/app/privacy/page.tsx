@@ -5,7 +5,7 @@ import Link from 'next/link';
 export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-black text-white">
-      <div className="max-w-3xl mx-auto px-6 py-16">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         <Link href="/" className="text-sm opacity-60 hover:opacity-100">← MT ECO SYSTEM</Link>
         <h1 className="text-4xl font-semibold tracking-tight mt-4 mb-8">Privacy Policy</h1>
 

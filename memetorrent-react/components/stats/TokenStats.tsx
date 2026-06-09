@@ -120,45 +120,45 @@ export default function TokenStats() {
         className="max-w-6xl mx-auto px-6"
       >
         <div
-          className="rounded-3xl p-8 border border-white/10 bg-white/[0.015]"
+          className="rounded-3xl p-5 sm:p-8 border border-white/10 bg-white/[0.015]"
           style={{
             background: 'var(--card)',
             border: '1px solid var(--border)',
           }}
         >
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-y-3 mb-6">
             <div>
               <div className="text-emerald-400 text-xs tracking-[3px] mb-1">LIVE ON SOLANA • PUMP.FUN</div>
-              <div className="text-4xl font-semibold tracking-tight">MT Token Stats</div>
+              <div className="text-3xl sm:text-4xl font-semibold tracking-tight">MT Token Stats</div>
               <div className="text-xs opacity-60 mt-1">Live from DexScreener • Auto-refreshes every 15s</div>
-              {/* Contract Address centered under the live from line */}
-              <div className="text-center mt-2">
+              {/* Contract Address - short display + copy for mobile friendliness */}
+              <div className="mt-2">
                 <span className="text-xs opacity-70">Contract Address: </span>
                 <button 
                   onClick={() => navigator.clipboard.writeText('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump')} 
-                  className="font-mono text-sm text-emerald-400 hover:text-white underline"
-                  title="Copy contract address"
+                  className="font-mono text-xs sm:text-sm text-emerald-400 hover:text-white underline break-all sm:break-normal"
+                  title="ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump (tap to copy)"
                 >
-                  ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump
+                  ELyw...pump
                 </button>
               </div>
             </div>
-            <div className="text-right text-xs opacity-60">
+            <div className="text-left sm:text-right text-xs opacity-60">
               {safeStats.name} ({safeStats.symbol})<br />
               24h Buys/Sells: {safeStats.total_buys || 0}/{safeStats.total_sells || 0}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
             <Stat label="Price" value={`$${safeStats.price}`} sub={`~${(priceNum * 1e9).toFixed(0)} per 1B`} />
             <Stat label="Market Cap" value={safeStats.market_cap} sub={marketCapNum > 0 ? `FDV ~${safeStats.market_cap}` : ''} />
             <Stat label="Total Supply" value={safeStats.total_supply} sub="1T max • Burnable" />
           </div>
 
-          <div className="mt-6 pt-6 border-t border-white/10 flex flex-wrap gap-4 text-xs opacity-70">
+          <div className="mt-5 sm:mt-6 pt-5 sm:pt-6 border-t border-white/10 flex flex-col sm:flex-row flex-wrap gap-x-4 gap-y-1 text-xs opacity-70">
             <div>24h Buy Vol: {safeStats.total_buy_volume}</div>
             <div>24h Sell Vol: {safeStats.total_sell_volume}</div>
-            <a href="#management" className="ml-auto font-medium text-emerald-400 hover:underline">Buy $MT directly on this page (no third party) →</a>
+            <a href="#management" className="sm:ml-auto font-medium text-emerald-400 hover:underline">Buy $MT directly on this page (no third party) →</a>
           </div>
 
           {/* Pure icon logos marquee - only actual logos, no names. Very slow floating + gentle dancing bobs */}
@@ -194,9 +194,9 @@ export default function TokenStats() {
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 p-5 bg-black/30">
+    <div className="rounded-2xl border border-white/10 p-4 sm:p-5 bg-black/30">
       <div className="text-xs uppercase tracking-wide opacity-60 mb-1">{label}</div>
-      <div className="text-3xl font-semibold tabular-nums tracking-[-1px]">{value}</div>
+      <div className="text-2xl sm:text-3xl font-semibold tabular-nums tracking-[-1px]">{value}</div>
       {sub && <div className="text-xs opacity-50 mt-1">{sub}</div>}
     </div>
   );

@@ -29,12 +29,12 @@ export default function Features() {
   ];
 
   return (
-    <section id="features" className="py-20 border-t border-white/10">
-      <div className="max-w-7xl mx-auto px-6">
+    <section id="features" className="py-12 sm:py-20 border-t border-white/10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="text-xs tracking-[3px] text-emerald-400 mb-3">WHY MT IS DIFFERENT</div>
-        <div className="text-4xl font-semibold tracking-[-1.5px] max-w-2xl">No rented chains. No rented wallets. No rented trust.</div>
+        <div className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-[-1.5px] max-w-2xl">No rented chains. No rented wallets. No rented trust.</div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-12">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-8 sm:mt-12">
           {items.map((item, i) => (
             <div key={i} className="rounded-3xl border border-white/10 bg-white/[0.015] p-7">
               <div className="font-semibold text-xl tracking-tight mb-3">{item.title}</div>

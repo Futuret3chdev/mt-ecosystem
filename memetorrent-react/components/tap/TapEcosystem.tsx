@@ -20,17 +20,17 @@ const NFTS_GAMES = [
 
 export default function TapEcosystem() {
   return (
-    <section id="tap" className="py-20 border-t border-white/10 bg-black">
-      <div className="max-w-7xl mx-auto px-6">
+    <section id="tap" className="py-12 sm:py-20 border-t border-white/10 bg-black">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="text-xs tracking-[3px] text-emerald-400 mb-3">TAP ECO SYSTEM — COMING SOON</div>
-        <div className="text-4xl font-semibold tracking-[-1.5px] max-w-3xl mb-4">
+        <div className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-[-1.5px] max-w-3xl mb-3 sm:mb-4">
           Games. NFTs. Utilities. All powered by INFINITE WALLET.
         </div>
-        <p className="max-w-2xl opacity-70 mb-10">
+        <p className="max-w-2xl opacity-70 mb-8 sm:mb-10 text-sm sm:text-base">
           The full TAP ecosystem: shop, match, transport, studio — everything on-chain, self-built, infinite possibilities.
         </p>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-10 sm:mb-16">
           {TAP_FEATURES.map((f, i) => (
             <div key={i} className="rounded-3xl border border-white/10 p-7 bg-white/[0.015]">
               <div className="font-semibold text-xl mb-2 tracking-tight">{f.name}</div>
@@ -41,7 +41,7 @@ export default function TapEcosystem() {
 
         <div>
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-4">LIVE &amp; UPCOMING • NFTS + GAMES</div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {NFTS_GAMES.map((item, i) => (
               <motion.div
                 key={i}
