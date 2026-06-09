@@ -63,50 +63,35 @@ export default function Navbar() {
     setIsConnecting(true);
 
     try {
-      // Poll for provider first (handles case where already in-app browser on mobile, or delayed injection)
-      let provider: any = null;
-      for (let i = 0; i < 10; i++) {
-        if (walletType === 'phantom') provider = (window as any).phantom?.solana;
-        if (walletType === 'solflare') provider = (window as any).solflare;
-        if (walletType === 'backpack') provider = (window as any).backpack;
-        if (provider) break;
-        await new Promise(r => setTimeout(r, 200));
-      }
-
-      // Only deep link on mobile if no provider found (prevents redirect loops when already inside wallet browser)
-      if (!provider && /iPhone|Android/i.test(navigator.userAgent)) {
-        const currentUrl = window.location.href;
-        if (walletType === 'solflare') {
-          window.location.href = `https://solflare.com/ul/v1/browse/${encodeURIComponent(currentUrl)}`;
-          return;
-        }
-        if (walletType === 'phantom') {
-          window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
-          return;
-        }
-        if (walletType === 'backpack') {
-          window.location.href = `https://backpack.app/ul/browse/${encodeURIComponent(currentUrl)}`;
-          return;
-        }
-      }
-
-      if (!provider) {
-        // No provider and not mobile or deep link not triggered: open install page
-        const installUrls: Record<string, string> = {
-          phantom: 'https://phantom.app/',
-          solflare: 'https://solflare.com/',
-          backpack: 'https://backpack.app/',
-        };
-        window.open(installUrls[walletType], '_blank');
-        return;
-      }
-
-      // Provider available (desktop or in-app after deep link), use adapter
       const adapterName = walletType === 'phantom' ? 'Phantom' : walletType === 'solflare' ? 'Solflare' : 'Backpack';
       select(adapterName as any);
       await adapterConnect();
+      // Success if we get here (provider was available)
     } catch (error: any) {
-      console.error('Wallet connect error:', error?.message || error);
+      console.error('Adapter connect failed, attempting mobile deep link fallback:', error);
+      // Fallback for mobile: deep link to open the dapp in the wallet's in-app browser
+      if (/iPhone|Android/i.test(navigator.userAgent)) {
+        const currentUrl = window.location.href;
+        let deepLink = '';
+        if (walletType === 'phantom') {
+          deepLink = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
+        } else if (walletType === 'solflare') {
+          deepLink = `https://solflare.com/ul/v1/browse/${encodeURIComponent(currentUrl)}`;
+        } else if (walletType === 'backpack') {
+          deepLink = `https://backpack.app/ul/browse/${encodeURIComponent(currentUrl)}`;
+        }
+        if (deepLink) {
+          window.location.href = deepLink;
+          return; // page will reload in the wallet app/browser
+        }
+      }
+      // Fallback: open install page
+      const installUrls: Record<string, string> = {
+        phantom: 'https://phantom.app/',
+        solflare: 'https://solflare.com/',
+        backpack: 'https://backpack.app/',
+      };
+      window.open(installUrls[walletType], '_blank');
     } finally {
       setIsConnecting(false);
     }
