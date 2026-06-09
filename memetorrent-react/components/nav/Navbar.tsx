@@ -70,15 +70,17 @@ export default function Navbar() {
     } catch (error: any) {
       console.error('Adapter connect failed, attempting mobile deep link fallback:', error);
       // Fallback for mobile: deep link to open the dapp in the wallet's in-app browser
+      // Using ref param to help wallets recognize it as a dapp link (prevents opening wallet home/swap instead of the site)
       if (/iPhone|Android/i.test(navigator.userAgent)) {
         const currentUrl = window.location.href;
+        const ref = encodeURIComponent(window.location.origin);
         let deepLink = '';
         if (walletType === 'phantom') {
-          deepLink = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
+          deepLink = `https://phantom.app/ul/v1/browse/${encodeURIComponent(currentUrl)}?ref=${ref}`;
         } else if (walletType === 'solflare') {
-          deepLink = `https://solflare.com/ul/v1/browse/${encodeURIComponent(currentUrl)}`;
+          deepLink = `https://solflare.com/ul/v1/browse/${encodeURIComponent(currentUrl)}?ref=${ref}`;
         } else if (walletType === 'backpack') {
-          deepLink = `https://backpack.app/ul/browse/${encodeURIComponent(currentUrl)}`;
+          deepLink = `https://backpack.app/ul/browse/${encodeURIComponent(currentUrl)}?ref=${ref}`;
         }
         if (deepLink) {
           window.location.href = deepLink;
