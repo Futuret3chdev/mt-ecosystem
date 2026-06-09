@@ -1852,7 +1852,6 @@ export default function MTWalletApp() {
             {/* Official locked nodes - no customer-editable fields */}
             <div className="border border-zinc-800 rounded-3xl p-4 bg-zinc-950 mt-2">
               <div className="font-semibold text-sm mb-2 text-emerald-400">Node Configuration</div>
-<<<<<<< HEAD
               <div className="text-xs text-zinc-400">Connected to official MT-ECO SYSTEM nodes for primary native $MT and secure backups. Managed for reliability.</div>
               <div className="mt-2 text-[10px] text-emerald-400/70">MT Node: {getMTNode()} (locked official)</div>
               <div className="text-[10px] text-emerald-400/70">Auth: {getAuthURL()} (locked official)</div>
