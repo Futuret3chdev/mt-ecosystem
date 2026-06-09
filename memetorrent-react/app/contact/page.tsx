@@ -51,6 +51,19 @@ export default function ContactPage() {
         </div>
       </div>
 
+      {/* Social icons on contact page for consistency */}
+      <div className="border-t border-white/10">
+        <div className="max-w-7xl mx-auto px-6 py-2 flex items-center gap-x-6 text-sm">
+          <a href="https://discord.gg/FxT7q7fpkT" target="_blank" rel="noopener" title="Discord" style={{ color: '#5865F2' }}><i className="fab fa-discord text-xl"></i></a>
+          <a href="https://twitter.com/MemeTorrent" target="_blank" rel="noopener" title="X / Twitter" style={{ color: '#1DA1F2' }}><i className="fab fa-twitter text-xl"></i></a>
+          <a href="https://t.me/MemeTorrentPortal" target="_blank" rel="noopener" title="Telegram" style={{ color: '#26A5E4' }}><i className="fab fa-telegram text-xl"></i></a>
+          <div className="flex-1" />
+          <span className="text-[10px] opacity-50">Contract: ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump</span>
+        </div>
+      </div>
+        </div>
+      </div>
+
       <div className="max-w-3xl mx-auto px-6 py-16">
         <div className="uppercase text-xs tracking-[3px] text-emerald-400 mb-2">MEME OVERLORDS</div>
         <h1 className="text-5xl font-semibold tracking-[-1.6px] mb-4">Contact the Meme Overlords</h1>

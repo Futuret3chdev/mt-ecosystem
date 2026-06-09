@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ThemeToggle from '@/components/theme/ThemeToggle';
 import { LINKS } from '@/lib/constants';
@@ -35,6 +35,118 @@ export default function Navbar() {
     // Simple toast via alert for now (or we can reuse global toast if exposed)
     alert(msg);
   };
+
+  // Buy $MT form state (compact at top, below BUY $MT NOW)
+  const [showBuyPanel, setShowBuyPanel] = useState(false);
+  const buyPanelRef = useRef<HTMLDivElement>(null);
+
+  // Buy states and logic (duplicated here for top panel to work independently; real Jupiter buy)
+  const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [buySolAmount, setBuySolAmount] = useState(0.1);
+  const [jupQuote, setJupQuote] = useState<any>(null);
+  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
+  const [isExecutingSwap, setIsExecutingSwap] = useState(false);
+
+  const MT_MINT = 'ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump';
+
+  const connectWallet = async (walletType: 'phantom' | 'solflare' | 'backpack') => {
+    try {
+      let provider: any = null;
+      if (walletType === 'phantom') {
+        provider = (window as any).phantom?.solana;
+      } else if (walletType === 'solflare') {
+        provider = (window as any).solflare;
+      } else if (walletType === 'backpack') {
+        provider = (window as any).backpack?.solana;
+      }
+      if (!provider) {
+        alert(`Please install the ${walletType} wallet.`);
+        return;
+      }
+      const resp = await provider.connect();
+      const address = resp.publicKey?.toString() || resp.publicKey;
+      setWalletAddress(address);
+      setConnectedWallet(walletType);
+    } catch (err) {
+      alert('Failed to connect wallet');
+    }
+  };
+
+  const disconnectWallet = () => {
+    setWalletAddress(null);
+    setConnectedWallet(null);
+    setJupQuote(null);
+  };
+
+  const getJupiterQuote = async () => {
+    if (!buySolAmount || buySolAmount <= 0) return;
+    setIsLoadingQuote(true);
+    try {
+      const inputMint = 'So11111111111111111111111111111111111111112';
+      const amountLamports = Math.floor(buySolAmount * 1_000_000_000);
+      const url = `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint}&outputMint=${MT_MINT}&amount=${amountLamports}&slippageBps=100&onlyDirectRoutes=false`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Quote failed');
+      const data = await res.json();
+      setJupQuote(data);
+    } catch (e) {
+      alert('Failed to get quote (network). Use the Raydium link below.');
+      setJupQuote(null);
+    }
+    setIsLoadingQuote(false);
+  };
+
+  const executeRealBuy = async () => {
+    if (!walletAddress || !jupQuote || !connectedWallet) {
+      alert('Connect wallet and get quote first.');
+      return;
+    }
+    setIsExecutingSwap(true);
+    try {
+      const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quoteResponse: jupQuote,
+          userPublicKey: walletAddress,
+          wrapAndUnwrapSol: true,
+        }),
+      });
+      if (!swapRes.ok) throw new Error('Swap tx failed');
+      const { swapTransaction } = await swapRes.json();
+      const connection = new (await import('@solana/web3.js')).Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+      const transaction = (await import('@solana/web3.js')).Transaction.from(Buffer.from(swapTransaction, 'base64'));
+      let provider: any = null;
+      if (connectedWallet === 'phantom') provider = (window as any).phantom?.solana;
+      else if (connectedWallet === 'solflare') provider = (window as any).solflare;
+      else if (connectedWallet === 'backpack') provider = (window as any).backpack?.solana;
+      if (!provider) throw new Error('Provider not available');
+      const signedTx = await provider.signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      await connection.confirmTransaction(signature, 'confirmed');
+      alert(`Buy successful! Tx: ${signature}`);
+      setJupQuote(null);
+    } catch (err: any) {
+      alert('Swap failed: ' + (err.message || 'Use Raydium link.'));
+    }
+    setIsExecutingSwap(false);
+  };
+
+  // Close buy panel on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (buyPanelRef.current && !buyPanelRef.current.contains(event.target as Node)) {
+        setShowBuyPanel(false);
+      }
+    };
+    if (showBuyPanel) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showBuyPanel]);
 
   return (
     <header className="w-full border-b border-white/10">
@@ -109,18 +221,67 @@ export default function Navbar() {
 
           <div className="flex-1" />
 
-          {/* BUY $MT NOW - clickable, replaces the long text; clicking shows the purpose */}
-          <a 
-            href="#management" 
+          {/* BUY $MT NOW - toggles the compact form panel just below */}
+          <button 
+            onClick={() => setShowBuyPanel(!showBuyPanel)}
             className="font-medium text-emerald-400 hover:text-emerald-300 transition cursor-pointer"
-            onClick={() => {
-              // Optional: could dispatch an event to highlight buy area
-            }}
           >
             BUY $MT NOW
-          </a>
+          </button>
         </div>
       </div>
+
+      {/* Compact buy form panel - shows just below BUY $MT NOW, hides on click off.
+          Form (connect) first, then the full THE WALLET IS THE GATEWAY block below it. */}
+      {showBuyPanel && (
+        <div ref={buyPanelRef} className="border-t border-white/10 bg-zinc-950/95 backdrop-blur">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            {/* Compact form: Connect your wallet to buy */}
+            <div className="mb-4">
+              <div className="text-sm font-medium mb-2">Connect your wallet to buy</div>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => connectWallet('phantom')} className="px-3 py-1.5 text-xs rounded-xl border border-white/20 hover:bg-white/5">👻 Phantom</button>
+                <button onClick={() => connectWallet('solflare')} className="px-3 py-1.5 text-xs rounded-xl border border-white/20 hover:bg-white/5">☀️ Solflare</button>
+                <button onClick={() => connectWallet('backpack')} className="px-3 py-1.5 text-xs rounded-xl border border-white/20 hover:bg-white/5">🎒 Backpack</button>
+              </div>
+              {walletAddress && (
+                <div className="mt-2 text-xs">Connected: {connectedWallet} {walletAddress.slice(0,6)}... <button onClick={disconnectWallet} className="underline">Disconnect</button></div>
+              )}
+              <div className="text-[10px] opacity-60 mt-1">Best in wallet browser on mobile.</div>
+            </div>
+
+            {/* THE WALLET IS THE GATEWAY block just below the form in the panel */}
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-sm">
+              <div className="text-emerald-400 text-xs tracking-[3px]">THE WALLET IS THE GATEWAY</div>
+              <div className="font-semibold tracking-tight mt-1">INFINITE WALLET<br />For infinite possibilities.<br />Truly ours.</div>
+              <ul className="mt-2 space-y-0.5 text-xs opacity-80">
+                <li>• 100% self-built. No injected providers.</li>
+                <li>• Create, import, send, mint NFTs, earn &amp; spend Rockets.</li>
+                <li>• Native MT chain + Solana $MT + future bridges.</li>
+                <li>• Keys encrypted locally. Seed never leaves your device.</li>
+              </ul>
+              <a href={LINKS.wallet} target="_blank" className="mt-3 inline-block text-xs text-emerald-400 hover:underline">OPEN INFINITE WALLET →</a>
+            </div>
+
+            {/* Buy controls if connected */}
+            {walletAddress && (
+              <div className="mt-4">
+                <div className="flex items-center gap-2 text-xs mb-1">
+                  <span>Amount (SOL)</span>
+                  <input type="range" min="0.01" max="5" step="0.01" value={buySolAmount} onChange={e => setBuySolAmount(parseFloat(e.target.value))} className="flex-1 accent-emerald-400" />
+                  <span className="font-mono">{buySolAmount}</span>
+                </div>
+                <button onClick={getJupiterQuote} disabled={isLoadingQuote} className="w-full py-2 text-xs border border-white/20 rounded-xl mb-2">Get Quote</button>
+                {jupQuote && <div className="text-xs mb-2">~{(Number(jupQuote.outAmount)/1e6).toFixed(0)} $MT</div>}
+                <button onClick={executeRealBuy} disabled={!jupQuote || isExecutingSwap} className="w-full py-2 bg-emerald-400 text-black text-xs font-semibold rounded-xl">BUY REAL $MT (Jupiter)</button>
+                <div className="text-center mt-1">
+                  <a href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} target="_blank" className="text-xs text-emerald-400 underline">Or Raydium</a>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Auth Modal / Popup — clean, good looking, hidden until icon clicked */}
       <AnimatePresence>
