@@ -70,10 +70,13 @@ export function getMTNode() {
   }
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const isVercelOrCustom = hostname.includes('vercel.app') || hostname.endsWith('futuret3ch.com.au');
-  // On production (Vercel or our custom domains), default to the https api subdomain.
-  // Set VITE_MT_NODE_URL=https://api.futuret3ch.com.au (or /api/mt) in Vercel env to override.
+  // On production (Vercel or our custom domains for the *wallet*), default to the co-located Vercel
+  // serverless proxy (/api/mt). This is the key for "sign in and everything works when launching
+  // the wallet from the marketing site". No separate api subdomain or mixed content issues.
+  // The /api/mt function (in this same Vercel project) forwards to your live mt-core.
+  // Override by setting VITE_MT_NODE_URL (full https://... or /api/mt) in Vercel, or use Settings/localStorage.
   if (isVercelOrCustom) {
-    return 'https://api.futuret3ch.com.au'; // official api subdomain (nginx proxy to core)
+    return '/api/mt'; // same-origin Vercel function proxy -> VPS mt-core (no mixed content, sign-in ready)
   }
   let local = localStorage.getItem('mt_custom_mt_node');
   if (local) {
@@ -123,10 +126,12 @@ export function getAuthURL() {
   }
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const isVercelOrCustom = hostname.includes('vercel.app') || hostname.endsWith('futuret3ch.com.au');
-  // On production (Vercel or our custom domains), default to the https auth subdomain.
-  // Set VITE_AUTH_URL=https://auth.futuret3ch.com.au (or /api/auth) in Vercel env to override.
+  // On production (Vercel or our custom domains for the *wallet*), default to the co-located Vercel
+  // serverless proxy (/api/auth). This makes email/phone sign-in (signup, login, verify, cross-device
+  // encrypted wallet restore) work immediately for visitors arriving from the marketing site links.
+  // Override via VITE_AUTH_URL=https://... in the Vercel infinite-wallet project (or localStorage in Settings).
   if (isVercelOrCustom) {
-    return 'https://auth.futuret3ch.com.au'; // official auth subdomain (nginx proxy to mt-auth)
+    return '/api/auth'; // same-origin Vercel function proxy -> VPS mt-auth (no mixed content, sign-in ready)
   }
   let local = localStorage.getItem('mt_custom_auth_url');
   if (local) {

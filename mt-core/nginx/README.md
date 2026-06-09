@@ -93,7 +93,7 @@ In your Vercel dashboard for the "infinite-wallet" project:
     Value: https://api.futuret3ch.com.au
   - Name: AUTH_TARGET_URL
     Value: https://auth.futuret3ch.com.au
-  (You can also point at http://127.0.0.1:4001 etc if the functions run with access, but https subdomains are simplest now.)
+  (You can also point at http://161.97.106.182:4001 etc for direct; https subdomains are simplest once live.)
 
 - Redeploy the project (or push a commit to trigger).
 
@@ -117,6 +117,7 @@ sudo ufw allow 443/tcp
 
 The error "wallet.futuret3ch.com.au Invalid Configuration" (while vercel.app shows Valid) happens because DNS does not yet point the name at Vercel's edge.
 
+<<<<<<< HEAD
 **CRITICAL WARNING — DO NOT CHANGE NAMESERVERS**
 
 Vercel is showing you the option to switch the whole domain to `ns1.vercel-dns.com` / `ns2.vercel-dns.com`.
@@ -223,6 +224,46 @@ Keep the auth and api A records to the VPS IP.
 
 The old ~/eco/mt-ecosystem/infinite-wallet (CRA/craco) on VPS is legacy 2025 code — ignore it. All current work is in the Vite mt-ecosystem tree on your PC.
 
+**Do this:**
+
+1. In your DNS provider, **DELETE** any A/AAAA/CNAME record for `wallet.futuret3ch.com.au` that points to 161.97.106.182 (or anywhere else).
+
+2. In Vercel (infinite-wallet project → Domains), open the entry for wallet.futuret3ch.com.au. Vercel will display the **exact DNS records** it needs in a table like this:
+
+   Type: CNAME
+   Name: wallet
+   Value: bb78f335c0031b77.vercel-dns-017.com.
+
+   (The important part: in **your DNS provider**, the "Name" / "Host" / "Subdomain" field must be exactly `wallet` — **not** `wallet.futuret3ch.com.au` or `wallet.`. The provider appends the rest.)
+
+   For the "Value" / "Target" / "Points to" field, use the full value Vercel gives, usually with a trailing dot: `bb78f335c0031b77.vercel-dns-017.com.`
+
+   (Trailing dot on the target is often required or recommended by DNS providers to mark it as a full name.)
+
+   Some setups use two A records instead — copy **whatever table** Vercel lists for this domain exactly.
+
+3. First **DELETE** any existing A record + any old/wrong CNAME for `wallet` (including ones that used the full `wallet.futuret3ch.com.au.` as the name). Then create the new record matching Vercel's table.
+
+4. Save / publish the DNS change.
+
+5. Wait for propagation (check https://dnschecker.org for both `wallet.futuret3ch.com.au` and the CNAME target). This can be 1-30+ minutes depending on your provider's TTL (14400 is what you showed — fine, but lower helps during setup).
+
+6. Back in Vercel, click "Verify", "Refresh", or "Check again" on the domain row. It should change from "Invalid Configuration" to "Valid Configuration".
+
+7. (After valid) You can set `wallet.futuret3ch.com.au` as the primary domain for the Production deployment. Both it and the vercel.app will work (Vercel can redirect or serve on the custom).
+
+**Alternative (VPS proxy for wallet too):** If you prefer everything under your VPS nginx (simpler DNS: just one A to VPS for wallet.), keep the A record pointing to 161.97.106.182 for wallet., then:
+
+```bash
+sudo cp wallet.conf /etc/nginx/sites-available/wallet
+sudo ln -s /etc/nginx/sites-available/wallet /etc/nginx/sites-enabled/ || true
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d wallet.futuret3ch.com.au
+```
+
+This works but adds a proxy hop. Direct-to-Vercel (above) is recommended.
+>>>>>>> 5644329 (chore(marketing): clean memetorrent-react to pure marketing site only (remove old embedded wallet/ CRA build, duplicate WalletStub, empty files, web3))
+
 ## Firewall (VPS)
 
 ```bash
@@ -247,6 +288,7 @@ After DNS valid + redeploy + VPS certs + restarts:
 
 - Marketing site (memetorrent-react) CTAs already point to https://wallet.futuret3ch.com.au/
 
+<<<<<<< HEAD
 Use http://YOUR_VPS_IP:4001 (mt-core) / :4002 (mt-auth) for direct VPS testing before domains/TLS are live. After, prefer https://api.futuret3ch.com.au/health etc.
 
 This completes production custom domain + real persistent per-user wallets for the 20k users path. No demo fallbacks in the happy path.
@@ -418,3 +460,7 @@ curl -I http://wallet.futuret3ch.com.au   # or https after cert
 And check what `proxy_pass` line is active for it using the `nginx -T` command above.
 
 Always run `sudo nginx -t` before `reload`. If it fails, the site will be broken until you fix the syntax.
+
+Use http://161.97.106.182:4001 etc for direct VPS testing before domains/TLS are live.
+
+This completes production custom domain + real persistent per-user wallets for the 20k users path. No demo fallbacks in the happy path. (For the marketing site + Vercel wallet deploys, the /api proxies + correct TARGET envs give working sign-in and native data even before all subdomains are 100% cut over.)
