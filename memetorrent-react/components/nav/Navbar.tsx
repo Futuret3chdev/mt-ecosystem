@@ -49,142 +49,49 @@ export default function Navbar() {
     setIsMobile(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
   }, []);
 
-  // Buy states and logic (duplicated here for top panel to work independently; real Jupiter buy)
-  const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [buySolAmount, setBuySolAmount] = useState(0.1);
-  const [jupQuote, setJupQuote] = useState<any>(null);
-  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
-  const [isExecutingSwap, setIsExecutingSwap] = useState(false);
-
   const MT_MINT = 'ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump';
 
-  const connectWallet = async (walletType: 'phantom' | 'solflare' | 'backpack') => {
-    try {
-      let provider: any = null;
-      if (walletType === 'phantom') {
-        provider = (window as any).phantom?.solana;
-      } else if (walletType === 'solflare') {
-        provider = (window as any).solflare;
-      } else if (walletType === 'backpack') {
-        provider = (window as any).backpack?.solana;
+  // Jupiter Plugin init effect (replaces all previous custom buy logic that was erroring)
+  useEffect(() => {
+    if (!showBuyPanel) {
+      if (typeof window !== 'undefined' && (window as any).Jupiter && typeof (window as any).Jupiter.destroy === 'function') {
+        try { (window as any).Jupiter.destroy(); } catch (e) {}
       }
-      if (!provider) {
-        alert(`Please install the ${walletType} wallet.`);
-        return;
-      }
-      const resp = await provider.connect();
-      const address = resp.publicKey?.toString() || resp.publicKey;
-      setWalletAddress(address);
-      setConnectedWallet(walletType);
-    } catch (err) {
-      alert('Failed to connect wallet');
-    }
-  };
-
-  const disconnectWallet = () => {
-    setWalletAddress(null);
-    setConnectedWallet(null);
-    setJupQuote(null);
-  };
-
-  const getRaydiumQuote = async () => {
-    if (!buySolAmount || buySolAmount <= 0) return;
-    setIsLoadingQuote(true);
-    try {
-      const { API_URLS } = await import('@raydium-io/raydium-sdk-v2');
-
-      const amount = Math.floor(buySolAmount * 1_000_000_000);
-      const slippageBps = 100;
-      const txVersion = 'V0';
-
-      // Accurate quote directly from Raydium (no Jupiter, matches "no third parties" + docs)
-      const computeUrl = `${API_URLS.SWAP_HOST}/compute/swap-base-in?inputMint=So11111111111111111111111111111111111111112&outputMint=${MT_MINT}&amount=${amount}&slippageBps=${slippageBps}&txVersion=${txVersion}`;
-      const res = await fetch(computeUrl);
-      const computeData = await res.json();
-
-      const swapResponse = computeData.data || computeData;
-      if (swapResponse && swapResponse.amountOut) {
-        setJupQuote({ outAmount: swapResponse.amountOut });
-        // cache for execute
-        (window as any).__raydiumSwapResponse = swapResponse;
-      } else {
-        throw new Error('No amountOut in Raydium response');
-      }
-    } catch (e) {
-      console.error('Raydium quote error:', e);
-      alert('Failed to get quote (network). Use the Raydium link below.');
-      setJupQuote(null);
-    }
-    setIsLoadingQuote(false);
-  };
-
-  const executeRealBuy = async () => {
-    if (!walletAddress || !connectedWallet) {
-      alert('Connect wallet first.');
       return;
     }
-    setIsExecutingSwap(true);
-    try {
-      const { Connection, VersionedTransaction } = await import('@solana/web3.js');
-      const { API_URLS } = await import('@raydium-io/raydium-sdk-v2');
 
-      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-
-      let provider: any = null;
-      if (connectedWallet === 'phantom') provider = (window as any).phantom?.solana;
-      else if (connectedWallet === 'solflare') provider = (window as any).solflare;
-      else if (connectedWallet === 'backpack') provider = (window as any).backpack?.solana;
-      if (!provider) throw new Error('Provider not available');
-
-      let swapResponse = (window as any).__raydiumSwapResponse;
-      if (!swapResponse) {
-        // re-compute if needed
-        const amount = Math.floor(buySolAmount * 1_000_000_000);
-        const slippageBps = 100;
-        const txVersion = 'V0';
-        const computeUrl = `${API_URLS.SWAP_HOST}/compute/swap-base-in?inputMint=So11111111111111111111111111111111111111112&outputMint=${MT_MINT}&amount=${amount}&slippageBps=${slippageBps}&txVersion=${txVersion}`;
-        const res = await fetch(computeUrl);
-        const computeData = await res.json();
-        swapResponse = computeData.data || computeData;
+    const initJupiterPlugin = () => {
+      if (typeof window !== 'undefined' && (window as any).Jupiter) {
+        try {
+          if (typeof (window as any).Jupiter.destroy === 'function') (window as any).Jupiter.destroy();
+        } catch (e) {}
+        (window as any).Jupiter.init({
+          displayMode: "integrated",
+          integratedTargetId: "jupiter-buy-container",
+          formProps: {
+            initialInputMint: "So11111111111111111111111111111111111111112",
+            initialOutputMint: MT_MINT,
+          },
+          branding: {
+            logoUri: "https://futuret3ch.com.au/assets/img/logo.png",
+            name: "MT-ECOSYSTEM",
+          },
+        });
       }
-      if (!swapResponse) throw new Error('No swap response from Raydium');
+    };
 
-      // Get server-built tx from Raydium (direct, using their liquidity)
-      const txRes = await fetch(`${API_URLS.SWAP_HOST}/transaction/swap-base-in`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          swapResponse,
-          txVersion: 'V0',
-          wallet: walletAddress,
-          wrapSol: true,
-          unwrapSol: false,
-        }),
-      });
-      const txData = await txRes.json();
-
-      if (!txData || !txData.data || !txData.data.swapTransaction) {
-        throw new Error('No transaction from Raydium API');
+    if (typeof window !== 'undefined') {
+      if (!(window as any).Jupiter) {
+        const script = document.createElement('script');
+        script.src = 'https://plugin.jup.ag/plugin-v1.js';
+        script.async = true;
+        script.onload = initJupiterPlugin;
+        document.head.appendChild(script);
+      } else {
+        initJupiterPlugin();
       }
-
-      const transaction = VersionedTransaction.deserialize(
-        Buffer.from(txData.data.swapTransaction, 'base64')
-      );
-
-      const signedTx = await provider.signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signedTx.serialize());
-      await connection.confirmTransaction(signature, 'confirmed');
-
-      alert(`Buy successful! Tx: ${signature}`);
-      setJupQuote(null);
-      (window as any).__raydiumSwapResponse = null;
-    } catch (err: any) {
-      console.error('Swap error:', err);
-      alert('Swap failed: ' + (err.message || 'Use Raydium link.'));
     }
-    setIsExecutingSwap(false);
-  };
+  }, [showBuyPanel]);
 
   // Close buy panel on outside click (mouse + touch for mobile). User closes with X only - no auto scroll close.
   useEffect(() => {
@@ -338,38 +245,11 @@ export default function Navbar() {
               <div className="text-xs sm:text-sm font-medium">Direct on-chain buy — self-custodial</div>
               <button onClick={() => setShowBuyPanel(false)} className="text-xl leading-none opacity-60 hover:opacity-100 px-2" aria-label="Close buy panel">×</button>
             </div>
-            <div className="text-[10px] opacity-60 mb-3">Your wallet signs the transaction. No third party holds your keys or funds. Swap executes directly on Solana.</div>
+            {/* Jupiter Plugin for reliable integrated swap (SOL to $MT) - handles connect, quote, fees, and on-chain execution */}
+            <div id="jupiter-buy-container" style={{ width: '100%', height: '520px', borderRadius: '12px', overflow: 'hidden', background: '#000' }} />
 
-            {/* Connect buttons - work best inside wallet in-app browser on mobile */}
-            <div className="mb-3 sm:mb-4">
-              <div className="text-[10px] opacity-70 mb-1.5">Connect a self-custodial Solana wallet. No third party will ever see or hold your keys.</div>
-              <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-                <button onClick={() => connectWallet('phantom')} className="px-4 py-2 min-h-[44px] text-sm rounded-xl border border-white/20 hover:bg-white/5 active:bg-white/10">👻 Phantom</button>
-                <button onClick={() => connectWallet('solflare')} className="px-4 py-2 min-h-[44px] text-sm rounded-xl border border-white/20 hover:bg-white/5 active:bg-white/10">☀️ Solflare</button>
-                <button onClick={() => connectWallet('backpack')} className="px-4 py-2 min-h-[44px] text-sm rounded-xl border border-white/20 hover:bg-white/5 active:bg-white/10">🎒 Backpack</button>
-              </div>
-              {walletAddress && (
-                <div className="mt-2 text-xs">Connected: {connectedWallet} {walletAddress.slice(0,6)}... <button onClick={disconnectWallet} className="underline ml-1">Disconnect</button></div>
-              )}
-
-              {/* Mobile-specific app links so users can find & open the wallets */}
-              {isMobile && (
-                <div className="mt-2 text-[10px] opacity-70">
-                  On mobile: open this page <span className="font-medium">inside your wallet app's browser</span> for connect to work.
-                  <div className="mt-1 flex flex-wrap gap-x-3">
-                    <a href={walletApps.phantom.url} target="_blank" className="text-emerald-400 underline">Get Phantom app →</a>
-                    <a href={walletApps.solflare.url} target="_blank" className="text-emerald-400 underline">Get Solflare app →</a>
-                    <a href={walletApps.backpack.url} target="_blank" className="text-emerald-400 underline">Get Backpack app →</a>
-                  </div>
-                </div>
-              )}
-              {!isMobile && (
-                <div className="text-[10px] opacity-60 mt-1">Tip: On mobile, open this page inside your wallet app's browser for seamless on-chain signing.</div>
-              )}
-            </div>
-
-            {/* THE WALLET IS THE GATEWAY block just below the form in the panel - full original text */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 sm:p-4 text-xs sm:text-sm">
+            {/* THE WALLET IS THE GATEWAY block - promotional, kept below the plugin */}
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 sm:p-4 text-xs sm:text-sm mt-3">
               <div className="text-emerald-400 text-[10px] sm:text-xs tracking-[3px]">THE WALLET IS THE GATEWAY</div>
               <div className="font-semibold tracking-tight mt-0.5 sm:mt-1 text-sm sm:text-base">INFINITE WALLET<br />For infinite possibilities.<br />Truly ours.</div>
               <ul className="mt-1 sm:mt-2 space-y-0.5 text-[10px] sm:text-xs opacity-80">
@@ -381,32 +261,17 @@ export default function Navbar() {
               <a href={LINKS.wallet} target="_blank" className="mt-2 sm:mt-3 inline-block text-xs sm:text-sm text-emerald-400 hover:underline">OPEN INFINITE WALLET →</a>
             </div>
 
-            <div className="mt-3 text-[10px] opacity-70 border border-white/10 rounded-xl p-3 bg-white/[0.01]">
-              <strong>No third parties hold your assets.</strong> The buy is a direct on-chain transaction on Solana. 
-              You sign with your wallet. Liquidity is sourced from decentralized pools. 
-              This aligns with our mission: self-custodial, no custody, no middlemen.
-            </div>
-
-            {/* Buy controls if connected - responsive */}
-            {walletAddress && (
-              <div className="mt-3 sm:mt-4">
-                <div className="flex items-center gap-2 text-xs mb-1">
-                  <span>Amount (SOL)</span>
-                  <input type="range" min="0.01" max="5" step="0.01" value={buySolAmount} onChange={e => setBuySolAmount(parseFloat(e.target.value))} className="flex-1 accent-emerald-400" />
-                  <span className="font-mono text-xs sm:text-sm">{buySolAmount}</span>
-                </div>
-                <button onClick={getRaydiumQuote} disabled={isLoadingQuote} className="w-full py-2.5 min-h-[44px] text-xs sm:text-sm border border-white/20 rounded-xl mb-2 active:bg-white/5">Get On-Chain Quote</button>
-                {jupQuote && <div className="text-xs mb-2">~{(Number(jupQuote.outAmount)/1e6).toFixed(0)} $MT</div>}
-                <button onClick={executeRealBuy} disabled={isExecutingSwap} className="w-full py-2.5 min-h-[44px] bg-emerald-400 text-black text-xs sm:text-sm font-semibold rounded-xl active:opacity-90">SIGN &amp; SEND ON-CHAIN BUY</button>
-                <div className="text-center mt-1">
-                  <a href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} target="_blank" className="text-xs sm:text-sm text-emerald-400 underline">Or buy directly on Raydium</a>
-                </div>
-                <div className="mt-2 text-center text-[10px] opacity-70">
-                  Fully self-custodial • Your keys sign the tx • No custody by any service<br />
-                  <a href="https://docs.raydium.io/solana-fundamentals" target="_blank" className="text-emerald-400/80 hover:text-emerald-400 underline">Learn how Solana on-chain buys work →</a>
-                </div>
-              </div>
-            )}
+            {/* CSS vars to theme the Jupiter plugin to match the site's dark + emerald look */}
+            <style>{`
+              :root {
+                --jupiter-plugin-primary: 199, 242, 132;
+                --jupiter-plugin-background: 0, 0, 0;
+                --jupiter-plugin-primary-text: 232, 249, 255;
+                --jupiter-plugin-warning: 251, 191, 36;
+                --jupiter-plugin-interactive: 33, 42, 54;
+                --jupiter-plugin-module: 16, 23, 31;
+              }
+            `}</style>
           </div>
         </div>
       )}
