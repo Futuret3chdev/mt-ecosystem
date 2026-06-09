@@ -141,24 +141,21 @@ export default function Navbar() {
     setIsExecutingSwap(false);
   };
 
-  // Close buy panel on outside click (mouse + touch for mobile)
+  // Close buy panel on outside click (mouse + touch for mobile). User closes with X only - no auto scroll close.
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (buyPanelRef.current && !buyPanelRef.current.contains(event.target as Node)) {
         setShowBuyPanel(false);
       }
     };
-    const handleScroll = () => setShowBuyPanel(false);
 
     if (showBuyPanel) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside, { passive: true });
-      window.addEventListener('scroll', handleScroll, { passive: true });
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside as any);
-      window.removeEventListener('scroll', handleScroll);
     };
   }, [showBuyPanel]);
 
@@ -177,15 +174,16 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-3 sm:gap-6 text-sm">
-          {/* Desktop nav links */}
+          {/* Desktop nav links - use /# so they work correctly even from /contact or /whitepaper */}
           <div className="hidden md:flex items-center gap-6">
-            <a href="#stats" className="opacity-70 hover:opacity-100">LIVE $MT</a>
-            <a href="#tokenomics" className="opacity-70 hover:opacity-100">TOKENOMICS</a>
-            <a href="#utilities" className="opacity-70 hover:opacity-100">UTILITIES</a>
-            <a href="#tap" className="opacity-70 hover:opacity-100">TAP</a>
-            <a href="#tap" className="opacity-70 hover:opacity-100">P2E</a>
-            <a href="#safety" className="opacity-70 hover:opacity-100">SAFETY</a>
+            <a href="/#stats" className="opacity-70 hover:opacity-100">LIVE $MT</a>
+            <a href="/#tokenomics" className="opacity-70 hover:opacity-100">TOKENOMICS</a>
+            <a href="/#utilities" className="opacity-70 hover:opacity-100">UTILITIES</a>
+            <a href="/#tap" className="opacity-70 hover:opacity-100">TAP</a>
+            <a href="/#tap" className="opacity-70 hover:opacity-100">P2E</a>
+            <a href="/#safety" className="opacity-70 hover:opacity-100">SAFETY</a>
             <a href="/contact" className="opacity-70 hover:opacity-100">CONTACT</a>
+            <a href="/whitepaper" className="opacity-70 hover:opacity-100">WHITEPAPER</a>
           </div>
 
           <a href={LINKS.wallet} target="_blank" className="font-medium px-3 sm:px-4 py-1 sm:py-1.5 rounded-xl border border-white/30 hover:bg-white/5 text-xs sm:text-sm">Launch</a>
@@ -221,16 +219,17 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile nav menu */}
+      {/* Mobile nav menu - use /# so anchors work from subpages like /contact /whitepaper */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-white/10 bg-black px-4 py-3 flex flex-col gap-2 text-sm">
-          <a href="#stats" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">LIVE $MT</a>
-          <a href="#tokenomics" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">TOKENOMICS</a>
-          <a href="#utilities" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">UTILITIES</a>
-          <a href="#tap" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">TAP</a>
-          <a href="#tap" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">P2E</a>
-          <a href="#safety" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">SAFETY</a>
+          <a href="/#stats" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">LIVE $MT</a>
+          <a href="/#tokenomics" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">TOKENOMICS</a>
+          <a href="/#utilities" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">UTILITIES</a>
+          <a href="/#tap" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">TAP</a>
+          <a href="/#tap" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">P2E</a>
+          <a href="/#safety" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">SAFETY</a>
           <a href="/contact" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">CONTACT</a>
+          <a href="/whitepaper" onClick={() => setMobileMenuOpen(false)} className="py-1 opacity-70 hover:opacity-100">WHITEPAPER</a>
           <button 
             onClick={() => { setMobileMenuOpen(false); setShowBuyPanel(true); }}
             className="py-1 text-left font-medium text-emerald-400 hover:opacity-100"
@@ -348,6 +347,9 @@ export default function Navbar() {
                 <button onClick={executeRealBuy} disabled={!jupQuote || isExecutingSwap} className="w-full py-2.5 min-h-[44px] bg-emerald-400 text-black text-xs sm:text-sm font-semibold rounded-xl active:opacity-90">BUY REAL $MT (Jupiter)</button>
                 <div className="text-center mt-1">
                   <a href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} target="_blank" className="text-xs sm:text-sm text-emerald-400 underline">Or buy on Raydium instead</a>
+                </div>
+                <div className="mt-2 text-center">
+                  <a href="https://docs.raydium.io/solana-fundamentals" target="_blank" className="text-[10px] text-emerald-400/80 hover:text-emerald-400 underline">Use Raydium fundamentals for proper on-chain $MT buys →</a>
                 </div>
               </div>
             )}

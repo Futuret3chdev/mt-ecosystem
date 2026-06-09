@@ -31,7 +31,6 @@ export default function ContactPage() {
         'Your query has been logged in the MT-CHAIN queue.',
         'Soon™ — but real progress happening now.',
         'Message received. We move faster than the market.',
-        'Support ticket opened. Expect a response in under 69 minutes.',
       ];
       setBotLog(l => [...l, replies[Math.floor(Math.random() * replies.length)]]);
     }, 520);
@@ -98,7 +97,7 @@ export default function ContactPage() {
         </div>
 
         <div className="mt-8 text-center text-xs opacity-50">
-          Or open a ticket via the INFINITE WALLET support flows. All core infrastructure is self-hosted.
+          All core infrastructure is self-hosted.
         </div>
       </div>
 

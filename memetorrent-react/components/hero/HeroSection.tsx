@@ -8,8 +8,6 @@ export default function HeroSection() {
     <section className="min-h-[72vh] sm:min-h-[80vh] md:min-h-[88vh] flex items-center pt-6 sm:pt-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 grid md:grid-cols-12 gap-x-8 md:gap-x-12 items-center">
         <div className="md:col-span-7">
-          <div className="inline-block px-3 py-1 rounded-full border border-white/15 text-xs tracking-[2px] mb-5 sm:mb-6 text-emerald-400">MT-ECO SYSTEM</div>
-
           <h1 className="text-5xl sm:text-6xl md:text-[78px] font-bold leading-[0.92] tracking-[-3.5px] sm:tracking-[-4.4px]">
             The on-chain<br />network.<br />Built different.
           </h1>
