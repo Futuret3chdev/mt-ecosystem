@@ -59,14 +59,17 @@ export default function ContactPage() {
   return (
     <main className="min-h-screen">
       <div className="border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
-          <Link href="/" className="font-semibold tracking-tight flex items-center gap-2">
-            <span className="text-emerald-400">MT</span> ECO SYSTEM
-          </Link>
-          <div className="flex items-center gap-3 sm:gap-6 text-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between text-sm">
+          {/* Left side: navigation actions */}
+          <div className="flex items-center gap-3 sm:gap-6">
             <Link href="/" className="opacity-70 hover:opacity-100">Back to Home</Link>
             <a href="https://wallet.futuret3ch.com.au/" target="_blank" className="font-medium px-3 sm:px-4 py-1 sm:py-1.5 rounded-xl border border-white/30 hover:bg-white/5 text-xs sm:text-sm">Launch Infinite Wallet</a>
           </div>
+
+          {/* Right side: ONLY the MT ECO SYSTEM branding (top right corner) */}
+          <Link href="/" className="font-semibold tracking-tight flex items-center gap-2 hover:opacity-80 transition">
+            <span className="text-emerald-400">MT</span> ECO SYSTEM
+          </Link>
         </div>
       </div>
 
