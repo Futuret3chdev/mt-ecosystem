@@ -398,31 +398,34 @@ export default function PortfolioManager() {
           </div>
         </div>
 
-        {/* Tokenomics — original important allocations, in its own dedicated location (not a flow card) */}
-        <div className="mb-10">
+        {/* Tokenomics — restored full from old site https://memetorrent.futuret3ch.com.au/token.html */}
+        <div id="tokenomics" className="mb-10">
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-2">TOKENOMICS $MT</div>
           <div className="text-3xl font-semibold tracking-tight mb-4">1,000,000,000 TOTAL SUPPLY</div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { pct: '18%', label: 'PRESALE', amt: '180 Million', note: '' },
-              { pct: '10%', label: 'LIQUIDITY', amt: '100 Million', note: 'Over 12 months' },
-              { pct: '20%', label: 'STAKING', amt: '200 Million', note: 'Vested 2 years' },
-              { pct: '45%', label: 'MINING', amt: '450 Million', note: 'Interact to earn' },
-              { pct: '4%', label: 'AIRDROPS', amt: '40 Million', note: '' },
-              { pct: '2.5%', label: 'DEVELOPMENT', amt: '25 Million', note: 'Over 2 years' },
-              { pct: '0.5%', label: 'TEAM', amt: '5 Million', note: 'Locked 5 years' },
+              { icon: '🚀', pct: '18%', label: 'PRESALE', amt: '180 Million Tokens', note: '🎯' },
+              { icon: '💰', pct: '10%', label: 'LIQUIDITY', amt: '100 Million Tokens', note: 'Released over 12 Months' },
+              { icon: '💎', pct: '20%', label: 'STAKING', amt: '200 Million Tokens', note: 'Vested Over 2 Years' },
+              { icon: '⛏️', pct: '45%', label: 'MINING', amt: '450 Million Tokens', note: '🎮 Interact to Earn' },
+              { icon: '🎁', pct: '4%', label: 'AIRDROPS', amt: '40 Million Tokens', note: '🌐' },
+              { icon: '🛠️', pct: '2.5%', label: 'DEVELOPMENT', amt: '25 Million Tokens', note: 'Released Over 2 Years' },
+              { icon: '👥', pct: '0.5%', label: 'TEAM', amt: '5 Million Tokens', note: '⏳ Locked for 5 Years' },
             ].map((a, i) => (
-              <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.015] p-4 text-sm">
-                <div className="flex gap-2 items-baseline">
-                  <span className="font-mono text-emerald-400">{a.pct}</span>
-                  <span className="font-semibold">{a.label}</span>
+              <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.015] p-4 flex gap-3 items-start">
+                <div className="text-2xl mt-0.5">{a.icon}</div>
+                <div className="text-sm">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono text-emerald-400 text-lg">{a.pct}</span>
+                    <span className="font-semibold tracking-tight">{a.label}</span>
+                  </div>
+                  <div className="mt-0.5">{a.amt}</div>
+                  <div className="text-[10px] opacity-60 mt-0.5">{a.note}</div>
                 </div>
-                <div>{a.amt} Tokens</div>
-                {a.note && <div className="text-[10px] opacity-60">{a.note}</div>}
               </div>
             ))}
           </div>
-          <div className="text-[10px] mt-2 opacity-50">Full details in the whitepaper. $MT is the universal key across the ecosystem.</div>
+          <a href={LINKS.whitepaper || 'https://memetorrent.futuret3ch.com.au/whitepaper.pdf'} target="_blank" className="inline-block mt-3 text-xs text-emerald-400 hover:underline">📄 READ $MT WHITEPAPER</a>
         </div>
 
         {/* The good stuff: actual management flows */}
@@ -664,22 +667,26 @@ export default function PortfolioManager() {
           </AnimatePresence>
 
           {/* Utility items now displayed statically under the ONE-PLACE MANAGEMENT FLOWS (not as individual flow cards) */}
-          <div className="mt-10 pt-8 border-t border-white/10">
+          <div id="utilities" className="mt-10 pt-8 border-t border-white/10">
             <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">CORE UTILITIES POWERED BY $MT</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
               {[
-                'Token Exclusivity — $MT is the universal key. Every feature, game, marketplace, login & identity runs with $MT.',
-                'P2E Mining — Earn real $MT by gaming, raiding socials, or completing MemeTorrent missions.',
-                'NFT Digital Identity — Burn $MT → Mint your 1/1 NFT identity. Required for premium areas & exclusive utilities.',
-                'Physical / Digital Store — Buy hardware, software, tech services, AI tools, dev work — ONLY with $MT.',
-                'MT-CHAIN (Soon) — Our blockchain is coming. Validators, nodes, staking, governance, gas-less features.',
-                'Weekly Drops — New utilities roll out constantly. New apps, bots, tools, games and protocols.',
-                'Safety & Security — Anti-rug tech, secure ecosystem, wallet protection, community guardians.',
-                'Launchpad Access — Exclusive early access to future tokens, NFTs, dApps & partner projects.',
-                'Vault & Rewards — Lock $MT → earn yield, XP, badges, NFT rank-ups & weekly reward distributions.',
+                { icon: '🔑', title: 'Token Exclusivity', desc: '$MT is the universal key. Every feature, game, marketplace, login & identity runs with $MT.' },
+                { icon: '⛏️', title: 'P2E Mining', desc: 'Earn real $MT by gaming, raiding socials, or completing MemeTorrent missions.' },
+                { icon: '🖼️', title: 'NFT Digital Identity', desc: 'Burn $MT → Mint your 1/1 NFT identity. Required for premium areas & exclusive utilities.' },
+                { icon: '🛒', title: 'Physical / Digital Store', desc: 'Buy hardware, software, tech services, AI tools, dev work — ONLY with $MT.' },
+                { icon: '⛓️', title: 'MT-CHAIN (Soon)', desc: 'Our blockchain is coming. Validators, nodes, staking, governance, gas-less features.' },
+                { icon: '📦', title: 'Weekly Drops', desc: 'New utilities roll out constantly. New apps, bots, tools, games and protocols.' },
+                { icon: '🛡️', title: 'Safety & Security', desc: 'Anti-rug tech, secure ecosystem, wallet protection, community guardians.' },
+                { icon: '🚀', title: 'Launchpad Access', desc: 'Exclusive early access to future tokens, NFTs, dApps & partner projects.' },
+                { icon: '🏦', title: 'Vault & Rewards', desc: 'Lock $MT → earn yield, XP, badges, NFT rank-ups & weekly reward distributions.' },
               ].map((u, i) => (
-                <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.015] p-4 leading-snug">
-                  {u}
+                <div key={i} className="group rounded-2xl border border-white/10 bg-white/[0.015] p-4 hover:border-emerald-400/30 transition flex gap-3">
+                  <div className="text-2xl mt-0.5 group-hover:scale-110 transition">{u.icon}</div>
+                  <div>
+                    <div className="font-semibold tracking-tight">{u.title}</div>
+                    <p className="text-xs opacity-70 leading-snug mt-1">{u.desc}</p>
+                  </div>
                 </div>
               ))}
             </div>
