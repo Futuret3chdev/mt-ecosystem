@@ -15,7 +15,7 @@ type Asset = {
   logo?: string;
 };
 
-type FlowType = 'bridge' | 'swap' | 'harvest' | 'report' | 'nft-designer' | 'rockets-staking' | 'multi-wallet' | 'constellation' | 'buy-mt' | null;
+type FlowType = 'bridge' | 'swap' | 'harvest' | 'report' | 'nft-designer' | 'rockets-staking' | 'multi-wallet' | 'constellation' | null;
 
 export default function PortfolioManager() {
   const [price, setPrice] = useState(0);
@@ -76,19 +76,7 @@ export default function PortfolioManager() {
     }
   }, [activeFlow]);
 
-  // Auto open the direct "Buy $MT Directly" flow when user clicks "Buy directly on this page"
-  // links from Live $MT / hero area. Allows true on-page purchase with no third party.
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const hash = window.location.hash.toLowerCase();
-      if (hash.includes('buy') || hash.includes('management')) {
-        const t = setTimeout(() => {
-          startFlow('buy-mt');
-        }, 850);
-        return () => clearTimeout(t);
-      }
-    }
-  }, []);
+
 
   const totalValue = assets.reduce((sum, a) => {
     if (a.symbol === 'MT' || a.symbol === '$MT') return sum + a.balance * price;
@@ -329,7 +317,6 @@ export default function PortfolioManager() {
       setTimeout(() => closeFlow(), 400);
     }
 
-    // Note: 'buy-mt' is now handled with real wallet connection + Jupiter inside the flow UI (no longer uses this demo path)
   };
 
   const flows = [
@@ -339,12 +326,7 @@ export default function PortfolioManager() {
       desc: 'Native MT ↔ Solana SPL. Burn + proof. Self-verified. No third parties.',
       icon: '🔗',
     },
-    {
-      key: 'buy-mt' as const,
-      title: 'Buy $MT Directly',
-      desc: 'Connect Phantom, Solflare or Backpack and swap real SOL for $MT on Jupiter — all on this page. No custody.',
-      icon: '💰',
-    },
+
     {
       key: 'harvest' as const,
       title: 'Harvest TAP Earnings',
@@ -583,6 +565,107 @@ export default function PortfolioManager() {
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-3">ONE-PLACE MANAGEMENT FLOWS</div>
           <div className="text-2xl font-semibold tracking-tight mb-6">Command-center actions. Real ownership.</div>
 
+          {/* Direct $MT purchase section - prominent at top of management, triggered by top bar BUY $MT NOW */}
+          <div id="direct-buy" className="mb-8 p-6 rounded-3xl border border-emerald-400/30 bg-emerald-400/5">
+            <div className="uppercase text-xs tracking-[3px] text-emerald-400 mb-1">Direct $MT purchase in LIVE $MT + ONE-PLACE MANAGEMENT FLOWS</div>
+            <div className="text-lg font-semibold mb-4">Buy $MT directly on this page using your own wallet (Phantom, Solflare, Backpack). Real on-chain swap via Jupiter. No custody.</div>
+
+            {/* Wallet Connection */}
+            {!walletAddress ? (
+              <div>
+                <div className="text-sm font-medium mb-3">Connect your wallet to buy</div>
+                <div className="flex flex-wrap gap-3">
+                  <button 
+                    onClick={() => connectWallet('phantom')} 
+                    className="px-5 py-2.5 rounded-2xl border border-white/20 hover:bg-white/5 flex items-center gap-2"
+                  >
+                    👻 Phantom
+                  </button>
+                  <button 
+                    onClick={() => connectWallet('solflare')} 
+                    className="px-5 py-2.5 rounded-2xl border border-white/20 hover:bg-white/5 flex items-center gap-2"
+                  >
+                    ☀️ Solflare
+                  </button>
+                  <button 
+                    onClick={() => connectWallet('backpack')} 
+                    className="px-5 py-2.5 rounded-2xl border border-white/20 hover:bg-white/5 flex items-center gap-2"
+                  >
+                    🎒 Backpack
+                  </button>
+                </div>
+                <div className="text-[10px] mt-2 opacity-60">Works best on desktop or when this page is opened inside your wallet app's browser on mobile.</div>
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl border border-emerald-400/30 bg-black/40 mb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs opacity-60">Connected</div>
+                    <div className="font-mono text-sm">{connectedWallet} • {walletAddress.slice(0,6)}...{walletAddress.slice(-4)}</div>
+                  </div>
+                  <button onClick={disconnectWallet} className="text-xs px-3 py-1 border border-white/20 rounded-xl hover:bg-white/5">Disconnect</button>
+                </div>
+              </div>
+            )}
+
+            {/* Buy Controls */}
+            {walletAddress && (
+              <div className="space-y-4">
+                <div>
+                  <div className="text-xs opacity-60 mb-1">Amount to spend (SOL)</div>
+                  <input 
+                    type="range" 
+                    min="0.01" 
+                    max="10" 
+                    step="0.01" 
+                    value={buySolAmount} 
+                    onChange={(e) => { setBuySolAmount(parseFloat(e.target.value)); setJupQuote(null); }} 
+                    className="w-full accent-emerald-400" 
+                  />
+                  <div className="font-mono text-lg mt-1">{buySolAmount} SOL</div>
+                </div>
+
+                <button 
+                  onClick={getJupiterQuote} 
+                  disabled={isLoadingQuote}
+                  className="w-full py-3 rounded-2xl border border-white/20 hover:bg-white/5 disabled:opacity-50"
+                >
+                  {isLoadingQuote ? 'Getting best price from Jupiter...' : 'Get Quote (Jupiter)'}
+                </button>
+
+                {jupQuote && (
+                  <div className="p-4 bg-black/40 rounded-2xl text-sm">
+                    You will receive approximately <span className="font-mono text-emerald-400">{(Number(jupQuote.outAmount) / 1_000_000).toFixed(0)} $MT</span><br />
+                    <span className="text-[10px] opacity-60">Price impact &amp; fees included • Slippage 1%</span>
+                  </div>
+                )}
+
+                <button 
+                  onClick={executeRealBuy} 
+                  disabled={!jupQuote || isExecutingSwap}
+                  className="w-full py-4 rounded-2xl bg-emerald-400 text-black font-semibold tracking-wider disabled:opacity-40"
+                >
+                  {isExecutingSwap ? 'Signing &amp; Sending Swap...' : `BUY $MT WITH ${connectedWallet?.toUpperCase() || 'WALLET'} (REAL ON-CHAIN)`}
+                </button>
+
+                <div className="text-center text-xs">
+                  <a 
+                    href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} 
+                    target="_blank" 
+                    className="text-emerald-400 hover:underline"
+                  >
+                    Or buy on Raydium instead →
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Fallback always available */}
+            <div className="text-[10px] opacity-50 text-center pt-3 mt-3 border-t border-white/10">
+              Prefer to buy outside? <a href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} target="_blank" className="underline">Open Raydium Swap</a>
+            </div>
+          </div>
+
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
             {flows.map((f) => {
               const isActive = activeFlow === f.key;
@@ -785,110 +868,7 @@ export default function PortfolioManager() {
                   </div>
                 )}
 
-                {/* REAL Direct Buy $MT — connect Phantom / Solflare / Backpack and swap on Jupiter */}
-                {activeFlow === 'buy-mt' && (
-                  <div className="mt-6 space-y-6">
-                    <p className="opacity-80">
-                      Buy $MT <strong>directly on this page</strong> using your own wallet. No custody. No third-party handoff for the transaction.
-                    </p>
 
-                    {/* Wallet Connection */}
-                    {!walletAddress ? (
-                      <div>
-                        <div className="text-sm font-medium mb-3">Connect your wallet to buy</div>
-                        <div className="flex flex-wrap gap-3">
-                          <button 
-                            onClick={() => connectWallet('phantom')} 
-                            className="px-5 py-2.5 rounded-2xl border border-white/20 hover:bg-white/5 flex items-center gap-2"
-                          >
-                            👻 Phantom
-                          </button>
-                          <button 
-                            onClick={() => connectWallet('solflare')} 
-                            className="px-5 py-2.5 rounded-2xl border border-white/20 hover:bg-white/5 flex items-center gap-2"
-                          >
-                            ☀️ Solflare
-                          </button>
-                          <button 
-                            onClick={() => connectWallet('backpack')} 
-                            className="px-5 py-2.5 rounded-2xl border border-white/20 hover:bg-white/5 flex items-center gap-2"
-                          >
-                            🎒 Backpack
-                          </button>
-                        </div>
-                        <div className="text-[10px] mt-2 opacity-60">Only the three supported wallets. Your keys stay in your wallet.</div>
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/5">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-xs opacity-60">Connected</div>
-                            <div className="font-mono text-sm">{connectedWallet} • {walletAddress.slice(0,6)}...{walletAddress.slice(-4)}</div>
-                          </div>
-                          <button onClick={disconnectWallet} className="text-xs px-3 py-1 border border-white/20 rounded-xl">Disconnect</button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Buy Controls (only when connected) */}
-                    {walletAddress && (
-                      <div className="space-y-4">
-                        <div>
-                          <div className="text-xs opacity-60 mb-1">Amount to spend (SOL)</div>
-                          <input 
-                            type="range" 
-                            min="0.01" 
-                            max="10" 
-                            step="0.01" 
-                            value={buySolAmount} 
-                            onChange={(e) => { setBuySolAmount(parseFloat(e.target.value)); setJupQuote(null); }} 
-                            className="w-full accent-emerald-400" 
-                          />
-                          <div className="font-mono text-lg mt-1">{buySolAmount} SOL</div>
-                        </div>
-
-                        <button 
-                          onClick={getJupiterQuote} 
-                          disabled={isLoadingQuote}
-                          className="w-full py-3 rounded-2xl border border-white/20 hover:bg-white/5 disabled:opacity-50"
-                        >
-                          {isLoadingQuote ? 'Getting best price from Jupiter...' : 'Get Quote (Jupiter)'}
-                        </button>
-
-                        {jupQuote && (
-                          <div className="p-4 bg-white/5 rounded-2xl text-sm">
-                            You will receive approximately <span className="font-mono text-emerald-400">{(Number(jupQuote.outAmount) / 1_000_000).toFixed(0)} $MT</span><br />
-                            <span className="text-[10px] opacity-60">Price impact &amp; fees included in quote • Slippage 1%</span>
-                          </div>
-                        )}
-
-                        <button 
-                          onClick={executeRealBuy} 
-                          disabled={!jupQuote || isExecutingSwap}
-                          className="w-full py-4 rounded-2xl bg-emerald-400 text-black font-semibold tracking-wider disabled:opacity-40"
-                        >
-                          {isExecutingSwap ? 'Signing &amp; Sending Swap...' : `BUY $MT WITH ${connectedWallet?.toUpperCase() || 'WALLET'} (REAL ON-CHAIN)`}
-                        </button>
-
-                        <div className="text-center">
-                          <a 
-                            href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} 
-                            target="_blank" 
-                            className="text-sm text-emerald-400 hover:underline"
-                          >
-                            Or buy on Raydium instead →
-                          </a>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Always visible external option */}
-                    <div className="text-[10px] opacity-50 text-center pt-2 border-t border-white/10">
-                      Prefer to buy outside this page?{' '}
-                      <a href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} target="_blank" className="text-emerald-400 underline">Open Raydium Swap</a>
-                    </div>
-                  </div>
-                )}
               </motion.div>
             )}
           </AnimatePresence>

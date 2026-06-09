@@ -133,13 +133,21 @@ export default function TokenStats() {
             <Stat label="Total Supply" value={stats.total_supply} sub="1T max • Burnable" />
           </div>
 
+          {/* Contract address - noticeable, just above the stats (this is how we make money) */}
+          <div className="mb-3 p-3 rounded-2xl border border-emerald-400/30 bg-emerald-400/5 text-sm">
+            <span className="opacity-70">💰 $MT Contract (primary revenue):</span>{' '}
+            <button 
+              onClick={() => navigator.clipboard.writeText('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump')} 
+              className="font-mono text-emerald-400 hover:text-white underline active:no-underline"
+            >
+              ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump
+            </button>
+            <span className="text-[10px] opacity-60 ml-2">(tap to copy)</span>
+          </div>
+
           <div className="mt-6 pt-6 border-t border-white/10 flex flex-wrap gap-4 text-xs opacity-70">
             <div>24h Buy Vol: {stats.total_buy_volume}</div>
             <div>24h Sell Vol: {stats.total_sell_volume}</div>
-            {/* Contract address near LIVE $MT info */}
-            <div className="font-mono text-emerald-400/80">
-              Contract: <button onClick={() => navigator.clipboard.writeText('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump')} className="underline hover:text-emerald-400">ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump</button>
-            </div>
             <a href="#management" className="ml-auto font-medium text-emerald-400 hover:underline">Buy $MT directly on this page (no third party) →</a>
           </div>
 

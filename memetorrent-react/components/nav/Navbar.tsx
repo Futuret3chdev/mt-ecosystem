@@ -41,20 +41,6 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between text-sm">
         <div className="font-semibold tracking-tight flex items-center gap-2">
           <span className="text-emerald-400">MT</span> ECO SYSTEM
-          {/* Contract address up top */}
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump');
-              // simple feedback
-              const orig = (event?.currentTarget as HTMLElement)?.innerText;
-              // toast would be better but inline
-              alert('Contract copied: ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump');
-            }}
-            className="ml-2 text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 border border-white/10 hover:bg-white/10 active:bg-white/20"
-            title="Copy contract address"
-          >
-            ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump
-          </button>
         </div>
 
         <div className="flex items-center gap-6 text-sm">
@@ -101,8 +87,38 @@ export default function Navbar() {
           <a href="https://t.me/MemeTorrentPortal" target="_blank" rel="noopener" title="Telegram" style={{ color: '#26A5E4' }}>
             <i className="fab fa-telegram text-xl"></i>
           </a>
+
+          {/* Contract address near social icons, slightly away, noticeable as revenue source */}
+          <div className="ml-4 pl-4 border-l border-white/20 flex items-center gap-2 text-[11px]">
+            <span className="opacity-60">💰 Contract (revenue):</span>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump');
+                // Fallback feedback
+                const btn = event?.currentTarget as HTMLElement;
+                const origText = btn?.innerText;
+                if (btn) btn.innerText = 'Copied!';
+                setTimeout(() => { if (btn) btn.innerText = origText || 'ELyw...pump'; }, 1500);
+              }}
+              className="font-mono text-emerald-400 hover:text-emerald-300 active:text-white transition"
+              title="Copy $MT contract address - this is how we make money"
+            >
+              ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump
+            </button>
+          </div>
+
           <div className="flex-1" />
-          <span className="text-[10px] opacity-50">Direct $MT purchase in LIVE $MT + ONE-PLACE MANAGEMENT FLOWS</span>
+
+          {/* BUY $MT NOW - clickable, replaces the long text; clicking shows the purpose */}
+          <a 
+            href="#management" 
+            className="font-medium text-emerald-400 hover:text-emerald-300 transition cursor-pointer"
+            onClick={() => {
+              // Optional: could dispatch an event to highlight buy area
+            }}
+          >
+            BUY $MT NOW
+          </a>
         </div>
       </div>
 
