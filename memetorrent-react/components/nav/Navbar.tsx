@@ -291,12 +291,14 @@ export default function Navbar() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 text-sm">
             {/* Header with close for mobile/desktop */}
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs sm:text-sm font-medium">Connect your wallet to buy</div>
+              <div className="text-xs sm:text-sm font-medium">Direct on-chain buy — self-custodial</div>
               <button onClick={() => setShowBuyPanel(false)} className="text-xl leading-none opacity-60 hover:opacity-100 px-2" aria-label="Close buy panel">×</button>
             </div>
+            <div className="text-[10px] opacity-60 mb-3">Your wallet signs the transaction. No third party holds your keys or funds. Swap executes directly on Solana.</div>
 
             {/* Connect buttons - work best inside wallet in-app browser on mobile */}
             <div className="mb-3 sm:mb-4">
+              <div className="text-[10px] opacity-70 mb-1.5">Connect a self-custodial Solana wallet. No third party will ever see or hold your keys.</div>
               <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                 <button onClick={() => connectWallet('phantom')} className="px-4 py-2 min-h-[44px] text-sm rounded-xl border border-white/20 hover:bg-white/5 active:bg-white/10">👻 Phantom</button>
                 <button onClick={() => connectWallet('solflare')} className="px-4 py-2 min-h-[44px] text-sm rounded-xl border border-white/20 hover:bg-white/5 active:bg-white/10">☀️ Solflare</button>
@@ -318,7 +320,7 @@ export default function Navbar() {
                 </div>
               )}
               {!isMobile && (
-                <div className="text-[10px] opacity-60 mt-1">Tip: For mobile, open this site inside the Phantom / Solflare / Backpack app browser.</div>
+                <div className="text-[10px] opacity-60 mt-1">Tip: On mobile, open this page inside your wallet app's browser for seamless on-chain signing.</div>
               )}
             </div>
 
@@ -335,6 +337,12 @@ export default function Navbar() {
               <a href={LINKS.wallet} target="_blank" className="mt-2 sm:mt-3 inline-block text-xs sm:text-sm text-emerald-400 hover:underline">OPEN INFINITE WALLET →</a>
             </div>
 
+            <div className="mt-3 text-[10px] opacity-70 border border-white/10 rounded-xl p-3 bg-white/[0.01]">
+              <strong>No third parties hold your assets.</strong> The buy is a direct on-chain transaction on Solana. 
+              You sign with your wallet. Liquidity is sourced from decentralized pools. 
+              This aligns with our mission: self-custodial, no custody, no middlemen.
+            </div>
+
             {/* Buy controls if connected - responsive */}
             {walletAddress && (
               <div className="mt-3 sm:mt-4">
@@ -343,14 +351,15 @@ export default function Navbar() {
                   <input type="range" min="0.01" max="5" step="0.01" value={buySolAmount} onChange={e => setBuySolAmount(parseFloat(e.target.value))} className="flex-1 accent-emerald-400" />
                   <span className="font-mono text-xs sm:text-sm">{buySolAmount}</span>
                 </div>
-                <button onClick={getJupiterQuote} disabled={isLoadingQuote} className="w-full py-2.5 min-h-[44px] text-xs sm:text-sm border border-white/20 rounded-xl mb-2 active:bg-white/5">Get Quote (Jupiter)</button>
+                <button onClick={getJupiterQuote} disabled={isLoadingQuote} className="w-full py-2.5 min-h-[44px] text-xs sm:text-sm border border-white/20 rounded-xl mb-2 active:bg-white/5">Get On-Chain Quote</button>
                 {jupQuote && <div className="text-xs mb-2">~{(Number(jupQuote.outAmount)/1e6).toFixed(0)} $MT</div>}
-                <button onClick={executeRealBuy} disabled={!jupQuote || isExecutingSwap} className="w-full py-2.5 min-h-[44px] bg-emerald-400 text-black text-xs sm:text-sm font-semibold rounded-xl active:opacity-90">BUY REAL $MT (Jupiter)</button>
+                <button onClick={executeRealBuy} disabled={!jupQuote || isExecutingSwap} className="w-full py-2.5 min-h-[44px] bg-emerald-400 text-black text-xs sm:text-sm font-semibold rounded-xl active:opacity-90">SIGN &amp; SEND ON-CHAIN BUY</button>
                 <div className="text-center mt-1">
-                  <a href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} target="_blank" className="text-xs sm:text-sm text-emerald-400 underline">Or buy on Raydium instead</a>
+                  <a href={`https://raydium.io/swap/?inputMint=sol&outputMint=${MT_MINT}`} target="_blank" className="text-xs sm:text-sm text-emerald-400 underline">Or buy directly on Raydium</a>
                 </div>
-                <div className="mt-2 text-center">
-                  <a href="https://docs.raydium.io/solana-fundamentals" target="_blank" className="text-[10px] text-emerald-400/80 hover:text-emerald-400 underline">Use Raydium fundamentals for proper on-chain $MT buys →</a>
+                <div className="mt-2 text-center text-[10px] opacity-70">
+                  Fully self-custodial • Your keys sign the tx • No custody by any service<br />
+                  <a href="https://docs.raydium.io/solana-fundamentals" target="_blank" className="text-emerald-400/80 hover:text-emerald-400 underline">Learn how Solana on-chain buys work →</a>
                 </div>
               </div>
             )}
