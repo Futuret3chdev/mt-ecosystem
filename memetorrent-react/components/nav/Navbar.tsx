@@ -54,8 +54,8 @@ export default function Navbar() {
     }
   }, []);
 
-  // ==================== MANUAL WALLET CONNECT (from your SolanaReels game pattern) ====================
-  // This makes BUY $MT NOW actually pick up Phantom / Solflare / Backpack on mobile + desktop via deeplinks + injected
+  // ==================== REAL SOLANA WALLET CONNECTION (ported from your game) ====================
+  // No separate ugly "Open in ..." buttons. Click "Phantom" / "Solflare" / "Backpack" and it just connects (or deep links on mobile).
   const SOLANA_RPC_URL =
     (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SOLANA_RPC_URL) ||
     'https://api.mainnet-beta.solana.com';
@@ -63,82 +63,128 @@ export default function Navbar() {
 
   const [connectedWallet, setConnectedWallet] = useState<{ address: string; provider: any } | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [buying, setBuying] = useState(false);
   const [buyResult, setBuyResult] = useState<{ signature?: string; error?: string } | null>(null);
 
-  const getProvider = (name: 'phantom' | 'solflare' | 'backpack') => {
-    if (typeof window === 'undefined') return null;
-    const w = window as any;
-
-    if (name === 'phantom') {
-      return w.phantom?.solana || (w.solana?.isPhantom ? w.solana : null);
-    }
-    if (name === 'solflare') {
-      return w.solflare?.isSolflare ? w.solflare : (w.solflare || null);
-    }
-    if (name === 'backpack') {
-      return w.backpack?.solana || w.backpack || null;
-    }
-    return null;
-  };
-
-  const openWalletDeeplink = (name: 'phantom' | 'solflare' | 'backpack') => {
-    const current = typeof window !== 'undefined' ? window.location.href : 'https://memetorrent.futuret3ch.com.au';
-    const encoded = encodeURIComponent(current);
-    let url = '';
-    if (name === 'phantom') url = `https://phantom.app/ul/browse/${encoded}`;
-    else if (name === 'solflare') url = `https://solflare.com/ul/browse/${encoded}?ref=mt`;
-    else url = `https://backpack.app/ul/browse/${encoded}`;
-    window.open(url, '_blank');
-  };
-
-  const connectWalletForBuy = async (name: 'phantom' | 'solflare' | 'backpack') => {
+  const connectWalletForBuy = async (walletType: 'phantom' | 'solflare' | 'backpack') => {
+    setIsConnecting(true);
     setBuyResult(null);
-    const provider = getProvider(name);
-
-    if (!provider) {
-      // No injected provider — use deeplink so user can connect from inside the wallet app (exactly like the game)
-      openWalletDeeplink(name);
-      setBuyResult({ error: `No ${name} injected provider found. Opened deeplink — connect inside the ${name} browser then tap Connect ${name} again.` });
-      return;
-    }
 
     try {
-      // Explicit connect call — this is what often fixes Solflare "stuck connecting" vs auto-detect in widgets
-      const resp = await provider.connect();
-      const pk = resp?.publicKey?.toString?.() || resp?.publicKey?.toBase58?.();
-      if (!pk) throw new Error('No public key returned from wallet');
+      let provider: any = null;
 
-      // Fetch SOL balance
+      if (walletType === 'phantom') {
+        provider = (window as any).phantom?.solana;
+
+        // Mobile support: if no extension, redirect with deep link (like your game)
+        if (!provider && /iPhone|Android/i.test(navigator.userAgent)) {
+          const url = window.location.href;
+          window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(url)}`;
+          throw new Error('Opening Phantom mobile...');
+        }
+
+        if (!provider?.isPhantom) {
+          window.open('https://phantom.app/', '_blank');
+          throw new Error('Phantom not installed');
+        }
+      } else if (walletType === 'solflare') {
+        provider = (window as any).solflare;
+
+        if (!provider && /iPhone|Android/i.test(navigator.userAgent)) {
+          const url = window.location.href;
+          window.location.href = `https://solflare.com/ul/browse/${encodeURIComponent(url)}`;
+          throw new Error('Opening Solflare mobile...');
+        }
+
+        if (!provider) {
+          window.open('https://solflare.com/', '_blank');
+          throw new Error('Solflare not installed');
+        }
+      } else if (walletType === 'backpack') {
+        provider = (window as any).backpack;
+        if (!provider) {
+          window.open('https://backpack.app/', '_blank');
+          throw new Error('Backpack not installed');
+        }
+      }
+
+      if (!provider) throw new Error('Wallet not found');
+
+      let resp;
+      try {
+        resp = await provider.connect();
+      } catch (e) {
+        console.warn('Initial connect attempt warning:', e);
+      }
+
+      // Robust public key extraction with retry (critical for Solflare — wallets can be slow to expose publicKey)
+      let pk = null;
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        pk = resp?.publicKey || provider?.publicKey;
+
+        if (pk) break;
+
+        await new Promise(r => setTimeout(r, 250));
+      }
+
+      if (!pk) {
+        const walletName = walletType.charAt(0).toUpperCase() + walletType.slice(1);
+        throw new Error(`Failed to get public key from ${walletName}. Please try clicking the button again, or use Phantom instead.`);
+      }
+
+      const publicKey = typeof pk.toString === 'function' ? pk.toString() : String(pk);
+
+      // Fetch real SOL balance
       let bal = 0;
       try {
-        const lamports = await BUY_CONNECTION.getBalance(new PublicKey(pk));
+        const pubKey = new PublicKey(publicKey);
+        const lamports = await BUY_CONNECTION.getBalance(pubKey);
         bal = lamports / LAMPORTS_PER_SOL;
       } catch {}
 
-      setConnectedWallet({ address: pk, provider });
+      setConnectedWallet({ address: publicKey, provider });
       setWalletBalance(bal);
       setBuyResult(null);
-    } catch (e: any) {
-      const msg = e?.message || 'Failed to connect';
-      setBuyResult({ error: msg });
-      // On failure, still offer the deeplink as escape hatch
-      if (isMobile) openWalletDeeplink(name);
+
+    } catch (error: any) {
+      console.error('Wallet connection error:', error);
+      const msg = error.message || 'Unknown wallet error';
+
+      if (msg.includes('Opening ') || msg.includes('mobile...')) {
+        // Deep link navigation happened — don't show scary error
+        setBuyResult({ error: 'Switching to wallet app...' });
+      } else {
+        setBuyResult({ error: msg });
+      }
+    } finally {
+      setIsConnecting(false);
     }
   };
 
-  const disconnectWalletForBuy = () => {
-    const prov = connectedWallet?.provider;
+  const disconnectWalletForBuy = async () => {
+    try {
+      const prov = connectedWallet?.provider;
+      if (prov?.disconnect) {
+        await prov.disconnect();
+      }
+    } catch (e) {
+      // ignore
+    }
+
     setConnectedWallet(null);
     setWalletBalance(null);
     setBuyResult(null);
-    try { prov?.disconnect?.(); } catch {}
   };
 
-  // Real self-custodial buy using Jupiter quote + swap API + manual sign (like the game does real transfers)
+  // Real self-custodial buy using Jupiter quote + swap API + manual sign (ported from game connect + signing pattern)
   const quickBuyMT = async (solAmount: number) => {
-    if (!connectedWallet?.provider || !connectedWallet.address) {
-      setBuyResult({ error: 'Connect a wallet first' });
+    const provider = connectedWallet?.provider;
+    const address = connectedWallet?.address;
+
+    if (!provider || !address) {
+      setBuyResult({ error: 'Connect a wallet first (use the Phantom / Solflare / Backpack buttons above)' });
       return;
     }
 
@@ -146,55 +192,63 @@ export default function Navbar() {
     setBuyResult(null);
 
     try {
-      const inputMint = 'So11111111111111111111111111111111111111112'; // wSOL / SOL
+      const inputMint = 'So11111111111111111111111111111111111111112';
       const outputMint = MT_MINT;
       const amount = Math.floor(solAmount * 1_000_000_000);
 
-      // 1. Get quote from Jupiter (public API, no plugin)
+      // 1. Quote
       const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=100&swapMode=ExactIn`;
       const quoteResp = await fetch(quoteUrl);
-      if (!quoteResp.ok) throw new Error('Failed to get quote from Jupiter');
+      if (!quoteResp.ok) throw new Error('Failed to get quote');
       const quote = await quoteResp.json();
 
-      // 2. Get serialized swap transaction
+      // 2. Build swap tx (server returns base64 serialized VersionedTransaction)
       const swapResp = await fetch('https://quote-api.jup.ag/v6/swap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           quoteResponse: quote,
-          userPublicKey: connectedWallet.address,
+          userPublicKey: address,
           wrapAndUnwrapSol: true,
           dynamicComputeUnitLimit: true,
           prioritizationFeeLamports: 10000,
         }),
       });
-      if (!swapResp.ok) throw new Error('Failed to build swap transaction');
+      if (!swapResp.ok) throw new Error('Failed to build swap tx');
       const { swapTransaction } = await swapResp.json();
 
-      // 3. Deserialize, sign with the manually connected provider (this is the key for Solflare mobile)
-      // Use atob + Uint8Array so we don't depend on global Buffer (works in browser)
+      // 3. Deserialize
       const binary = atob(swapTransaction);
       const txBuffer = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) txBuffer[i] = binary.charCodeAt(i);
       const transaction = VersionedTransaction.deserialize(txBuffer);
 
-      const signedTx = await connectedWallet.provider.signTransaction(transaction);
+      // 4. Sign — defensive (some Solflare mobile sessions only expose sign after connect, or via signAllTransactions)
+      let signedTx: any;
+      if (typeof provider.signTransaction === 'function') {
+        signedTx = await provider.signTransaction(transaction);
+      } else if (typeof provider.signAllTransactions === 'function') {
+        const signedArr = await provider.signAllTransactions([transaction]);
+        signedTx = signedArr[0];
+      } else {
+        throw new Error('This wallet did not expose signTransaction in the current context. Use the Jupiter widget below or try Phantom.');
+      }
 
-      // 4. Send (self-custodial — user signed it)
-      const raw = signedTx.serialize();
+      // 5. Serialize + send (user fully controls the signature)
+      const raw = signedTx.serialize ? signedTx.serialize() : signedTx;
       const signature = await BUY_CONNECTION.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 3 });
-
-      // Confirm
       await BUY_CONNECTION.confirmTransaction(signature, 'confirmed');
 
       setBuyResult({ signature });
-      // Refresh balance
+
+      // refresh balance
       try {
-        const newLamports = await BUY_CONNECTION.getBalance(new PublicKey(connectedWallet.address));
+        const newLamports = await BUY_CONNECTION.getBalance(new PublicKey(address));
         setWalletBalance(newLamports / LAMPORTS_PER_SOL);
       } catch {}
     } catch (e: any) {
-      setBuyResult({ error: e?.message || 'Swap failed. Try a smaller amount or use the Jupiter widget below.' });
+      const msg = e?.message || 'Swap failed';
+      setBuyResult({ error: msg.includes('signTransaction') ? msg : (msg + ' — try the Jupiter widget below or a different wallet.') });
     } finally {
       setBuying(false);
     }
@@ -398,19 +452,20 @@ export default function Navbar() {
               <button onClick={() => setShowBuyPanel(false)} className="text-xl leading-none opacity-60 hover:opacity-100 px-2" aria-label="Close buy panel">×</button>
             </div>
 
-            {/* MANUAL CONNECT SECTION — this is the important part for mobile Solflare/Phantom/Backpack */}
+            {/* MANUAL CONNECT SECTION — exactly like your game: three buttons, click to connect (deeplink handled inside on mobile) */}
             <div className="mb-3">
-              <div className="text-[10px] tracking-[2px] opacity-60 mb-1.5">CONNECT WALLET (works on mobile + desktop)</div>
+              <div className="text-[10px] tracking-[2px] opacity-60 mb-1.5">CONNECT WALLET</div>
 
               {!connectedWallet ? (
                 <div className="flex flex-wrap gap-2">
                   {(['phantom', 'solflare', 'backpack'] as const).map((name) => (
                     <button
                       key={name}
+                      disabled={isConnecting}
                       onClick={() => connectWalletForBuy(name)}
-                      className="px-3 py-1.5 text-xs rounded-2xl border border-white/20 hover:bg-white/5 active:bg-white/10"
+                      className="px-3 py-1.5 text-xs rounded-2xl border border-white/20 hover:bg-white/5 active:bg-white/10 disabled:opacity-50"
                     >
-                      {name === 'phantom' ? 'Phantom' : name === 'solflare' ? 'Solflare' : 'Backpack'}
+                      {isConnecting ? 'Connecting...' : (name === 'phantom' ? 'Phantom' : name === 'solflare' ? 'Solflare' : 'Backpack')}
                     </button>
                   ))}
                 </div>
@@ -424,9 +479,9 @@ export default function Navbar() {
                     <button onClick={disconnectWalletForBuy} className="text-[10px] underline opacity-70">Disconnect</button>
                   </div>
 
-                  {/* Quick buy amounts + execute button using the manually connected wallet */}
+                  {/* Quick buy amounts + execute button using the manually connected wallet (from game pattern) */}
                   <div className="mt-3">
-                    <div className="text-[10px] opacity-60 mb-1">Quick Buy $MT (signs real swap tx)</div>
+                    <div className="text-[10px] opacity-60 mb-1">Quick Buy $MT — signs with your wallet</div>
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {[0.05, 0.1, 0.25, 0.5, 1].map((amt) => (
                         <button
@@ -444,13 +499,13 @@ export default function Navbar() {
                       onClick={() => quickBuyMT(0.1)}
                       className="w-full py-2 rounded-2xl bg-emerald-400 text-black text-sm font-medium disabled:opacity-60"
                     >
-                      {buying ? 'Swapping...' : 'Buy $MT with 0.1 SOL (manual sign)'}
+                      {buying ? 'Swapping & signing...' : 'Buy $MT with 0.1 SOL'}
                     </button>
                   </div>
 
                   {buyResult?.signature && (
                     <div className="mt-2 text-[10px] text-emerald-400 break-all">
-                      Success! Tx: <a href={`https://solscan.io/tx/${buyResult.signature}`} target="_blank" className="underline">view on Solscan</a>
+                      Success! <a href={`https://solscan.io/tx/${buyResult.signature}`} target="_blank" className="underline">View tx on Solscan</a>
                     </div>
                   )}
                   {buyResult?.error && (
@@ -485,23 +540,12 @@ export default function Navbar() {
               </div>
             </div>
 
-            {/* Mobile tip + extra deeplinks (helps when injected is not present) */}
-            <div className="mt-2 text-[10px] opacity-70 text-center space-y-1">
-              {isMobile && (
-                <div>On mobile: best results when you open this site from inside Phantom / Solflare / Backpack browser.</div>
-              )}
-              <div className="flex flex-wrap gap-1.5 justify-center">
-                {(['phantom', 'solflare', 'backpack'] as const).map((name) => (
-                  <button
-                    key={name}
-                    onClick={() => openWalletDeeplink(name)}
-                    className="px-2 py-0.5 text-[10px] rounded border border-white/15 hover:bg-white/5"
-                  >
-                    Open in {name}
-                  </button>
-                ))}
+            {/* Mobile tip (no separate ugly deeplink buttons — handled inside the connect clicks like your game) */}
+            {isMobile && (
+              <div className="mt-1 text-[10px] opacity-60 text-center">
+                On mobile: tap a wallet button above. It will deep link into the app if needed.
               </div>
-            </div>
+            )}
 
             {/* CSS vars to theme the Jupiter plugin to match the site's dark + emerald look */}
             <style>{`
