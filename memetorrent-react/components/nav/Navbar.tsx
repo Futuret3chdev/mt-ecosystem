@@ -92,22 +92,27 @@ export default function Navbar() {
     if (!buySolAmount || buySolAmount <= 0) return;
     setIsLoadingQuote(true);
     try {
-      // Use dexscreener for price estimate (avoids Jupiter DNS issues)
-      const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${MT_MINT}`);
-      const data = await res.json();
-      const pair = data.pairs?.[0];
-      let outAmount = '0';
-      if (pair) {
-        const tokenPriceUsd = parseFloat(pair.priceUsd || '0');
-        // Approximate SOL price
-        const solRes = await fetch('https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112');
-        const solData = await solRes.json();
-        const solPriceUsd = parseFloat(solData.pairs?.[0]?.priceUsd || '140');
-        const amountOut = Math.floor((buySolAmount * solPriceUsd) / tokenPriceUsd);
-        outAmount = (amountOut * 1_000_000).toString(); // 6 decimals for the token
+      const { API_URLS } = await import('@raydium-io/raydium-sdk-v2');
+
+      const amount = Math.floor(buySolAmount * 1_000_000_000);
+      const slippageBps = 100;
+      const txVersion = 'V0';
+
+      // Accurate quote directly from Raydium (no Jupiter, matches "no third parties" + docs)
+      const computeUrl = `${API_URLS.SWAP_HOST}/compute/swap-base-in?inputMint=So11111111111111111111111111111111111111112&outputMint=${MT_MINT}&amount=${amount}&slippageBps=${slippageBps}&txVersion=${txVersion}`;
+      const res = await fetch(computeUrl);
+      const computeData = await res.json();
+
+      const swapResponse = computeData.data || computeData;
+      if (swapResponse && swapResponse.amountOut) {
+        setJupQuote({ outAmount: swapResponse.amountOut });
+        // cache for execute
+        (window as any).__raydiumSwapResponse = swapResponse;
+      } else {
+        throw new Error('No amountOut in Raydium response');
       }
-      setJupQuote({ outAmount });
     } catch (e) {
+      console.error('Raydium quote error:', e);
       alert('Failed to get quote (network). Use the Raydium link below.');
       setJupQuote(null);
     }
@@ -121,11 +126,10 @@ export default function Navbar() {
     }
     setIsExecutingSwap(true);
     try {
-      const { Connection, PublicKey } = await import('@solana/web3.js');
-      const { Raydium, TxVersion } = await import('@raydium-io/raydium-sdk-v2');
+      const { Connection, VersionedTransaction } = await import('@solana/web3.js');
+      const { API_URLS } = await import('@raydium-io/raydium-sdk-v2');
 
       const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-      const owner = new PublicKey(walletAddress);
 
       let provider: any = null;
       if (connectedWallet === 'phantom') provider = (window as any).phantom?.solana;
@@ -133,33 +137,48 @@ export default function Navbar() {
       else if (connectedWallet === 'backpack') provider = (window as any).backpack?.solana;
       if (!provider) throw new Error('Provider not available');
 
-      const signAllTransactions = async (txs: any[]) => {
-        const signedTxs = [];
-        for (const tx of txs) {
-          const signed = await provider.signTransaction(tx);
-          signedTxs.push(signed);
-        }
-        return signedTxs;
-      };
+      let swapResponse = (window as any).__raydiumSwapResponse;
+      if (!swapResponse) {
+        // re-compute if needed
+        const amount = Math.floor(buySolAmount * 1_000_000_000);
+        const slippageBps = 100;
+        const txVersion = 'V0';
+        const computeUrl = `${API_URLS.SWAP_HOST}/compute/swap-base-in?inputMint=So11111111111111111111111111111111111111112&outputMint=${MT_MINT}&amount=${amount}&slippageBps=${slippageBps}&txVersion=${txVersion}`;
+        const res = await fetch(computeUrl);
+        const computeData = await res.json();
+        swapResponse = computeData.data || computeData;
+      }
+      if (!swapResponse) throw new Error('No swap response from Raydium');
 
-      const raydium = await Raydium.load({
-        connection,
-        owner,
-        signAllTransactions,
+      // Get server-built tx from Raydium (direct, using their liquidity)
+      const txRes = await fetch(`${API_URLS.SWAP_HOST}/transaction/swap-base-in`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          swapResponse,
+          txVersion: 'V0',
+          wallet: walletAddress,
+          wrapSol: true,
+          unwrapSol: false,
+        }),
       });
+      const txData = await txRes.json();
 
-      // Use Raydium SDK v2 as per docs for direct on-chain swap (avoids Jupiter)
-      const { execute } = await (raydium.tradeV2.swap as any)({
-        inputMint: 'So11111111111111111111111111111111111111112',
-        outputMint: MT_MINT,
-        amountIn: BigInt(Math.floor(buySolAmount * 1_000_000_000)),
-        slippageBps: 100,
-        txVersion: TxVersion.V0,
-      });
+      if (!txData || !txData.data || !txData.data.swapTransaction) {
+        throw new Error('No transaction from Raydium API');
+      }
 
-      const { txId } = await execute({ sendAndConfirm: true });
-      alert(`Buy successful! Tx: ${txId}`);
+      const transaction = VersionedTransaction.deserialize(
+        Buffer.from(txData.data.swapTransaction, 'base64')
+      );
+
+      const signedTx = await provider.signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      alert(`Buy successful! Tx: ${signature}`);
       setJupQuote(null);
+      (window as any).__raydiumSwapResponse = null;
     } catch (err: any) {
       console.error('Swap error:', err);
       alert('Swap failed: ' + (err.message || 'Use Raydium link.'));
