@@ -108,13 +108,6 @@ console.log(balance); // 124567890 MT`}</code></pre>
 
           <div className="grid sm:grid-cols-2 gap-4 text-sm">
             <div className="border border-white/10 rounded-2xl p-5">
-              <div className="font-semibold">POST /api/grokchat</div>
-              <div className="text-xs opacity-60 mb-2">AI assistant for site questions (used on /contact).</div>
-              <pre className="bg-black p-3 text-xs rounded mt-2 overflow-auto">{'{'} "message": "tell me about $MT" {'}'}</pre>
-              <div className="mt-1 text-xs opacity-70">Returns: {'{'} "reply": "..." {'}'}</div>
-            </div>
-
-            <div className="border border-white/10 rounded-2xl p-5">
               <div className="font-semibold">GET /api/holders</div>
               <div className="text-xs opacity-60 mb-2">Live holder &amp; stats data (used by TokenStats).</div>
               <div className="mt-1 text-xs opacity-70">Returns Dexscreener-style payload + on-chain holder count.</div>

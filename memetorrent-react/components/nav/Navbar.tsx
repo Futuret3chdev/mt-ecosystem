@@ -43,13 +43,15 @@ export default function Navbar() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Mobile detection for wallet links
+  const MT_MINT = 'ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump';
+
+  // Mobile detection for tips
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
-    setIsMobile(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
+    if (typeof navigator !== 'undefined') {
+      setIsMobile(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
+    }
   }, []);
-
-  const MT_MINT = 'ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump';
 
   // Jupiter Plugin init effect (replaces all previous custom buy logic that was erroring)
   useEffect(() => {
@@ -245,21 +247,36 @@ export default function Navbar() {
               <div className="text-xs sm:text-sm font-medium">Direct on-chain buy — self-custodial</div>
               <button onClick={() => setShowBuyPanel(false)} className="text-xl leading-none opacity-60 hover:opacity-100 px-2" aria-label="Close buy panel">×</button>
             </div>
-            {/* Jupiter Plugin for reliable integrated swap (SOL to $MT) - handles connect, quote, fees, and on-chain execution */}
-            <div id="jupiter-buy-container" style={{ width: '100%', height: '520px', borderRadius: '12px', overflow: 'hidden', background: '#000' }} />
+            {/* Desktop: THE WALLET IS THE GATEWAY on LEFT, Jupiter swap box on RIGHT (under BUY button area).
+                Mobile: stacks (gateway on top). Reduced gap. Smaller overall panel. */}
+            <div className="flex flex-col md:flex-row gap-2 md:gap-3">
+              {/* Gateway block on left on desktop */}
+              <div className="md:w-2/5">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-2 sm:p-3 text-xs sm:text-sm">
+                  <div className="text-emerald-400 text-[10px] sm:text-xs tracking-[3px]">THE WALLET IS THE GATEWAY</div>
+                  <div className="font-semibold tracking-tight mt-0.5 text-sm sm:text-base">INFINITE WALLET<br />For infinite possibilities.<br />Truly ours.</div>
+                  <ul className="mt-1 space-y-0.5 text-[10px] sm:text-xs opacity-80">
+                    <li>• 100% self-built. No injected providers.</li>
+                    <li>• Create, import, send, mint NFTs, earn &amp; spend Rockets.</li>
+                    <li>• Native MT chain + Solana $MT + future bridges.</li>
+                    <li>• Keys encrypted locally. Seed never leaves your device.</li>
+                  </ul>
+                  <a href={LINKS.wallet} target="_blank" className="mt-1 inline-block text-xs sm:text-sm text-emerald-400 hover:underline">OPEN INFINITE WALLET →</a>
+                </div>
+              </div>
 
-            {/* THE WALLET IS THE GATEWAY block - promotional, kept below the plugin */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 sm:p-4 text-xs sm:text-sm mt-3">
-              <div className="text-emerald-400 text-[10px] sm:text-xs tracking-[3px]">THE WALLET IS THE GATEWAY</div>
-              <div className="font-semibold tracking-tight mt-0.5 sm:mt-1 text-sm sm:text-base">INFINITE WALLET<br />For infinite possibilities.<br />Truly ours.</div>
-              <ul className="mt-1 sm:mt-2 space-y-0.5 text-[10px] sm:text-xs opacity-80">
-                <li>• 100% self-built. No injected providers.</li>
-                <li>• Create, import, send, mint NFTs, earn &amp; spend Rockets.</li>
-                <li>• Native MT chain + Solana $MT + future bridges.</li>
-                <li>• Keys encrypted locally. Seed never leaves your device.</li>
-              </ul>
-              <a href={LINKS.wallet} target="_blank" className="mt-2 sm:mt-3 inline-block text-xs sm:text-sm text-emerald-400 hover:underline">OPEN INFINITE WALLET →</a>
+              {/* Swap box (Jupiter plugin) on right on desktop */}
+              <div className="md:w-3/5">
+                <div id="jupiter-buy-container" style={{ width: '100%', height: '380px', borderRadius: '12px', overflow: 'hidden', background: '#000' }} />
+              </div>
             </div>
+
+            {/* Mobile tip for wallet detection (plugin works best in-app browser) */}
+            {isMobile && (
+              <div className="mt-1 text-[10px] opacity-70 text-center">
+                On mobile: open this page inside your wallet app's browser (Phantom, Solflare or Backpack) so wallets are detected.
+              </div>
+            )}
 
             {/* CSS vars to theme the Jupiter plugin to match the site's dark + emerald look */}
             <style>{`
