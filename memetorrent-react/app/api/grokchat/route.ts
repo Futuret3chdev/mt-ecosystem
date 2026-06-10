@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     } else if (lower.includes('price') || lower.includes('$mt') || lower.includes('token price') || lower.includes('how much')) {
       reply = "$MT live stats (price, market cap, volume) are shown on the homepage under LIVE $MT. The contract address is ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump. You can buy directly using the BUY $MT NOW button with your own wallet.";
     } else if (lower.includes('wallet') || lower.includes('infinite') || lower.includes('infinite wallet')) {
-      reply = "INFINITE WALLET is our fully self-custodial wallet at https://mt.futuret3ch.com.au/. It supports native MT, Solana $MT, minting NFTs, earning/spending Rockets, and all the real management flows. Your keys never leave your device.";
+      reply = "INFINITE WALLET is our fully self-custodial wallet at https://wallet.futuret3ch.com.au/. It supports native MT, Solana $MT, minting NFTs, earning/spending Rockets, and all the real management flows. Your keys never leave your device.";
     } else if (lower.includes('bridge') || lower.includes('swap') || lower.includes('cross chain')) {
       reply = "You can bridge Native MT ↔ SPL $MT and perform swaps inside INFINITE WALLET. Real on-chain flows (with demo versions) are available right on the homepage under ONE-PLACE MANAGEMENT FLOWS.";
     } else if (lower.includes('whitepaper') || lower.includes('docs') || lower.includes('paper')) {

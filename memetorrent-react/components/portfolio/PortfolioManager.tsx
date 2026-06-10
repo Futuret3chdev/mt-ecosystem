@@ -689,7 +689,7 @@ export default function PortfolioManager() {
                   <p>This is the first true self-custodial couples product — no bank, no trustee, no single point of failure or third-party access.</p>
                 </div>
               )}
-              <a href="https://mt.futuret3ch.com.au/" target="_blank" className="mt-4 inline-block text-sm text-purple-400 hover:underline">Create in INFINITE WALLET →</a>
+              <a href="https://wallet.futuret3ch.com.au/" target="_blank" className="mt-4 inline-block text-sm text-purple-400 hover:underline">Create in INFINITE WALLET →</a>
             </div>
             <div className="rounded-3xl border border-blue-400/30 bg-white/[0.01] p-6">
               <div className="text-blue-400 text-xs tracking-widest">FOR BUSINESSES</div>
@@ -710,13 +710,13 @@ export default function PortfolioManager() {
                   <p>Fully enterprise-ready and self-custodial: the master seed stays with the company, sub-accounts are derived, and no external custodian or platform ever touches the keys.</p>
                 </div>
               )}
-              <a href="https://mt.futuret3ch.com.au/" target="_blank" className="mt-4 inline-block text-sm text-blue-400 hover:underline">Create in INFINITE WALLET →</a>
+              <a href="https://wallet.futuret3ch.com.au/" target="_blank" className="mt-4 inline-block text-sm text-blue-400 hover:underline">Create in INFINITE WALLET →</a>
             </div>
           </div>
         </div>
 
         <div className="mt-8 text-center">
-          <a href="https://mt.futuret3ch.com.au/" target="_blank" className="inline-block text-sm px-8 py-3 rounded-2xl border border-white/30 hover:bg-white/5">LAUNCH INFINITE WALLET TO RUN THESE FLOWS FOR REAL →</a>
+          <a href="https://wallet.futuret3ch.com.au/" target="_blank" className="inline-block text-sm px-8 py-3 rounded-2xl border border-white/30 hover:bg-white/5">LAUNCH INFINITE WALLET TO RUN THESE FLOWS FOR REAL →</a>
           <div className="text-[10px] mt-3 opacity-50">All balances, NFTs, and Rockets live forever in your self-custodial vault. No third parties. Infinite possibilities.</div>
         </div>
 
