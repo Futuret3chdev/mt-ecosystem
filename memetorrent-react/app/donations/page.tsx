@@ -10,7 +10,7 @@ const ETH_ADDRESS = '0x47c3F0388fDcF30156Bd98bcc370828d022E18f6';
 const MT_MINT = 'ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump';
 
 export default function DonationsPage() {
-  const { publicKey, sendTransaction, connected, connect, disconnect } = useWallet();
+  const { publicKey, sendTransaction, connected, connect, disconnect, select } = useWallet();
   const { connection } = useConnection();
 
   const [selectedAsset, setSelectedAsset] = useState<'SOL' | 'BTC' | 'ETH'>('SOL');
@@ -209,12 +209,30 @@ export default function DonationsPage() {
             <div className="text-sm font-medium mb-4 text-[#19d37e]">Transfer Directly from Wallet</div>
 
             {!connected ? (
-              <button
-                onClick={() => connect()}
-                className="w-full py-3 rounded-2xl bg-emerald-400 text-black font-medium mb-4"
-              >
-                Connect Solana Wallet
-              </button>
+              <div className="mb-4">
+                <div className="text-xs mb-2 text-[#97a7c6]">Connect your wallet to send SOL:</div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => { select('Phantom' as any); connect(); }}
+                    className="px-4 py-2 text-sm rounded-2xl border border-white/20 hover:bg-white/5"
+                  >
+                    Connect Phantom
+                  </button>
+                  <button
+                    onClick={() => { select('Solflare' as any); connect(); }}
+                    className="px-4 py-2 text-sm rounded-2xl border border-white/20 hover:bg-white/5"
+                  >
+                    Connect Solflare
+                  </button>
+                  <button
+                    onClick={() => { select('Backpack' as any); connect(); }}
+                    className="px-4 py-2 text-sm rounded-2xl border border-white/20 hover:bg-white/5"
+                  >
+                    Connect Backpack
+                  </button>
+                </div>
+                <div className="text-[10px] text-[#97a7c6] mt-1">Use the buttons above (same as in the buy panel) for reliable connection.</div>
+              </div>
             ) : (
               <div className="mb-4 text-xs flex justify-between items-center">
                 <span>Connected: <span className="font-mono text-emerald-400">{publicKey?.toBase58().slice(0, 6)}...{publicKey?.toBase58().slice(-4)}</span></span>

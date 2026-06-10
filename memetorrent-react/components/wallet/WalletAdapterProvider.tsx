@@ -14,8 +14,8 @@ export const WalletAdapterProvider: FC<{ children: ReactNode }> = ({ children })
   // Use the same RPC preference as the rest of the buy flow
   const endpoint = useMemo(() => {
     const envRpc = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SOLANA_RPC_URL) || '';
-    // Use a more reliable public RPC to avoid 403 "Access forbidden" on public mainnet-beta
-    return envRpc || 'https://rpc.ankr.com/solana';
+    // Use official public RPC as reliable default (avoids API key / access forbidden issues on third-party endpoints)
+    return envRpc || 'https://api.mainnet-beta.solana.com';
   }, [network]);
 
   const wallets = useMemo(
