@@ -11,7 +11,10 @@ const MT_MINT = 'ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump';
 
 export default function DonationsPage() {
   const { publicKey, sendTransaction, connected, connect, disconnect, select } = useWallet();
-  const { connection } = useConnection();
+  const { connection: adapterConnection } = useConnection();
+
+  // Use a dedicated public RPC for all blockchain reads (balance, blockhash) to avoid 403 from potentially restricted endpoints in the adapter provider.
+  const donationConnection = new Connection('https://solana.public-rpc.com', 'confirmed');
 
   const [selectedAsset, setSelectedAsset] = useState<'SOL' | 'BTC' | 'ETH'>('SOL');
   const [amount, setAmount] = useState('');
@@ -38,7 +41,7 @@ export default function DonationsPage() {
     const fetchDonationValue = async () => {
       try {
         // SOL balance
-        const solLamports = await connection.getBalance(new PublicKey(SOL_ADDRESS));
+        const solLamports = await donationConnection.getBalance(new PublicKey(SOL_ADDRESS));
         const solBal = solLamports / LAMPORTS_PER_SOL;
 
         // BTC balance via Blockstream (public, no key needed)
@@ -110,18 +113,18 @@ export default function DonationsPage() {
         })
       );
 
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      const { blockhash, lastValidBlockHeight } = await donationConnection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
 
       setStatus('Please approve the transaction in your wallet...');
 
-      const signature = await sendTransaction(transaction, connection);
+      const signature = await sendTransaction(transaction, donationConnection);
       setTxSignature(signature);
 
       setStatus('Confirming transaction...');
 
-      await connection.confirmTransaction({
+      await donationConnection.confirmTransaction({
         blockhash,
         lastValidBlockHeight,
         signature,
