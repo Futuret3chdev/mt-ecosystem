@@ -79,7 +79,7 @@ export default function DonationsPage() {
     // Refresh every 5 minutes
     const interval = setInterval(fetchDonationValue, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [connection]);
+  }, [donationConnection]);
 
   const handleTransfer = async () => {
     if (!connected || !publicKey || !sendTransaction) {
