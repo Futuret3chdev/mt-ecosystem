@@ -14,7 +14,7 @@ export default function DonationsPage() {
   const { connection: adapterConnection } = useConnection();
 
   // Use a dedicated public RPC for all blockchain reads (balance, blockhash) to avoid 403 from potentially restricted endpoints in the adapter provider.
-  const donationConnection = new Connection('https://solana.public-rpc.com', 'confirmed');
+  const donationConnection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
 
   const [selectedAsset, setSelectedAsset] = useState<'SOL' | 'BTC' | 'ETH'>('SOL');
   const [amount, setAmount] = useState('');
@@ -216,19 +216,29 @@ export default function DonationsPage() {
                 <div className="text-xs mb-2 text-[#97a7c6]">Connect your wallet to send SOL:</div>
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => { select('Phantom' as any); connect(); }}
+                    onClick={() => { 
+                      select('Phantom' as any); 
+                      // select updates state async, connect in next tick to avoid WalletNotSelectedError
+                      setTimeout(() => connect(), 0); 
+                    }}
                     className="px-4 py-2 text-sm rounded-2xl border border-white/20 hover:bg-white/5"
                   >
                     Connect Phantom
                   </button>
                   <button
-                    onClick={() => { select('Solflare' as any); connect(); }}
+                    onClick={() => { 
+                      select('Solflare' as any); 
+                      setTimeout(() => connect(), 0); 
+                    }}
                     className="px-4 py-2 text-sm rounded-2xl border border-white/20 hover:bg-white/5"
                   >
                     Connect Solflare
                   </button>
                   <button
-                    onClick={() => { select('Backpack' as any); connect(); }}
+                    onClick={() => { 
+                      select('Backpack' as any); 
+                      setTimeout(() => connect(), 0); 
+                    }}
                     className="px-4 py-2 text-sm rounded-2xl border border-white/20 hover:bg-white/5"
                   >
                     Connect Backpack

@@ -13,9 +13,9 @@ export const WalletAdapterProvider: FC<{ children: ReactNode }> = ({ children })
 
   // Use the same RPC preference as the rest of the buy flow
   const endpoint = useMemo(() => {
-    // Hardcode a reliable public RPC. Ignore VITE_SOLANA_RPC_URL if it is a restricted key causing 403.
-    // 'https://solana.public-rpc.com' is a community public endpoint that generally allows getLatestBlockhash and balance queries without API key issues.
-    return 'https://solana.public-rpc.com';
+    // Hardcode the standard public Solana RPC. This avoids any restricted API keys from env vars that cause 403 errors.
+    // 'https://api.mainnet-beta.solana.com' is the official public endpoint and works reliably for getLatestBlockhash and balance queries.
+    return 'https://api.mainnet-beta.solana.com';
   }, [network]);
 
   const wallets = useMemo(
