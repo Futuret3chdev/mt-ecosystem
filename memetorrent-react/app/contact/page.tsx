@@ -63,7 +63,7 @@ export default function ContactPage() {
           {/* Back to Home and Launch Infinite Wallet aligned to the right. No extra MT ECO SYSTEM text here (main navbar already provides the branding at top). */}
           <div className="flex items-center gap-3 sm:gap-6">
             <Link href="/" className="opacity-70 hover:opacity-100">Back to Home</Link>
-            <a href="https://wallet.futuret3ch.com.au/" target="_blank" className="font-medium px-3 sm:px-4 py-1 sm:py-1.5 rounded-xl border border-white/30 hover:bg-white/5 text-xs sm:text-sm">Launch Infinite Wallet</a>
+            <a href="https://mt.futuret3ch.com.au/" target="_blank" className="font-medium px-3 sm:px-4 py-1 sm:py-1.5 rounded-xl border border-white/30 hover:bg-white/5 text-xs sm:text-sm">Launch Infinite Wallet</a>
           </div>
         </div>
       </div>

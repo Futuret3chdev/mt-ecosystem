@@ -13,7 +13,7 @@ export default function WalletPromo() {
             <p className="mt-5 sm:mt-6 text-base sm:text-lg opacity-70 max-w-md">INFINITE WALLET is the official gateway. Full control. Built from the ground up for the MT-ECO SYSTEM by Futuret3ch and MemeTorrent. Looks and feels like the best — because we made it. Infinite possibilities.</p>
 
             <a href={LINKS.wallet} target="_blank" className="mt-6 sm:mt-8 inline-block px-6 sm:px-9 py-3 sm:py-4 rounded-2xl bg-white text-black font-semibold text-sm tracking-wider min-h-[44px] flex items-center">LAUNCH INFINITE WALLET</a>
-            <div className="text-xs mt-3 opacity-50">Opens the production INFINITE WALLET at https://wallet.futuret3ch.com.au/</div> {/* all memetorrent-react wallet launch links updated */}
+            <div className="text-xs mt-3 opacity-50">Opens the production INFINITE WALLET at https://mt.futuret3ch.com.au/</div> {/* all memetorrent-react wallet launch links updated to marketing wallet version */}
           </div>
 
           <div className="rounded-3xl border border-white/10 p-5 sm:p-8 bg-zinc-950/60 text-sm">
