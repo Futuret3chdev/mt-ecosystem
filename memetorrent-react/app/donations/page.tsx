@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Connection, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 const SOL_ADDRESS = '2apinmLPU1myd4aeM6ZdZNLkhqBBUfGSMrxy7xkRBsZu';
 const BTC_ADDRESS = 'bc1qtuyjn27ggdu080rlrpf90tn239hgcxc2h295rv';
