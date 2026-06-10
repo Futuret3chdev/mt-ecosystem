@@ -13,7 +13,8 @@ export default function DonationsPage() {
   const { publicKey, sendTransaction, connected, connect, disconnect, select } = useWallet();
   const { connection: adapterConnection } = useConnection();
 
-  // Use a dedicated public RPC for all blockchain reads (balance, blockhash) to avoid 403 from potentially restricted endpoints in the adapter provider.
+  // Use a dedicated public RPC for client-side submission (sendRawTransaction).
+  // Blockhash and balance are fetched via our API routes (server-side) to avoid 403 from client-side RPC calls.
   const donationConnection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
 
   const [selectedAsset, setSelectedAsset] = useState<'SOL' | 'BTC' | 'ETH'>('SOL');
@@ -40,9 +41,11 @@ export default function DonationsPage() {
   useEffect(() => {
     const fetchDonationValue = async () => {
       try {
-        // SOL balance
-        const solLamports = await donationConnection.getBalance(new PublicKey(SOL_ADDRESS));
-        const solBal = solLamports / LAMPORTS_PER_SOL;
+        // SOL balance via our server-side proxy (avoids client-side 403 on RPC)
+        const solRes = await fetch(`/api/solana/balance?address=${SOL_ADDRESS}`);
+        const solData = await solRes.json();
+        if (solData.error) throw new Error(solData.error);
+        const solBal = solData.lamports / LAMPORTS_PER_SOL;
 
         // BTC balance via Blockstream (public, no key needed)
         const btcRes = await fetch(`https://blockstream.info/api/address/${BTC_ADDRESS}`);
@@ -113,7 +116,12 @@ export default function DonationsPage() {
         })
       );
 
-      const { blockhash, lastValidBlockHeight } = await donationConnection.getLatestBlockhash();
+      // Get blockhash from our server-side proxy to avoid client 403 on RPC
+      const blockhashRes = await fetch('/api/solana/blockhash');
+      const blockhashData = await blockhashRes.json();
+      if (blockhashData.error) throw new Error(blockhashData.error);
+      const { blockhash, lastValidBlockHeight } = blockhashData;
+
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
 
