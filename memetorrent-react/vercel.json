@@ -3,5 +3,9 @@
   "buildCommand": "next build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
-  "devCommand": "next dev --port $PORT"
+  "devCommand": "next dev --port $PORT",
+  "rewrites": [
+    { "source": "/message_counts.php", "destination": "/api/message-counts" },
+    { "source": "/message_counts.php(.*)", "destination": "/api/message-counts$1" }
+  ]
 }

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Message Stats | MemeTorrent</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        if (typeof jQuery === 'undefined') {
+            document.write('<script src="/jquery-3.6.0.min.js"><\/script>');
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {font-family: 'Segoe UI', Arial, sans-serif;background: linear-gradient(135deg, #111 0%, #222 100%);color: #fff;padding: 20px;margin: 0;min-height: 100vh;}
+        .header {text-align: center;margin-bottom: 30px;}
+        .header h1 {font-size: 2.2em;margin: 0;background: linear-gradient(45deg, #28a745, #20c997);-webkit-background-clip: text;-webkit-text-fill-color: transparent;text-shadow: 0 0 20px rgba(40,167,69,0.3);}
+        .last-updated {color: #aaa;font-size: 0.9em;margin-top: 5px;font-family: 'Courier New', monospace;}
+        .tabs {display: flex;justify-content: center;margin: 20px auto;max-width: 800px;background: rgba(255,255,255,0.1);border-radius: 25px;padding: 4px;box-shadow: 0 4px 15px rgba(0,0,0,0.3);}
+        .tablink {background: transparent;color: #fff;padding: 12px 24px;border: none;cursor: pointer;border-radius: 20px;font-size: 1em;transition: all .3s;flex: 1;text-align: center;}
+        .tablink:hover {background: rgba(255,255,255,0.1);transform: translateY(-2px);}
+        .tablink.active {background: linear-gradient(45deg, #28a745, #20c997);box-shadow: 0 4px 15px rgba(40,167,69,0.3);}
+        .tabcontent {display: none;max-width: 800px;margin: 20px auto;background: rgba(255,255,255,0.08);border-radius: 15px;padding: 25px;box-shadow: 0 8px 25px rgba(0,0,0,0.3);backdrop-filter: blur(10px);}
+        .tabcontent.active {display: block;}
+        .section {margin-bottom: 30px;}
+        .section h3 {color: #28a745;border-bottom: 2px solid #28a745;padding-bottom: 8px;margin-bottom: 15px;font-size: 1.3em;}
+        .range-controls {text-align: center;margin-bottom: 15px;}
+        .range-controls input {padding: 8px;border-radius: 6px;border: none;background: rgba(255,255,255,0.15);color:#fff;margin:0 5px;}
+        .range-controls button {padding: 8px 16px;border-radius: 6px;background: #28a745;color:#fff;border:none;cursor:pointer;}
+        table {width: 100%;border-collapse: collapse;margin-top: 10px;background: rgba(255,255,255,0.05);border-radius: 10px;overflow: hidden;}
+        th, td {padding: 12px 8px;text-align: left;border-bottom: 1px solid rgba(255,255,255,0.1);}
+        th {background: linear-gradient(45deg, #218838, #28a745);font-weight:600;text-transform:uppercase;font-size:0.85em;letter-spacing:0.5px;}
+        tr:hover {background: rgba(40,167,69,0.1);transform:scale(1.01);transition:.2s;}
+        .user-id {width:100px;font-family:'Courier New',monospace;}
+        .username {width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:help;}
+        .message-count {width:100px;text-align:right;font-weight:600;color:#28a745;}
+        .no-data, .loading, .error {text-align:center;padding:20px;}
+        .loading {color:#28a745;font-style:italic;animation:pulse 1.5s infinite;}
+        @keyframes pulse {0%,100%{opacity:1}50%{opacity:0.5}}
+        @media (max-width:600px){.tabs{flex-direction:column;}.tablink{border-radius:10px;margin:2px 0;}}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Message Leaderboard Maintenance</h1>
+        <div class="last-updated" id="lastUpdated">Loading...</div>
+    </div>
+
+    <div class="tabs">
+        <button class="tablink active" onclick="openTab(event,'Telegram')">Telegram</button>
+        <button class="tablink" onclick="openTab(event,'Discord')">Discord</button>
+        <button class="tablink" onclick="openTab(event,'Custom')">Custom Range</button>
+    </div>
+
+    <!-- Telegram -->
+    <div id="Telegram" class="tabcontent active">
+        <div class="section"><h3>Daily Top Talkers</h3><div id="tg_daily" class="loading">Loading...</div></div>
+        <div class="section"><h3>Monthly Champions</h3><div id="tg_monthly" class="loading">Loading...</div></div>
+    </div>
+
+    <!-- Discord -->
+    <div id="Discord" class="tabcontent">
+        <div class="section"><h3>Daily Top Talkers</h3><div id="dc_daily" class="loading">Loading...</div></div>
+        <div class="section"><h3>Monthly Champions</h3><div id="dc_monthly" class="loading">Loading...</div></div>
+    </div>
+
+    <!-- Custom Range -->
+    <div id="Custom" class="tabcontent">
+        <div class="range-controls">
+            <input type="text" id="startDate" placeholder="Start (YYYY-MM-DD)">
+            <input type="text" id="endDate" placeholder="End (YYYY-MM-DD)">
+            <button onclick="loadCustom()">Search</button>
+        </div>
+        <div class="section"><h3>Telegram</h3><div id="custom_tg" class="loading">Select dates...</div></div>
+        <div class="section"><h3>Discord</h3><div id="custom_dc" class="loading">Select dates...</div></div>
+    </div>
+
+    <script>
+        const fpStart = flatpickr("#startDate", {dateFormat: "Y-m-d"});
+        const fpEnd   = flatpickr("#endDate",   {dateFormat: "Y-m-d"});
+
+        function openTab(evt, name) {
+            $('.tabcontent').removeClass('active');
+            $('#'+name).addClass('active');
+            $('.tablink').removeClass('active');
+            $(evt.currentTarget).addClass('active');
+            if (name !== 'Custom') updateAll();
+        }
+
+        function renderTable(data, container) {
+            if (!data || data.length === 0) return $(container).html('<div class="no-data">No messages</div>');
+            let html = '<table><thead><tr><th class="user-id">ID</th><th class="username">Username</th><th class="message-count">Messages</th></tr></thead><tbody>';
+            data.forEach((row, i) => {
+                const cnt = row.message_count ?? row.total_message_count;
+                const rank = i + 1;
+                const color = rank===1?'#ffd700':rank===2?'#c0c0c0':rank===3?'#cd7f32':'#fff';
+                html += `<tr>
+                    <td class="user-id">${row.user_id}</td>
+                    <td class="username" title="${esc(row.username)}">${esc(row.username)}</td>
+                    <td class="message-count"><span style="color:${color}">${cnt}</span>${rank<=3?`<span style="color:${color};font-size:0.8em;margin-left:5px">${medal(rank)}</span>`:''}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            $(container).html(html);
+        }
+
+        function esc(t){return !t?'Anonymous':String(t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+        function medal(r){return {1:'1st',2:'2nd',3:'3rd'}[r]||'';}
+
+        function updateAll() {
+            $('#tg_daily, #tg_monthly, #dc_daily, #dc_monthly').html('<div class="loading">Updating...</div>');
+            $.getJSON('message_counts.php', res => {
+                $('#lastUpdated').text(`Last updated: ${res.timestamp} (Melbourne)`);
+                renderTable(res.telegram.daily, '#tg_daily');
+                renderTable(res.telegram.monthly, '#tg_monthly');
+                renderTable(res.discord.daily, '#dc_daily');
+                renderTable(res.discord.monthly, '#dc_monthly');
+            }).fail(()=>$('.tabcontent .section > div').html('<div class="error">Load error</div>'));
+        }
+
+        function loadCustom() {
+            const start = $('#startDate').val(), end = $('#endDate').val();
+            if (!start || !end) return alert('Pick both dates');
+            $('#custom_tg, #custom_dc').html('<div class="loading">Loading...</div>');
+            $.getJSON(`message_counts.php?start_date=${start}&end_date=${end}`, res => {
+                renderTable(res.telegram.range, '#custom_tg');
+                renderTable(res.discord.range, '#custom_dc');
+            }).fail(()=>$('#custom_tg, #custom_dc').html('<div class="error">Error</div>'));
+        }
+
+        $(function(){
+            updateAll();
+            setInterval(updateAll, 300000);
+            // default today for custom
+            const today = new Date().toISOString().split('T')[0];
+            fpStart.setDate(today); fpEnd.setDate(today);
+        });
+    </script>
+</body>
+</html>
