@@ -50,6 +50,33 @@ sudo systemctl reload nginx
 echo ""
 echo "Nginx configs updated. /static/ should now be served statically (protecting your tester page)."
 
+# Emergency patch: ensure the critical /static/ location exists in the *active* config
+# (handles cases where certbot split 80/443 into separate server blocks and dropped the location).
+echo ">>> Applying emergency /static/ protection patch to active config (for both http and https)..."
+STATIC_BLOCK=$(cat << 'STATICBLOCK'
+    # AUTO-PATCHED by FIX-STATIC script - protects admin_messages.html for testers
+    location ^~ /static/ {
+        alias /opt/mt-ecosystem/mt-admin-api/static/;
+        autoindex off;
+        expires 1h;
+        add_header Cache-Control "public, max-age=3600";
+    }
+STATICBLOCK
+)
+
+for conf in /etc/nginx/sites-enabled/admin.futuret3ch.com.au /etc/nginx/sites-available/admin.futuret3ch.com.au; do
+  if [ -f "$conf" ]; then
+    if ! grep -q 'location ^~ /static/' "$conf"; then
+      echo "Patching $conf with /static/ handler..."
+      # Insert the block right after the first 'server {' line
+      sudo sed -i '/^server {/r /dev/stdin' "$conf" <<< "$STATIC_BLOCK" 2>/dev/null || true
+    fi
+  fi
+done
+
+sudo nginx -t && sudo systemctl reload nginx
+echo "Patch applied and nginx reloaded if needed."
+
 # 5. Deploy mt-admin-api (for Developer Mode + dashboard)
 echo ""
 echo ">>> Deploying mt-admin-api (self-hosted admin that Developer Mode talks to)"
