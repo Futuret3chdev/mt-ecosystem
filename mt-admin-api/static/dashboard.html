@@ -520,18 +520,20 @@
     }
 
     function logoutKey() {
-      ADMIN_KEY = '';
-      promptForKey(true);
-      loadOverview();
-      loadGlobeData();
-      loadEvents();
-      loadTraffic();
-      loadVitals();
-      logApi('Key cleared / logged out. Re-prompted for new key.');
+      // Redirect to /dashboard without key -> server will show the login form
+      location.href = '/dashboard';
     }
 
     async function init() {
-      promptForKey(true);
+      // Prefer key from URL (set by the server login form redirect) so the full UI only loads with valid key
+      const urlKey = new URLSearchParams(location.search).get('key');
+      if (urlKey) {
+        ADMIN_KEY = urlKey.trim();
+      } else if (!ADMIN_KEY) {
+        // Fallback: prompt (in case direct load or bookmark)
+        promptForKey(false);
+      }
+
       await loadOverview();
       initGlobe();
       loadEvents();
