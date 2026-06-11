@@ -148,8 +148,42 @@ app.get('/api/geo', (req, res) => {
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'mt-admin-api', time: Date.now() }));
 
 // Serve the ambitious live dashboard (globe with red bot dots, traffic, firewall, API playground with runnable examples, WS live updates)
+// Gate behind valid key so the dashboard *always* requires a password (ADMIN_API_KEY or separate TEST_API_KEY for devs).
+// No key or wrong key -> show a clean login form that redirects with ?key=
 app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'static', 'dashboard.html'));
+  const key = req.headers['x-admin-key'] || req.query.key;
+  const isValid = key === ADMIN_API_KEY || (TEST_API_KEY && key === TEST_API_KEY);
+
+  if (isValid) {
+    res.sendFile(path.join(__dirname, 'static', 'dashboard.html'));
+    return;
+  }
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>MT Admin — Login</title>
+<style>body{font-family:system-ui;background:#111;color:#ddd;display:flex;align-items:center;justify-content:center;height:100vh;margin:0} .box{background:#1a1a1f;border:1px solid #333;padding:2rem;border-radius:12px;max-width:380px;width:100%;text-align:center} input{width:100%;padding:.6rem;background:#111;border:1px solid #444;color:#fff;margin:1rem 0;border-radius:6px} button{background:#10b981;color:#000;padding:.6rem 1.2rem;border:none;border-radius:6px;font-weight:600;cursor:pointer} .note{font-size:.8rem;opacity:.7;margin-top:1rem}</style>
+</head><body>
+<div class="box">
+  <h2 style="margin:0 0 1rem">MT Admin</h2>
+  <p style="margin:0 0 1rem">Enter your key to access the full dashboard and live globe.</p>
+  <form onsubmit="doLogin(event)">
+    <input id="k" placeholder="ADMIN_API_KEY or TEST_API_KEY" autofocus>
+    <button type="submit">Login</button>
+  </form>
+  <div class="note">
+    Use your master ADMIN_API_KEY for full access.<br>
+    Or the separate TEST_API_KEY for developers (does not expose the master password).<br>
+    Public sample data: <a href="/api/geo" style="color:#10b981">/api/geo</a>
+  </div>
+</div>
+<script>
+function doLogin(e){ e.preventDefault(); 
+  const key = document.getElementById('k').value.trim();
+  if(key) location.href = '/dashboard?key=' + encodeURIComponent(key);
+}
+</script>
+</body></html>`);
 });
 
 // Create HTTP server so we can attach WebSocket for live globe dots + real-time events
