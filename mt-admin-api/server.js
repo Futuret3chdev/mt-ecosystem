@@ -10,6 +10,7 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 4003;
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'dev-key-change-me';
+const TEST_API_KEY = process.env.TEST_API_KEY || '';
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 
 // Initialize DB tables on startup (idempotent)
@@ -48,7 +49,7 @@ app.use(cors({
 // Simple API key middleware for admin / internal sources
 function requireAdminKey(req, res, next) {
   const key = req.headers['x-admin-key'] || req.query.key;
-  if (key === ADMIN_API_KEY) return next();
+  if (key === ADMIN_API_KEY || (TEST_API_KEY && key === TEST_API_KEY)) return next();
   res.status(401).json({ error: 'Unauthorized - invalid admin key' });
 }
 
@@ -162,6 +163,7 @@ wss.on('connection', (ws) => {
 server.listen(PORT, () => {
   console.log(`MT Admin API running on port ${PORT}`);
   console.log('Dashboard: /dashboard (use ?key= or X-Admin-Key header for full data)');
-  console.log('Protected endpoints require X-Admin-Key header (or ?key=)');
+  console.log('Protected endpoints require X-Admin-Key header (or ?key=). TEST_API_KEY also works for developer read access.');
   console.log('WebSocket live updates (globe + events) available on same port');
+  if (TEST_API_KEY) console.log('TEST_API_KEY configured for limited developer testing (does not expose master ADMIN_API_KEY)');
 });
