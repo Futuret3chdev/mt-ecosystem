@@ -159,6 +159,9 @@ app.get('/dashboard', (req, res) => {
     return;
   }
 
+  const hadKey = !!key;
+  const errMsg = hadKey ? '<p style="color:#f66;margin:0 0 .5rem">Invalid key — try again or use the correct TEST_API_KEY.</p>' : '';
+
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(`<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>MT Admin — Login</title>
@@ -167,6 +170,7 @@ app.get('/dashboard', (req, res) => {
 <div class="box">
   <h2 style="margin:0 0 1rem">MT Admin</h2>
   <p style="margin:0 0 1rem">Enter your key to access the full dashboard and live globe.</p>
+  ${errMsg}
   <form onsubmit="doLogin(event)">
     <input id="k" placeholder="ADMIN_API_KEY or TEST_API_KEY" autofocus>
     <button type="submit">Login</button>
