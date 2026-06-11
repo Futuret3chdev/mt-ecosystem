@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>MT Admin — Master Observatory (self-hosted)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; }
+    .tab { padding: 0.5rem 1rem; cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px; }
+    .tab.active { border-bottom: 2px solid #10b981; color: #10b981; }
+    .section { display: none; }
+    .section.active { display: block; }
+    .card { background: #18181b; border: 1px solid #27272a; border-radius: 1rem; padding: 1rem; }
+    canvas#globe { image-rendering: crisp-edges; }
+    .log { font-family: ui-monospace, monospace; font-size: 11px; background:#111; padding:8px; border-radius:6px; max-height:160px; overflow:auto; white-space:pre-wrap; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-white p-6">
+  <div class="max-w-7xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">MT Admin <span class="text-emerald-400 text-base align-super">LIVE</span></h1>
+        <p class="text-zinc-400 text-sm">Self-hosted Master Observatory • memetorrent + wallet + games • geo + bots + real-time globe • no Vercel</p>
+      </div>
+      <div class="text-right text-xs">
+        <div class="text-emerald-400">● admin.futuret3ch.com.au</div>
+        <div class="text-zinc-500">4003 • WS broadcast • key=ft376937mt</div>
+        <div class="mt-1"><button onclick="window.location.reload()" class="text-[10px] px-2 py-0.5 border border-white/20 rounded">Reload</button></div>
+      </div>
+    </div>
+
+    <div class="flex gap-1 mb-4 border-b border-zinc-800 flex-wrap">
+      <div onclick="showTab('analytics')" class="tab active" id="tab-analytics">Analytics</div>
+      <div onclick="showTab('globe')" class="tab" id="tab-globe">🌍 Live Globe</div>
+      <div onclick="showTab('events')" class="tab" id="tab-events">Events</div>
+      <div onclick="showTab('traffic')" class="tab" id="tab-traffic">Traffic &amp; Bots</div>
+      <div onclick="showTab('firewall')" class="tab" id="tab-firewall">Firewall</div>
+      <div onclick="showTab('performance')" class="tab" id="tab-performance">RES / Vitals</div>
+      <div onclick="showTab('api')" class="tab" id="tab-api">API Playground</div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div id="section-analytics" class="section active">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div class="card">
+          <div class="text-xs text-zinc-400">Total Events (7d)</div>
+          <div id="total-events" class="text-4xl font-bold mt-1 text-emerald-400">—</div>
+        </div>
+        <div class="card">
+          <div class="text-xs text-zinc-400">Unique Sessions</div>
+          <div id="unique-sessions" class="text-4xl font-bold mt-1">—</div>
+        </div>
+        <div class="card">
+          <div class="text-xs text-zinc-400">Top Source</div>
+          <div id="top-source" class="text-2xl font-semibold mt-1">—</div>
+        </div>
+        <div class="card">
+          <div class="text-xs text-zinc-400">Last Event</div>
+          <div id="last-event" class="text-sm mt-1 text-zinc-400">—</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="font-semibold mb-2">Events by Source (live)</div>
+        <canvas id="source-chart" height="70"></canvas>
+      </div>
+      <div class="text-[10px] text-zinc-500 mt-2">Data from /api/track across all your properties. Red dots on globe = high botScore.</div>
+    </div>
+
+    <!-- LIVE GLOBE -->
+    <div id="section-globe" class="section">
+      <div class="card">
+        <div class="flex items-center justify-between mb-2">
+          <div>
+            <div class="font-semibold">Live Globe — Red dots from real /api/track as they happen</div>
+            <div class="text-xs text-zinc-400">Red = botScore &gt; 30 (detected via UA + rate in track handler). Orange = normal. WS live push. Self-hosted geoip-lite.</div>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="seedDemoDots()" class="text-xs px-3 py-1 border border-white/20 rounded hover:bg-white/5">Seed Demo</button>
+            <button onclick="loadGlobeData()" class="text-xs px-3 py-1 border border-white/20 rounded hover:bg-white/5">Refresh from API</button>
+            <button onclick="clearGlobe()" class="text-xs px-3 py-1 border border-white/20 rounded hover:bg-white/5">Clear</button>
+          </div>
+        </div>
+        <canvas id="globe" width="820" height="520" style="background:#05070a; border-radius:10px; width:100%; max-width:820px; cursor:crosshair;"></canvas>
+        <div class="text-[10px] mt-2 text-zinc-400">Click a dot for details. Drag to rotate. New events from wallet "Send Test Track Event" or games appear instantly (red if bot-like).</div>
+      </div>
+    </div>
+
+    <!-- EVENTS -->
+    <div id="section-events" class="section">
+      <div class="card">
+        <div class="flex justify-between mb-2">
+          <div class="font-semibold">Recent Events (all sources)</div>
+          <button onclick="loadEvents(true)" class="text-xs px-2 py-0.5 border border-white/20 rounded">Refresh</button>
+        </div>
+        <div id="events" class="text-xs font-mono max-h-72 overflow-auto bg-black/40 p-2 rounded"></div>
+      </div>
+    </div>
+
+    <!-- TRAFFIC &amp; BOTS -->
+    <div id="section-traffic" class="section">
+      <div class="card">
+        <div class="font-semibold mb-2">Traffic &amp; Bot Detection</div>
+        <div id="traffic" class="text-sm"></div>
+      </div>
+    </div>
+
+    <!-- FIREWALL -->
+    <div id="section-firewall" class="section">
+      <div class="card">
+        <div class="font-semibold mb-2">Firewall / Rules (demo)</div>
+        <div id="rules" class="text-sm mb-3 text-zinc-400">No rules yet. (POST /api/admin/rule to add real ones later.)</div>
+        <div class="text-xs flex gap-2 items-center">
+          <input id="rule-val" placeholder="1.2.3.4 or UA fragment" class="bg-zinc-900 border border-zinc-700 px-2 py-1 text-xs rounded w-64">
+          <button onclick="addRuleDemo()" class="px-3 py-1 text-xs border border-white/20 rounded">Add local demo rule</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PERFORMANCE / RES -->
+    <div id="section-performance" class="section">
+      <div class="card">
+        <div class="font-semibold mb-2">Real Experience Score (RES) + P75 Vitals (like Vercel Speed Insights, self-hosted)</div>
+        <div id="vitals" class="text-sm"></div>
+        <div class="text-[10px] text-zinc-500 mt-2">Send vitals from trackers in wallet/memetorrent/games. See src/db.js for RES formula.</div>
+      </div>
+    </div>
+
+    <!-- API PLAYGROUND -->
+    <div id="section-api" class="section">
+      <div class="card">
+        <div class="font-semibold mb-1">API Playground — Copy &amp; Run (developers)</div>
+        <div class="text-xs text-zinc-400 mb-3">Everything works against the live self-hosted instance. Use the key from your .env (ft376937mt in this playground).</div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div class="border border-white/10 rounded p-2">
+            <div class="font-medium text-emerald-400">POST /api/track (public — sends geo + botScore)</div>
+            <pre class="bg-black p-1.5 rounded mt-1 overflow-auto text-[10px]">fetch('/api/track', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ source:'web-wallet-dev', type:'dev_mode_ping', path:'/settings', data:{ geo:{lat:40.7,lon:-74}, dev:true } }) }).then(r=&gt;r.json()).then(console.log)</pre>
+            <button onclick="runTrackDemo()" class="mt-1 px-2 py-0.5 bg-emerald-600 text-[10px] rounded">Run Demo Track (lights up globe)</button>
+          </div>
+          <div class="border border-white/10 rounded p-2">
+            <div class="font-medium text-emerald-400">GET /api/admin/geo?key=... (globe dots)</div>
+            <pre class="bg-black p-1.5 rounded mt-1 overflow-auto text-[10px]">fetch('/api/admin/geo?limit=80&amp;key=ft376937mt').then(r=&gt;r.json()).then(d=&gt;console.log('Geo points:', d.length))</pre>
+            <button onclick="tryGeo()" class="mt-1 px-2 py-0.5 border border-white/20 rounded text-[10px]">Run /api/admin/geo</button>
+          </div>
+          <div class="border border-white/10 rounded p-2">
+            <div class="font-medium text-emerald-400">GET /api/admin/overview?key=...</div>
+            <button onclick="tryOverview()" class="mt-1 px-2 py-0.5 border border-white/20 rounded text-[10px]">Run Overview</button>
+          </div>
+          <div class="border border-white/10 rounded p-2">
+            <div class="font-medium text-emerald-400">GET /api/health (no key)</div>
+            <button onclick="tryHealth()" class="mt-1 px-2 py-0.5 border border-white/20 rounded text-[10px]">Ping Health</button>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <div class="text-xs font-medium mb-1">Live API response log</div>
+          <div id="api-log" class="log text-emerald-300/90">Ready. Run buttons above — results appear here + globe/events update.</div>
+        </div>
+        <div class="mt-2 text-[10px] text-zinc-500">Key is embedded for this demo (ft376937mt). Change in VPS .env + pm2 restart. Full source: server.js + src/db.js.</div>
+      </div>
+    </div>
+
+    <div class="mt-8 text-[10px] text-zinc-500 flex gap-4">
+      <div>Self-hosted • WS live globe • Bot scoring on ingest • Copy-paste ready APIs for your SDKs</div>
+      <div>Static tester page: <a href="/static/admin_messages.html" class="text-emerald-400">/static/admin_messages.html</a></div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '';
+    let ADMIN_KEY = 'ft376937mt';
+    let chartInstance = null;
+
+    function logApi(msg) {
+      const el = document.getElementById('api-log');
+      if (!el) return;
+      const time = new Date().toLocaleTimeString();
+      el.textContent = '[' + time + '] ' + msg + '\n' + el.textContent;
+      if (el.textContent.length > 1800) el.textContent = el.textContent.slice(0, 1600);
+    }
+
+    async function loadOverview() {
+      try {
+        const res = await fetch(API_BASE + '/api/admin/overview?range=7d' + (ADMIN_KEY ? '&key=' + ADMIN_KEY : ''));
+        if (!res.ok) { logApi('overview failed ' + res.status); return; }
+        const data = await res.json();
+        const te = document.getElementById('total-events');
+        if (te) te.textContent = (data.totalEvents || 0).toLocaleString();
+        const us = document.getElementById('unique-sessions');
+        if (us) us.textContent = (data.uniqueSessions || 0).toLocaleString();
+        const ts = document.getElementById('top-source');
+        if (ts) ts.textContent = (data.bySource && data.bySource[0] && data.bySource[0].source) || '—';
+        const le = document.getElementById('last-event');
+        if (le) le.textContent = data.lastUpdated ? new Date(data.lastUpdated).toLocaleTimeString() : '—';
+
+        if (chartInstance) { try { chartInstance.destroy(); } catch(e){} }
+        const ctx = document.getElementById('source-chart');
+        if (ctx && data.bySource && data.bySource.length) {
+          chartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: data.bySource.map(s => s.source),
+              datasets: [{ label: 'Events', data: data.bySource.map(s => s.count), backgroundColor: '#10b981' }]
+            },
+            options: { scales: { y: { beginAtZero: true, ticks: { color: '#666' } } }, plugins: { legend: { display: false } } }
+          });
+        }
+        logApi('overview loaded: ' + (data.totalEvents||0) + ' events');
+      } catch (e) { logApi('overview error: ' + e); }
+    }
+
+    async function loadEvents(force) {
+      try {
+        const res = await fetch(API_BASE + '/api/admin/events?limit=35' + (ADMIN_KEY ? '&key=' + ADMIN_KEY : ''));
+        if (!res.ok) return;
+        const data = await res.json();
+        const el = document.getElementById('events');
+        if (!el) return;
+        if (!data.length) { el.innerHTML = '<div class="text-zinc-500">No events yet. Use "Send Test Track Event" from wallet Developer Mode or POST /api/track.</div>'; return; }
+        el.innerHTML = data.map(e => {
+          const t = new Date(e.ts).toLocaleTimeString();
+          const geo = e.data && e.data.geo ? ' @' + (e.data.geo.lat||'').toFixed(1) + ',' + (e.data.geo.lon||'').toFixed(1) : '';
+          const bot = e.data && e.data.botScore ? ' bot:' + e.data.botScore : '';
+          return '<div class="py-0.5 border-b border-white/5">' + t + ' — <span class="text-emerald-400">' + (e.source||'') + '</span> / ' + (e.type||'') + ' ' + (e.path||'') + geo + bot + '</div>';
+        }).join('');
+      } catch(e){}
+    }
+
+    // === RELIABLE LIVE GLOBE (2D canvas, real-time red dots for bots) ===
+    let globeCtx, globeDots = [], globeRot = 0, globeTimer = null;
+    function initGlobe() {
+      const c = document.getElementById('globe');
+      if (!c) return;
+      globeCtx = c.getContext('2d');
+      c.onmousedown = (e) => { c._drag = true; c._lx = e.clientX; };
+      window.onmouseup = () => { if (c) c._drag = false; };
+      c.onmousemove = (e) => {
+        if (!c._drag || !globeCtx) return;
+        globeRot = (globeRot + (e.clientX - c._lx) * 0.6) % 360;
+        c._lx = e.clientX;
+        drawGlobe();
+      };
+      c.onclick = (e) => {
+        if (!globeDots.length) return;
+        const rect = c.getBoundingClientRect();
+        const x = e.clientX - rect.left, y = e.clientY - rect.top;
+        let best = null, bd = 999;
+        globeDots.forEach(d => { if (d.x && d.y) { const dx=d.x-x, dy=d.y-y; const dd=Math.hypot(dx,dy); if (dd<bd){bd=dd;best=d;} } });
+        if (best) alert('Event:\\n' + JSON.stringify(best, null, 2));
+      };
+      if (globeTimer) clearInterval(globeTimer);
+      globeTimer = setInterval(drawGlobe, 70);
+      loadGlobeData();
+      // live WS dots
+      try {
+        const p = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(p + '//' + location.host);
+        ws.onmessage = (ev) => {
+          try {
+            const m = JSON.parse(ev.data);
+            if (m.type === 'new_event' && m.event && m.event.data && m.event.data.geo) {
+              addDot(m.event);
+              logApi('WS live event: ' + m.event.source);
+            }
+          } catch(_) {}
+        };
+      } catch(_) {}
+    }
+    function drawGlobe() {
+      if (!globeCtx) return;
+      const c = document.getElementById('globe');
+      const w = c.width, h = c.height, cx = w/2, cy = h/2, r = 205;
+      globeCtx.fillStyle = '#05070a';
+      globeCtx.fillRect(0,0,w,h);
+      globeCtx.strokeStyle = '#223344';
+      globeCtx.lineWidth = 1.5;
+      globeCtx.beginPath();
+      globeCtx.arc(cx, cy, r, 0, Math.PI*2);
+      globeCtx.stroke();
+      globeCtx.strokeStyle = '#1a2633';
+      for (let i=-6; i<=6; i++) {
+        const yy = cy + i*17;
+        const rw = Math.sqrt(Math.max(0, r*r - (yy-cy)*(yy-cy)));
+        if (rw>3) { globeCtx.beginPath(); globeCtx.arc(cx, yy, rw, 0, Math.PI*2); globeCtx.stroke(); }
+      }
+      const now = Date.now();
+      globeDots = globeDots.filter(d => now - d.ts < 42000);
+      globeDots.forEach(d => {
+        const age = (now - d.ts) / 42000;
+        const alpha = Math.max(0.12, 1 - age);
+        const isBot = (d.botScore || 0) > 30;
+        globeCtx.fillStyle = isBot ? 'rgba(255,30,30,'+alpha+')' : 'rgba(255,130,40,'+alpha+')';
+        const size = isBot ? 4.5 : 3.2;
+        const lon = (d.lon + globeRot) % 360;
+        const px = cx + Math.cos(lon * Math.PI/180) * (r * Math.cos(d.lat * Math.PI/180) * 0.98);
+        const py = cy + Math.sin(d.lat * Math.PI/180) * (r * 0.52);
+        globeCtx.beginPath();
+        globeCtx.arc(px, py, size, 0, Math.PI*2);
+        globeCtx.fill();
+        if (isBot) {
+          globeCtx.strokeStyle = 'rgba(255,30,30,'+(alpha*0.7)+')';
+          globeCtx.lineWidth = 1;
+          globeCtx.beginPath();
+          globeCtx.arc(px, py, size+2.5, 0, Math.PI*2);
+          globeCtx.stroke();
+        }
+        d.x = px; d.y = py;
+      });
+      globeCtx.fillStyle = '#445566';
+      globeCtx.font = '11px system-ui';
+      globeCtx.fillText('LIVE — red dots = /api/track with geo (brighter ring = bot detected)', 14, 22);
+    }
+    function addDot(ev) {
+      if (!ev || !ev.data || !ev.data.geo) return;
+      const g = ev.data.geo;
+      const entry = {
+        lat: g.lat, lon: g.lon,
+        ts: Date.now(),
+        botScore: ev.data.botScore || 0,
+        source: ev.source || '',
+        path: ev.path || '',
+        ip: ev.ip || ''
+      };
+      globeDots.unshift(entry);
+      if (globeDots.length > 90) globeDots.pop();
+      drawGlobe();
+    }
+    async function loadGlobeData() {
+      try {
+        const res = await fetch('/api/admin/geo?limit=90' + (ADMIN_KEY ? '&key=' + ADMIN_KEY : ''));
+        if (!res.ok) { logApi('geo load ' + res.status); return; }
+        const data = await res.json();
+        globeDots = [];
+        (data || []).forEach(ev => addDot(ev));
+        drawGlobe();
+        logApi('globe loaded ' + (data||[]).length + ' geo events');
+      } catch (e) { logApi('globe fetch err'); }
+    }
+    function seedDemoDots() {
+      const demos = [
+        {lat:40.71, lon:-74.01, botScore: 12, source:'web-wallet-dev'},
+        {lat:51.51, lon:-0.13, botScore: 65, source:'web-marketing'},
+        {lat:35.68, lon:139.69, botScore: 3, source:'game-solana-reels'},
+        {lat:-33.87, lon:151.21, botScore: 48, source:'web-wallet-dev'},
+        {lat:1.35, lon:103.82, botScore: 5, source:'web-memetorrent'}
+      ];
+      demos.forEach((d,i) => {
+        globeDots.push({lat:d.lat, lon:d.lon, ts: Date.now()-i*4200, botScore:d.botScore, source:d.source, path:'/demo'});
+      });
+      drawGlobe();
+    }
+    function clearGlobe() { globeDots = []; drawGlobe(); }
+
+    async function loadTraffic() {
+      try {
+        const res = await fetch('/api/admin/traffic?range=7d' + (ADMIN_KEY ? '&key=' + ADMIN_KEY : ''));
+        if (!res.ok) return;
+        const d = await res.json();
+        const el = document.getElementById('traffic');
+        if (!el) return;
+        let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 text-sm">';
+        html += '<div><b>Top paths</b><br>' + (d.topPaths||[]).slice(0,8).map(p => p.path + ' (' + p.count + ')').join('<br>') + '</div>';
+        html += '<div><b>UAs (bots in red)</b><br>' + (d.topUAs||[]).map(u => {
+          const bot = /bot|crawler|spider|headless|curl|python|wget/i.test(u.ua||'');
+          return '<span class="' + (bot ? 'text-red-400' : '') + '">' + (u.ua||'').slice(0,58) + ' — ' + u.count + '</span>';
+        }).join('<br>') + '</div>';
+        if (d.botRequests) html += '<div class="col-span-full mt-2 text-red-400">Bot-like requests detected: ' + d.botRequests + '</div>';
+        html += '</div>';
+        el.innerHTML = html;
+      } catch(e){}
+    }
+
+    async function loadFirewall() {
+      try {
+        const res = await fetch('/api/admin/rules' + (ADMIN_KEY ? '?key=' + ADMIN_KEY : ''));
+        if (!res.ok) return;
+        const data = await res.json();
+        const el = document.getElementById('rules');
+        if (el) el.innerHTML = data.length ? data.map(r => r.type + ' ' + r.value + (r.note ? ' — ' + r.note : '')).join('<br>') : 'No rules yet.';
+      } catch(e){}
+    }
+
+    async function loadVitals() {
+      try {
+        const res = await fetch('/api/admin/vitals' + (ADMIN_KEY ? '?key=' + ADMIN_KEY : ''));
+        if (!res.ok) return;
+        const d = await res.json();
+        const el = document.getElementById('vitals');
+        if (!el) return;
+        el.innerHTML = 'RES: <span class="font-bold text-xl">' + (d.res != null ? d.res : '—') + '</span> (higher is better, &gt;90 great)<br>' +
+          'LCP p75: ' + (d.lcp_p75 ? Math.round(d.lcp_p75) + 'ms' : '—') + ' &nbsp; FCP p75: ' + (d.fcp_p75 ? Math.round(d.fcp_p75)+'ms' : '—') + ' &nbsp; INP p75: ' + (d.inp_p75 || '—');
+      } catch(e){}
+    }
+
+    function addRuleDemo() {
+      const v = document.getElementById('rule-val').value.trim() || '1.2.3.4';
+      alert('Demo only — would POST /api/admin/rule {type:"block_ip", value:"' + v + '"} in a full UI.');
+      const el = document.getElementById('rules');
+      if (el) el.innerHTML = 'block_ip ' + v + ' (local demo)';
+    }
+
+    async function runTrackDemo() {
+      const payload = { source: 'web-wallet-dev', type: 'dev_mode_ping', path: '/settings', data: { geo: { lat: 40.7128, lon: -74.0060, country: 'US', city: 'New York' }, dev: true, ts: Date.now() } };
+      const res = await fetch('/api/track', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+      const j = await res.json();
+      logApi('track OK ' + JSON.stringify(j));
+      setTimeout(() => { loadGlobeData(); loadEvents(); }, 180);
+    }
+
+    async function tryGeo() {
+      const res = await fetch('/api/admin/geo?limit=30&key=' + ADMIN_KEY);
+      const d = await res.json();
+      logApi('/api/admin/geo → ' + d.length + ' points (see console)');
+      console.log('geo sample', d.slice(0,3));
+      globeDots = [];
+      d.forEach(ev => addDot(ev));
+      drawGlobe();
+    }
+    async function tryOverview() {
+      const res = await fetch('/api/admin/overview?range=7d&key=' + ADMIN_KEY);
+      const j = await res.json();
+      logApi('overview: ' + j.totalEvents + ' events');
+      console.log(j);
+    }
+    async function tryHealth() {
+      const res = await fetch('/api/health');
+      const j = await res.json();
+      logApi('health: ' + JSON.stringify(j));
+    }
+
+    function showTab(tab) {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      const sec = document.getElementById('section-' + tab);
+      const tEl = document.getElementById('tab-' + tab);
+      if (sec) sec.classList.add('active');
+      if (tEl) tEl.classList.add('active');
+
+      if (tab === 'globe') { if (typeof drawGlobe === 'function') drawGlobe(); }
+      if (tab === 'events') loadEvents();
+      if (tab === 'traffic') loadTraffic();
+      if (tab === 'firewall') loadFirewall();
+      if (tab === 'performance') loadVitals();
+    }
+
+    async function init() {
+      await loadOverview();
+      initGlobe();
+      loadEvents();
+      setInterval(() => {
+        loadOverview();
+        loadGlobeData();
+      }, 14000);
+      setInterval(() => { loadEvents(); }, 22000);
+      setTimeout(() => { loadTraffic(); loadVitals(); }, 900);
+      logApi('dashboard ready — key=' + ADMIN_KEY);
+    }
+    window.onload = init;
+  </script>
+</body>
+</html>
