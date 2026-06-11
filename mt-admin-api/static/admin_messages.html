@@ -375,7 +375,7 @@
             <span class="brand-secondary">FutureT3ch</span>
         </div>
 
-        <div id="auth" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+        <form id="auth" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md" onsubmit="authenticate(event); return false;">
             <div class="relative mb-4">
                 <input
                     type="password"
@@ -396,10 +396,10 @@
                     </svg>
                 </button>
             </div>
-            <button id="submitAuth" class="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition focus:outline-none focus:ring-2 focus:ring-green-400">
+            <button type="submit" id="submitAuth" class="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition focus:outline-none focus:ring-2 focus:ring-green-400">
                 Submit
             </button>
-        </div>
+        </form>
 
         <div class="tab" id="tabs">
             <button class="tablinks" onclick="openTab(event, 'Discord')">Discord</button>
@@ -509,6 +509,31 @@
 
         <!-- Testers Tab -->
         <div id="Testers" class="tabcontent">
+            <!-- Quick Log Entry for testers to add notes on commands (core of the proper testers system) -->
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-4 border-l-4 border-emerald-500">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="font-semibold text-emerald-600 dark:text-emerald-400">Log Tester Action / Note</h4>
+                    <span class="text-xs text-gray-500">Saves to the tester's .log + powers checks</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
+                    <select id="logTester" class="px-3 py-2 border rounded dark:bg-gray-700 text-sm">
+                        <option value="penna">Penna</option>
+                        <option value="chan">Chan</option>
+                        <option value="tam">Tam</option>
+                    </select>
+                    <select id="logAction" class="px-3 py-2 border rounded dark:bg-gray-700 text-sm">
+                        <option value="note">Note / Comment</option>
+                        <option value="in">In (started shift)</option>
+                        <option value="out">Out (finished)</option>
+                        <option value="check_note">Check Note</option>
+                    </select>
+                    <input type="text" id="logItem" placeholder="Command or item (e.g. /PET adopt)" class="px-3 py-2 border rounded dark:bg-gray-700 text-sm">
+                    <input type="text" id="logNotes" placeholder="Notes / result / observation" class="md:col-span-2 px-3 py-2 border rounded dark:bg-gray-700 text-sm">
+                </div>
+                <button onclick="submitTesterLog()" class="mt-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded transition">Log Entry</button>
+                <span id="logStatus" class="ml-2 text-xs text-emerald-500"></span>
+            </div>
+
             <div class="subtab" id="testersSubtabs">
                 <button class="subtablinks active" onclick="openSubTab(event, 'Penna')">Penna Log</button>
                 <button class="subtablinks" onclick="openSubTab(event, 'PennaCheck')">Penna Chk List</button>
@@ -658,11 +683,21 @@
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
 
+            // Robust destroy for Chart.js v4 to prevent "canvas already in use" errors
+            const existing = Chart.getChart(canvas);
+            if (existing) existing.destroy();
+
             const ctx = canvas.getContext('2d');
             const isDark = html.classList.contains('dark');
 
-            if (platform === 'discord' && discordChartInstance) discordChartInstance.destroy();
-            if (platform === 'telegram' && telegramChartInstance) telegramChartInstance.destroy();
+            if (platform === 'discord' && discordChartInstance) {
+                discordChartInstance.destroy();
+                discordChartInstance = null;
+            }
+            if (platform === 'telegram' && telegramChartInstance) {
+                telegramChartInstance.destroy();
+                telegramChartInstance = null;
+            }
 
             const statsUrl = `${apiStatsBase}?platform=${platform}&hours=24&key=${adminKey}`;
 
@@ -1102,6 +1137,61 @@
                 .catch(err => {
                     logElement.innerHTML = `<div class="log-entry">Error: ${err}</div>`;
                 });
+        }
+
+        // Submit a new tester log entry (notes on commands etc. for proper tester system)
+        function submitTesterLog() {
+            if (!isAuthenticated) {
+                alert('Enter admin key first');
+                return;
+            }
+            const tester = document.getElementById('logTester').value;
+            const action = document.getElementById('logAction').value;
+            const item = document.getElementById('logItem').value.trim();
+            const notes = document.getElementById('logNotes').value.trim();
+            const statusEl = document.getElementById('logStatus');
+
+            if (!action) {
+                statusEl.textContent = 'Select an action';
+                return;
+            }
+
+            statusEl.textContent = 'Saving...';
+
+            const params = new URLSearchParams({
+                key: adminKey,
+                tester: tester,
+                action: action,
+                item: item,
+                notes: notes
+            });
+
+            fetch(apiTestersUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Telegram-User-ID': adminKey },
+                body: params.toString()
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'logged') {
+                    statusEl.textContent = 'Saved!';
+                    // refresh the current tester log view
+                    const current = document.querySelector('#testersSubtabs .subtablinks.active');
+                    if (current) {
+                        let logName = current.textContent.toLowerCase().replace(' log','').replace(' chk list','').trim();
+                        if (['penna','chan','tam'].includes(logName)) fetchTestersLogs(1, logName);
+                    }
+                    // clear form
+                    document.getElementById('logNotes').value = '';
+                    document.getElementById('logItem').value = '';
+                    setTimeout(() => statusEl.textContent = '', 1500);
+                } else {
+                    statusEl.textContent = data.error || 'Failed';
+                }
+            })
+            .catch(err => {
+                statusEl.textContent = 'Error: ' + err;
+            });
         }
 
         function fetchCheckCommands(logType) {
