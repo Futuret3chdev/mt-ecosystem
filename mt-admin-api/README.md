@@ -18,7 +18,8 @@ Self-hosted, custom-built observability and admin system for the MT-ECO SYSTEM p
 - API: Node + Express + better-sqlite3 (fast embedded DB, self-hosted).
 - Ingestion: Public /track endpoint (used by client trackers).
 - Queries: Protected /api/admin/* with X-Admin-Key.
-- Dashboard: Served from the API (self-contained HTML/JS for now, or separate mt-admin UI later).
+- Dashboard: Served from the API at `/dashboard` (self-contained HTML/JS).
+- Static tester pages: `/static/*` (especially `/static/admin_messages.html`) is **reserved** and served statically by nginx (with Express fallback). Testers rely on https://admin.futuret3ch.com.au/static/admin_messages.html — this path must never be broken or proxied away.
 - Storage: Local SQLite (easy to backup, move to Postgres later if needed).
 
 ## Setup (on your Contabo VPS or dev)

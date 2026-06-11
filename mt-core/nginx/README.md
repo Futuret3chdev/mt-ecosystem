@@ -272,6 +272,29 @@ sudo certbot --nginx -d wallet.futuret3ch.com.au
 
 This works but adds a proxy hop. Direct-to-Vercel (above) is recommended.
 
+## admin.futuret3ch.com.au (self-hosted master admin + tester static pages)
+
+The `admin` subdomain runs the mt-admin-api (port 4003) behind nginx.
+
+**Critical rule:** `/static/*` (especially `/static/admin_messages.html`) is served **directly from disk** and must never be proxied to the Node app. Testers rely on this exact URL for announcements and test coordination.
+
+Use the template:
+
+```bash
+sudo cp mt-core/nginx/admin.futuret3ch.com.au.conf /etc/nginx/sites-available/admin.futuret3ch.com.au
+sudo ln -sf ... /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d admin.futuret3ch.com.au
+```
+
+The template contains an explicit `location /static/ { alias /opt/mt-ecosystem/mt-admin-api/static/; ... }` **before** the catch-all proxy.
+
+Deploy script (in repo root) handles copying the static folder + the conf.
+
+See also: `VPS-DEPLOY-MEMETORRENT-AND-ADMIN.sh`
+
+---
+
 ## memetorrent marketing site (memetorrent.futuret3ch.com.au) — the same pattern as wallet
 
 The marketing site (`memetorrent-react` in this repo) deploys to `memetorrent-react.vercel.app`.

@@ -11,6 +11,12 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => 
 
 app.use(express.json({ limit: '1mb' }));
 
+// Serve static assets for tester pages etc. (e.g. /static/admin_messages.html)
+// This must come early so it is not caught by later proxy or catch-all logic.
+// Testers rely on https://admin.futuret3ch.com.au/static/admin_messages.html — do not break this path.
+const path = require('path');
+app.use('/static', express.static(path.join(__dirname, 'static')));
+
 // CORS for playground sites + future SDKs
 app.use(cors({
   origin: (origin, callback) => {

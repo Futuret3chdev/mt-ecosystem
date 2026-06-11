@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MT Admin — Tester Messages</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #111; color: #ddd; margin: 40px; line-height: 1.6; }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { color: #10b981; }
+    .message { background: #1f1f23; border-left: 4px solid #10b981; padding: 16px; margin-bottom: 16px; border-radius: 6px; }
+    .meta { font-size: 12px; color: #666; margin-top: 8px; }
+    .warning { background: #3f2a00; border-left-color: #f59e0b; }
+    footer { margin-top: 60px; font-size: 12px; color: #555; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MT-ECO SYSTEM • Admin Tester Messages</h1>
+    <p><strong>This page is intentionally lightweight and static.</strong> It is served directly for testers and does not load the heavy admin dashboard JS.</p>
+
+    <div class="message">
+      <strong>Welcome, testers!</strong><br>
+      This is the official channel for important notes about the current playground builds (memetorrent-react + infinite-wallet).
+    </div>
+
+    <div class="message warning">
+      <strong>Important:</strong><br>
+      • Developer Mode is now available inside the live Infinite Wallet (Settings tab → toggle "DEVELOPER MODE").<br>
+      • Use it to test tracking into the self-hosted admin, override nodes, view live logs, etc.<br>
+      • The full master dashboard is at <a href="/dashboard" style="color:#10b981">/dashboard</a> (requires X-Admin-Key for full data).
+    </div>
+
+    <!-- 
+      Testers: Add new messages below this line as simple div.message blocks.
+      Keep this file simple — no heavy scripts or external dependencies.
+      The file lives at mt-admin-api/static/admin_messages.html in the repo.
+      It is served at https://admin.futuret3ch.com.au/static/admin_messages.html
+    -->
+
+    <div class="message">
+      <strong>[YYYY-MM-DD] Example update</strong><br>
+      Replace this block with real tester communications. This path must remain working at all times.
+    </div>
+
+    <footer>
+      Served statically from the MT Admin API. Do not remove this file or change the /static/ path without coordinating with the team.
+      Main admin: <a href="/dashboard" style="color:#10b981">/dashboard</a>
+    </footer>
+  </div>
+</body>
+</html>
