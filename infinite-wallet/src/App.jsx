@@ -1370,7 +1370,7 @@ export default function MTWalletApp() {
             {TABS.map((t) => {
               const Icon = t.icon;
               const active = activeTab === t.id;
-              const label = (devMode && (t as any).devLabel) ? (t as any).devLabel : t.label;
+              const label = (devMode && t.devLabel) ? t.devLabel : t.label;
               return (
                 <button
                   key={t.id}
