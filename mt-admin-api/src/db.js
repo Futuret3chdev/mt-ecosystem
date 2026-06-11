@@ -123,6 +123,27 @@ function getEvents({ source, type, limit = 100, offset = 0 }) {
   }));
 }
 
+function getRecentGeoEvents(limit = 300) {
+  const rows = db.prepare(`
+    SELECT * FROM events 
+    WHERE data LIKE '%"lat"%' OR data LIKE '%"geo":%'
+    ORDER BY ts DESC 
+    LIMIT ?
+  `).all(limit);
+
+  return rows.map(r => {
+    let parsed = {};
+    try { parsed = JSON.parse(r.data || '{}'); } catch(e){}
+    const g = parsed.geo || (parsed.lat != null ? { lat: parsed.lat, lon: parsed.lon } : null);
+    return {
+      ...r,
+      geo: g,
+      botScore: parsed.botScore || 0,
+      data: parsed
+    };
+  }).filter(r => r.geo && typeof r.geo.lat === 'number' && typeof r.geo.lon === 'number');
+}
+
 function getVitalsSummary(filters = {}) {
   const since = Date.now() - (filters.range === '24h' ? 86400000 : 7*86400000);
   const vitals = db.prepare(`
@@ -221,5 +242,6 @@ module.exports = {
   getVitalsSummary,
   getTrafficSummary,
   addRule,
-  getRules
+  getRules,
+  getRecentGeoEvents
 };
