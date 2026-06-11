@@ -181,7 +181,7 @@ export default function MTWalletApp() {
 
   // === DEVELOPER MODE (self-hosted observability, advanced testing, direct API sandbox) ===
   const [devMode, setDevMode] = useState(false);
-  const [devLog, setDevLog] = useState<string[]>([]);
+  const [devLog, setDevLog] = useState([]);
   const [devNodeOverride, setDevNodeOverride] = useState('');
   const [devAuthOverride, setDevAuthOverride] = useState('');
 
