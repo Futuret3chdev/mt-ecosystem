@@ -83,8 +83,8 @@ This repo is set up to be easily deployed on Vercel for live previews and produc
 The projects were already created and deployed via Vercel CLI during setup.
 
 Current live previews (auto-updating from GitHub `main`):
-- **Marketing site**: https://memetorrent-react.vercel.app (or the project-specific one)
-- **INFINITE WALLET**: https://infinite-wallet.vercel.app (the production wallet)
+- **Marketing site**: https://memetorrent-react.vercel.app (or the project-specific one) → memetorrent.futuret3ch.com.au (use mt-core/nginx/memetorrent.conf for the optional VPS nginx proxy path, exactly like wallet.conf)
+- **INFINITE WALLET**: https://infinite-wallet.vercel.app (the production wallet) → wallet.futuret3ch.com.au (mt-core/nginx/wallet.conf for the optional VPS proxy)
 
 **Manual / re-deploy steps if needed:**
 
@@ -94,6 +94,7 @@ Current live previews (auto-updating from GitHub `main`):
    - **Root Directory**: `memetorrent-react`
    - Framework Preset: **Next.js**
    - Deploy.
+   - (Optional VPS nginx proxy for the custom domain: copy mt-core/nginx/memetorrent.conf on your VPS, enable, certbot --nginx -d memetorrent.futuret3ch.com.au. Or use direct Vercel CNAME for best perf — see mt-core/nginx/README.md.)
 
 3. **For the wallet** (https://infinite-wallet.vercel.app):
    - Import the **same** repo as a second project.

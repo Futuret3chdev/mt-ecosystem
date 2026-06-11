@@ -22,7 +22,9 @@ cd mt-core/nginx
 
 sudo cp mt-core.conf /etc/nginx/sites-available/mt-core
 sudo cp mt-auth.conf /etc/nginx/sites-available/mt-auth
-# (wallet.conf is only if you choose the VPS-reverse-proxy option for the frontend — see "wallet domain DNS" section)
+sudo cp wallet.conf /etc/nginx/sites-available/wallet
+sudo cp memetorrent.conf /etc/nginx/sites-available/memetorrent
+# (wallet.conf + memetorrent.conf are only if you choose the VPS-reverse-proxy option for the frontends — see the wallet / memetorrent domain sections. Direct Vercel CNAME recommended.)
 ```
 
 ## 2. Enable
@@ -30,6 +32,8 @@ sudo cp mt-auth.conf /etc/nginx/sites-available/mt-auth
 ```bash
 sudo ln -s /etc/nginx/sites-available/mt-core /etc/nginx/sites-enabled/ || true
 sudo ln -s /etc/nginx/sites-available/mt-auth /etc/nginx/sites-enabled/ || true
+sudo ln -s /etc/nginx/sites-available/wallet /etc/nginx/sites-enabled/ || true
+sudo ln -s /etc/nginx/sites-available/memetorrent /etc/nginx/sites-enabled/ || true
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -38,6 +42,9 @@ sudo systemctl reload nginx
 
 ```bash
 sudo certbot --nginx -d auth.futuret3ch.com.au -d api.futuret3ch.com.au
+# (Optional, only if using the VPS proxy alternatives:)
+# sudo certbot --nginx -d wallet.futuret3ch.com.au
+# sudo certbot --nginx -d memetorrent.futuret3ch.com.au
 # Follow prompts. It will auto-update the confs with ssl_ directives + 443 server blocks.
 ```
 
@@ -117,7 +124,6 @@ sudo ufw allow 443/tcp
 
 The error "wallet.futuret3ch.com.au Invalid Configuration" (while vercel.app shows Valid) happens because DNS does not yet point the name at Vercel's edge.
 
-<<<<<<< HEAD
 **CRITICAL WARNING — DO NOT CHANGE NAMESERVERS**
 
 Vercel is showing you the option to switch the whole domain to `ns1.vercel-dns.com` / `ns2.vercel-dns.com`.
@@ -193,6 +199,7 @@ cd mt-core/nginx
 sudo cp mt-auth.conf /etc/nginx/sites-available/auth.futuret3ch.com.au
 sudo cp mt-core.conf /etc/nginx/sites-available/api.futuret3ch.com.au
 sudo cp wallet.conf /etc/nginx/sites-available/wallet.futuret3ch.com.au
+sudo cp memetorrent.conf /etc/nginx/sites-available/memetorrent.futuret3ch.com.au
 
 # IMPORTANT for NFT mints: after copy + certbot, ensure BOTH 80 and 443 server blocks
 # have `client_max_body_size 20m;` (nginx default is 1m, which causes 413 on image NFTs).
@@ -202,6 +209,7 @@ sudo cp wallet.conf /etc/nginx/sites-available/wallet.futuret3ch.com.au
 sudo ln -sf /etc/nginx/sites-available/auth.futuret3ch.com.au /etc/nginx/sites-enabled/auth.futuret3ch.com.au
 sudo ln -sf /etc/nginx/sites-available/api.futuret3ch.com.au /etc/nginx/sites-enabled/api.futuret3ch.com.au
 sudo ln -sf /etc/nginx/sites-available/wallet.futuret3ch.com.au /etc/nginx/sites-enabled/wallet.futuret3ch.com.au
+sudo ln -sf /etc/nginx/sites-available/memetorrent.futuret3ch.com.au /etc/nginx/sites-enabled/memetorrent.futuret3ch.com.au
 
 sudo nginx -t
 sudo systemctl reload nginx
@@ -210,6 +218,7 @@ sudo systemctl reload nginx
 sudo certbot --nginx -d auth.futuret3ch.com.au
 sudo certbot --nginx -d api.futuret3ch.com.au
 sudo certbot --nginx -d wallet.futuret3ch.com.au
+sudo certbot --nginx -d memetorrent.futuret3ch.com.au
 ```
 
 If certbot says "not due for renewal", check existing certs with `sudo certbot certificates` and use `sudo certbot install --cert-name <the-name> --nginx` for each.
@@ -262,7 +271,38 @@ sudo certbot --nginx -d wallet.futuret3ch.com.au
 ```
 
 This works but adds a proxy hop. Direct-to-Vercel (above) is recommended.
->>>>>>> 5644329 (chore(marketing): clean memetorrent-react to pure marketing site only (remove old embedded wallet/ CRA build, duplicate WalletStub, empty files, web3))
+
+## memetorrent marketing site (memetorrent.futuret3ch.com.au) — the same pattern as wallet
+
+The marketing site (`memetorrent-react` in this repo) deploys to `memetorrent-react.vercel.app`.
+
+**Recommended (performance + "Valid Configuration"):** Use a clean CNAME in your DNS provider pointing `memetorrent` (host) at the exact Vercel target Vercel shows for the memetorrent-react project (similar to the wallet `bb78f...vercel-dns-017.com` example you had). No A record to the VPS. Add the domain in the Vercel memetorrent-react project and verify.
+
+**Alternative (VPS nginx proxy — "do the same now for memetorrent" like the wallet.conf you pasted):** Use the A record to VPS IP + the conf below. This is exactly what you asked for ("you should do this" + wallet ls/cat output). Useful if you prefer all TLS termination on your VPS (like the successful wallet case), during DNS troubleshooting, or to match your current nginx sites-available layout.
+
+```bash
+# On VPS (after git pull)
+cd /opt/mt-ecosystem
+cd mt-core/nginx
+
+sudo cp memetorrent.conf /etc/nginx/sites-available/memetorrent
+# (or /etc/nginx/sites-available/memetorrent.futuret3ch.com.au if you prefer the full name)
+
+sudo ln -sf /etc/nginx/sites-available/memetorrent /etc/nginx/sites-enabled/memetorrent
+sudo nginx -t && sudo systemctl reload nginx
+
+sudo certbot --nginx -d memetorrent.futuret3ch.com.au
+```
+
+The source template is at `mt-core/nginx/memetorrent.conf` (proxies to `https://memetorrent-react.vercel.app`, Host header set correctly, client_max_body_size 20m, same style/comments as the working wallet.conf).
+
+**DNS notes for this alternative:**
+- Delete any old/wrong A or CNAME for memetorrent.futuret3ch.com.au that pointed at the wrong place (the errors you saw: "CNAME and other data", "Invalid Configuration", "58e4e33d4e9780e2.vercel-dns-017.com").
+- Set A record: memetorrent.futuret3ch.com.au → 161.97.106.182 (your VPS).
+- Then the above nginx + certbot gives you the padlock via Let's Encrypt on the VPS.
+- (When you are ready to go direct-to-Vercel for speed: switch the record to the exact CNAME Vercel asks for the memetorrent-react project, remove the A, disable the nginx site block for it, re-verify in Vercel Domains.)
+
+Once live on the custom domain, update any references if needed (the site already links to /wallet.futuret3ch.com.au for the wallet CTAs).
 
 ## Firewall (VPS)
 
@@ -288,10 +328,9 @@ After DNS valid + redeploy + VPS certs + restarts:
 
 - Marketing site (memetorrent-react) CTAs already point to https://wallet.futuret3ch.com.au/
 
-<<<<<<< HEAD
 Use http://YOUR_VPS_IP:4001 (mt-core) / :4002 (mt-auth) for direct VPS testing before domains/TLS are live. After, prefer https://api.futuret3ch.com.au/health etc.
 
-This completes production custom domain + real persistent per-user wallets for the 20k users path. No demo fallbacks in the happy path.
+This completes production custom domain + real persistent per-user wallets for the 20k users path. No demo fallbacks in the happy path. (The memetorrent marketing site follows the exact same nginx + custom domain pattern now via memetorrent.conf.)
 
 ## Verify MT API returns JSON (fixes "Mint failed: Unexpected token '<', \"<!DOCTYPE\"... is not valid JSON")
 
@@ -373,9 +412,10 @@ There are two places:
    ```bash
    cd /opt/mt-ecosystem
    ls -l mt-core/nginx/
-   cat mt-core/nginx/wallet.conf     # the correct proxy-to-Vercel version
-   cat mt-core/nginx/mt-core.conf    # for api.futuret3ch.com.au → 4001
-   cat mt-core/nginx/mt-auth.conf    # for auth.futuret3ch.com.au → 4002
+   cat mt-core/nginx/wallet.conf        # the correct proxy-to-Vercel version (for wallet.)
+   cat mt-core/nginx/memetorrent.conf   # the memetorrent equivalent (for memetorrent.futuret3ch.com.au → memetorrent-react.vercel.app)
+   cat mt-core/nginx/mt-core.conf       # for api.futuret3ch.com.au → 4001
+   cat mt-core/nginx/mt-auth.conf       # for auth.futuret3ch.com.au → 4002
    ```
 
 2. **Live runtime files** (what nginx is actually using right now):

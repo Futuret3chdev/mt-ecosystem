@@ -1,0 +1,21 @@
+{
+  "name": "mt-admin-api",
+  "version": "0.1.0",
+  "description": "Self-hosted Master Admin + Analytics API for MT-ECO SYSTEM. Unlike third-party tools (Vercel Analytics, Speed Insights, Firewall). Built for the team to observe everything: page views, performance vitals, traffic, bots, rules, games telemetry, wallet activity. Extensible to Telegram/Discord bots, SDKs (web, iOS, Android, widgets).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "init-db": "node src/db/init.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "uuid": "^9.0.1"
+  },
+  "keywords": ["mt-ecosystem", "analytics", "admin", "self-hosted", "web3", "web5"],
+  "author": "Futuret3ch / MemeTorrent",
+  "license": "MIT"
+}

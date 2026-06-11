@@ -290,6 +290,10 @@ export default function DevelopersPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
         <div className="uppercase text-xs tracking-[3px] text-emerald-400 mb-2">FOR BUILDERS</div>
         <h1 className="text-4xl sm:text-5xl font-semibold tracking-[-1.6px] mb-4">Develop on MT-ECO SYSTEM</h1>
+        <div className="mb-6 text-sm">
+          <span className="opacity-60">This is the public API reference + MT-Connect sandbox (Facebook, Instagram, TikTok, Snapchat, Google, Microsoft flows + real wallet deeplinks).</span><br />
+          <span className="text-emerald-400">The full power-user “Developer Mode” (live admin analytics, session node overrides, debug logs, direct testing) lives inside the Infinite Wallet → Settings.</span>
+        </div>
         <p className="opacity-70 max-w-2xl mb-8">
           Build applications, games, tools, bridges and extensions that integrate directly with the self-built MT network, 
           INFINITE WALLET, native $MT token, Rockets economy, and on-chain NFTs.

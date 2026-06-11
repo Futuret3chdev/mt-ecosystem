@@ -67,7 +67,7 @@ const TABS = [
   { id: 'rockets', label: 'Rockets', icon: Zap },
   { id: 'activity', label: 'Activity', icon: RefreshCw },
   { id: 'bridge', label: 'Bridge', icon: ExternalLink },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'settings', label: 'Settings', icon: Settings, devLabel: 'Settings + Dev' },
 ];
 
 // Many social platforms for the slide bar / drawer. Lots of options!
@@ -105,6 +105,58 @@ const SOCIAL_PLATFORMS = [
 ];
 
 export default function MTWalletApp() {
+  // === MT Admin Analytics Tracker (self-hosted, no third party) ===
+  useEffect(() => {
+    const ADMIN_API = 'https://admin.futuret3ch.com.au'; // update to your admin API on VPS
+    const SOURCE = 'web-wallet';
+    function track(type, data = {}) {
+      try {
+        const payload = {
+          source: SOURCE,
+          type,
+          path: window.location.pathname + window.location.search,
+          referrer: document.referrer,
+          ua: navigator.userAgent,
+          session_id: sessionStorage.getItem('mt_session') || (sessionStorage.setItem('mt_session', (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36))), sessionStorage.getItem('mt_session')),
+          data
+        };
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(ADMIN_API + '/api/track', JSON.stringify(payload));
+        } else {
+          fetch(ADMIN_API + '/api/track', { method: 'POST', body: JSON.stringify(payload), keepalive: true, headers: {'Content-Type': 'application/json'} });
+        }
+      } catch(e) {}
+    }
+    track('pageview');
+    try {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (entry.entryType === 'paint' && entry.name === 'first-contentful-paint') track('vital', {fcp: entry.startTime});
+          if (entry.entryType === 'largest-contentful-paint') track('vital', {lcp: entry.startTime});
+          if (entry.entryType === 'first-input') track('vital', {fid: entry.processingStart - entry.startTime});
+        }
+      }).observe({type: 'paint', buffered: true});
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (entry.entryType === 'largest-contentful-paint') track('vital', {lcp: entry.startTime});
+        }
+      }).observe({type: 'largest-contentful-paint', buffered: true});
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (entry.entryType === 'first-input') track('vital', {fid: entry.processingStart - entry.startTime});
+        }
+      }).observe({type: 'first-input', buffered: true});
+      let cls = 0;
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (!entry.hadRecentInput) cls += entry.value;
+        }
+        track('vital', {cls: cls});
+      }).observe({type: 'layout-shift', buffered: true});
+    } catch(e) {}
+    window.addEventListener('beforeunload', () => track('pageleave'));
+  }, []);
+
   // Vault / Auth state (100% local, no third party)
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [wallet, setWallet] = useState(null); // { mnemonic, publicKey, secretKey, solanaSeed }
@@ -126,6 +178,38 @@ export default function MTWalletApp() {
   const [settingsImportName, setSettingsImportName] = useState('');
   const [settingsImportPwd, setSettingsImportPwd] = useState('');
   const [settingsImportConfirmPwd, setSettingsImportConfirmPwd] = useState('');
+
+  // === DEVELOPER MODE (self-hosted observability, advanced testing, direct API sandbox) ===
+  const [devMode, setDevMode] = useState(false);
+  const [devLog, setDevLog] = useState<string[]>([]);
+  const [devNodeOverride, setDevNodeOverride] = useState('');
+  const [devAuthOverride, setDevAuthOverride] = useState('');
+
+  // Persist devMode
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('mt_dev_mode');
+      if (saved === '1') setDevMode(true);
+    } catch {}
+  }, []);
+
+  const toggleDevMode = (next) => {
+    setDevMode(next);
+    try { localStorage.setItem('mt_dev_mode', next ? '1' : '0'); } catch {}
+    if (next) {
+      addDevLog('Developer Mode enabled — extra tools, logs and direct API access unlocked.');
+    } else {
+      addDevLog('Developer Mode disabled.');
+    }
+  };
+
+  const addDevLog = (msg) => {
+    setDevLog(prev => [ `[${new Date().toLocaleTimeString()}] ${msg}`, ...prev ].slice(0, 12));
+  };
+
+  // Effective endpoints (respect dev overrides when in dev mode)
+  const effectiveMTNode = () => (devMode && devNodeOverride.trim()) ? devNodeOverride.trim() : (getMTNode ? getMTNode() : 'https://api.futuret3ch.com.au');
+  const effectiveAuth = () => (devMode && devAuthOverride.trim()) ? devAuthOverride.trim() : (getAuthURL ? getAuthURL() : 'https://auth.futuret3ch.com.au');
 
   // === NEW: Email + Phone account system + multiple wallets per account ===
   const [accountEmail, setAccountEmail] = useState('');
@@ -1244,6 +1328,15 @@ export default function MTWalletApp() {
               </div>
             </div>
             <div className="ml-3 px-3 py-1 rounded-full bg-emerald-950 text-emerald-400 text-[10px] font-mono border border-emerald-900">LIVE • SELF BUILT • MT-ECO SYSTEM</div>
+            {devMode && (
+              <button
+                onClick={() => { setActiveTab('settings'); }}
+                className="ml-2 px-2 py-0.5 rounded-full bg-emerald-400 text-black text-[9px] font-mono tracking-widest border border-emerald-300 active:opacity-80"
+                title="Developer Mode is ON — click to jump to Settings"
+              >
+                DEV
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-3 text-sm">
@@ -1277,13 +1370,14 @@ export default function MTWalletApp() {
             {TABS.map((t) => {
               const Icon = t.icon;
               const active = activeTab === t.id;
+              const label = (devMode && (t as any).devLabel) ? (t as any).devLabel : t.label;
               return (
                 <button
                   key={t.id}
                   onClick={() => setActiveTab(t.id)}
                   className={`flex items-center gap-2 px-5 py-2 rounded-2xl whitespace-nowrap transition font-medium text-sm ${active ? 'bg-white text-black' : 'hover:bg-zinc-900 text-zinc-400 hover:text-white'}`}
                 >
-                  <Icon className="w-4 h-4" /> {t.label}
+                  <Icon className="w-4 h-4" /> {label}
                 </button>
               );
             })}
@@ -1856,6 +1950,125 @@ export default function MTWalletApp() {
               <div className="mt-2 text-[10px] text-emerald-400/70">MT Node: {getMTNode()} (locked official)</div>
               <div className="text-[10px] text-emerald-400/70">Auth: {getAuthURL()} (locked official)</div>
               <div className="mt-3 pt-3 border-t border-zinc-800 text-[10px] text-zinc-500">Developed by Futuret3ch and MemeTorrent • MT-ECO SYSTEM</div>
+            </div>
+
+            {/* DEVELOPER MODE — the major self-hosted API + observability layer for the whole ecosystem */}
+            <div className="border border-emerald-400/30 rounded-3xl p-4 bg-zinc-950">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <div className="font-semibold text-emerald-400 flex items-center gap-2">
+                    <span>DEVELOPER MODE</span>
+                    {devMode && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-400 text-black font-mono">ON</span>}
+                  </div>
+                  <div className="text-[10px] text-zinc-400">Self-hosted admin, analytics, direct MT node testing, full MT-Connect sandbox &amp; live logs. Ties into the master admin system (mt-admin-api) and the public /developers API reference.</div>
+                </div>
+                <button
+                  onClick={() => toggleDevMode(!devMode)}
+                  className={`px-4 py-1.5 rounded-2xl text-xs font-semibold border transition ${devMode ? 'bg-emerald-400 text-black border-emerald-400' : 'border-white/20 hover:bg-white/5'}`}
+                >
+                  {devMode ? 'DISABLE' : 'ENABLE'}
+                </button>
+              </div>
+
+              {devMode && (
+                <div className="space-y-4 mt-3 pt-3 border-t border-white/10 text-xs">
+                  {/* Live effective endpoints + session overrides for testing against your VPS / local */}
+                  <div>
+                    <div className="font-medium text-emerald-400 mb-1">Effective Endpoints (session overrides)</div>
+                    <div className="text-[10px] text-zinc-400 mb-1">MT Node: <span className="font-mono text-emerald-300">{effectiveMTNode()}</span></div>
+                    <div className="text-[10px] text-zinc-400 mb-2">Auth: <span className="font-mono text-emerald-300">{effectiveAuth()}</span></div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        value={devNodeOverride}
+                        onChange={(e) => setDevNodeOverride(e.target.value)}
+                        placeholder="Override MT node (e.g. http://161.97.106.182:4001 or https://api...)"
+                        className="bg-black border border-white/10 rounded-xl px-3 py-1.5 font-mono text-[10px] placeholder:text-zinc-500"
+                      />
+                      <input
+                        value={devAuthOverride}
+                        onChange={(e) => setDevAuthOverride(e.target.value)}
+                        placeholder="Override Auth URL (e.g. http://localhost:4002)"
+                        className="bg-black border border-white/10 rounded-xl px-3 py-1.5 font-mono text-[10px] placeholder:text-zinc-500"
+                      />
+                    </div>
+                    <div className="text-[9px] text-zinc-500 mt-1">Overrides apply only while Developer Mode is on and this tab is open. Clear the fields to use the locked official endpoints again.</div>
+                  </div>
+
+                  {/* Quick actions */}
+                  <div>
+                    <div className="font-medium text-emerald-400 mb-1">Quick Developer Actions</div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => {
+                          const url = 'https://memetorrent-react.vercel.app/developers';
+                          window.open(url, '_blank');
+                          addDevLog('Opened full public API + MT-Connect sandbox (the /developers page with all 6 social flows + wallet deeplinks).');
+                        }}
+                        className="px-3 py-1 rounded-xl border border-white/15 hover:bg-white/5"
+                      >
+                        Open Full API Sandbox (/developers)
+                      </button>
+                      <button
+                        onClick={() => {
+                          const admin = 'https://admin.futuret3ch.com.au/dashboard';
+                          window.open(admin, '_blank');
+                          addDevLog('Opened self-hosted master Admin Dashboard (analytics, vitals/RES, traffic, firewall rules, events).');
+                        }}
+                        className="px-3 py-1 rounded-xl border border-white/15 hover:bg-white/5"
+                      >
+                        Open Master Admin Dashboard
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch('https://admin.futuret3ch.com.au/api/health').catch(() => null);
+                            const txt = res ? await res.text() : 'no response (may be CORS or not deployed yet)';
+                            addDevLog('Admin health: ' + txt);
+                          } catch (e) {
+                            addDevLog('Admin ping failed (expected until admin.futuret3ch.com.au is live on VPS + nginx). Use the /dashboard direct link.');
+                          }
+                        }}
+                        className="px-3 py-1 rounded-xl border border-white/15 hover:bg-white/5"
+                      >
+                        Ping Admin API
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Force a track event so you can immediately see it in the admin dashboard
+                          try {
+                            const payload = { source: 'web-wallet-dev', type: 'dev_mode_ping', path: '/settings', data: { ts: Date.now(), dev: true } };
+                            const ADMIN_API = 'https://admin.futuret3ch.com.au';
+                            if (navigator.sendBeacon) navigator.sendBeacon(ADMIN_API + '/api/track', JSON.stringify(payload));
+                            else fetch(ADMIN_API + '/api/track', { method: 'POST', body: JSON.stringify(payload), keepalive: true });
+                            addDevLog('Sent dev_mode_ping track event to self-hosted admin. Check /dashboard → Events or Overview.');
+                          } catch (e) { addDevLog('Track send failed'); }
+                        }}
+                        className="px-3 py-1 rounded-xl border border-white/15 hover:bg-white/5"
+                      >
+                        Send Test Track Event
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Dev log */}
+                  <div>
+                    <div className="font-medium text-emerald-400 mb-1 flex items-center justify-between">
+                      <span>Developer Log (this session)</span>
+                      <button onClick={() => setDevLog([])} className="text-[9px] opacity-60 hover:opacity-100">clear</button>
+                    </div>
+                    <div className="bg-black/60 border border-white/10 rounded-2xl p-2 max-h-40 overflow-auto font-mono text-[10px] text-emerald-300/90 space-y-0.5">
+                      {devLog.length === 0 && <div className="opacity-40">No events yet. Toggle features or use the quick actions above.</div>}
+                      {devLog.map((l, i) => <div key={i}>{l}</div>)}
+                    </div>
+                    <div className="text-[9px] text-zinc-500 mt-1">All wallet operations (auth, native calls, trackers) are already logged to the self-hosted admin when reachable. This is the local mirror for this tab.</div>
+                  </div>
+
+                  <div className="text-[9px] text-emerald-400/70">
+                    This is the on-ramp to the full MT-ECO SYSTEM developer experience: the public /developers sandbox (social OAuth flows for FB/IG/TikTok/Snap/Google/Microsoft + wallet deeplinks), the self-hosted mt-admin-api (vitals like Vercel Speed Insights but yours, traffic, rules, webhooks stubs), mt-core, and future SDKs for iOS/Android/bots/widgets.
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="text-xs text-zinc-500 pt-4">Primary holdings live on the MT native chain. Solana SPL is legacy for bridging.</div>

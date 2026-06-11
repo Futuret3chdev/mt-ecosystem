@@ -70,7 +70,7 @@ systemctl enable --now mt-core
 systemctl enable --now mt-auth
 ```
 
-## 4. Nginx + SSL (for auth.futuret3ch.com.au + api.futuret3ch.com.au)
+## 4. Nginx + SSL (for auth.futuret3ch.com.au + api.futuret3ch.com.au + optional frontend proxies)
 Use the ready confs in `mt-core/nginx/` (recommended):
 
 ```bash
@@ -79,11 +79,18 @@ git pull
 cd mt-core/nginx
 sudo cp mt-core.conf /etc/nginx/sites-available/mt-core
 sudo cp mt-auth.conf /etc/nginx/sites-available/mt-auth
+sudo cp wallet.conf /etc/nginx/sites-available/wallet || true
+sudo cp memetorrent.conf /etc/nginx/sites-available/memetorrent || true
 sudo ln -s /etc/nginx/sites-available/mt-core /etc/nginx/sites-enabled/ 2>/dev/null || true
 sudo ln -s /etc/nginx/sites-available/mt-auth /etc/nginx/sites-enabled/ 2>/dev/null || true
+sudo ln -s /etc/nginx/sites-available/wallet /etc/nginx/sites-enabled/ 2>/dev/null || true
+sudo ln -s /etc/nginx/sites-available/memetorrent /etc/nginx/sites-enabled/ 2>/dev/null || true
 sudo nginx -t && sudo systemctl reload nginx
 sudo certbot --nginx -d auth.futuret3ch.com.au -d api.futuret3ch.com.au
+# (frontends optional: -d wallet.futuret3ch.com.au  and/or  -d memetorrent.futuret3ch.com.au )
 ```
+
+See `mt-core/nginx/README.md` (and the new memetorrent.conf) for the full current steps + the "VPS proxy vs direct Vercel CNAME" choice for memetorrent.futuret3ch.com.au (same pattern as the working wallet setup). Direct Vercel is recommended for the marketing site and wallet once DNS is clean.
 
 (Or manually place the server blocks with correct `server_name api.futuret3ch.com.au;` proxying 127.0.0.1:4001, and separate for auth on 4002.)
 
