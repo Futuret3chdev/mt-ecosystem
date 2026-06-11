@@ -1,52 +1,1205 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="light">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MT Admin — Tester Messages</title>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; background: #111; color: #ddd; margin: 40px; line-height: 1.6; }
-    .container { max-width: 800px; margin: 0 auto; }
-    h1 { color: #10b981; }
-    .message { background: #1f1f23; border-left: 4px solid #10b981; padding: 16px; margin-bottom: 16px; border-radius: 6px; }
-    .meta { font-size: 12px; color: #666; margin-top: 8px; }
-    .warning { background: #3f2a00; border-left-color: #f59e0b; }
-    footer { margin-top: 60px; font-size: 12px; color: #555; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Message Monitor - MemeTorrent</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Chart.js CDN for activity timeline charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            background-color: #f3f4f6;
+            color: #1f2937;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        html.dark body {
+            background-color: #111827;
+            color: #f3f4f6;
+        }
+        .container {
+            max-width: 100%;
+            margin: 10px auto;
+            padding: 5px;
+        }
+        .tab {
+            display: flex;
+            border-bottom: 2px solid #e5e7eb;
+            background-color: #ffffff;
+            border-radius: 8px 8px 0 0;
+            overflow: hidden;
+            display: none;
+        }
+        .tab.visible {
+            display: flex;
+        }
+        .tab button {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: #6b7280;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .tab button:hover {
+            background-color: #f9fafb;
+            color: #3b82f6;
+        }
+        .tab button.active {
+            background-color: #3b82f6;
+            color: #ffffff;
+        }
+        .tabcontent {
+            display: none;
+            padding: 15px;
+            background-color: #ffffff;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow-x: hidden;
+            max-width: 100%;
+        }
+        .search {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: row;
+            gap: 5px;
+        }
+        @media (max-width: 400px) {
+            .search {
+                flex-direction: column;
+            }
+        }
+        #discordSearch, #discordDeletedSearch, #discordUserSearch, #telegramSearch, #telegramDeletedSearch, #telegramUserSearch, #testersSearch {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        #discordUserFieldSelect, #telegramUserFieldSelect {
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        #discordSearchButton, #discordDeletedSearchButton, #discordUserSearchButton, #telegramSearchButton, #telegramDeletedSearchButton, #telegramUserSearchButton, #testersSearchButton {
+            padding: 8px 16px;
+            background-color: #10b981;
+            color: #ffffff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #discordSearchButton:hover, #discordDeletedSearchButton:hover, #discordUserSearchButton:hover, #telegramSearchButton:hover, #telegramDeletedSearchButton:hover, #telegramUserSearchButton:hover, #testersSearchButton:hover {
+            background-color: #059669;
+        }
+        .message, .user-entry, .log-entry, .check-entry {
+            border: 1px solid #e5e7eb;
+            padding: 12px;
+            margin-bottom: 10px;
+            background-color: #ffffff;
+            border-radius: 6px;
+            transition: box-shadow 0.3s ease;
+            overflow-wrap: break-word;
+        }
+        .message:hover, .user-entry:hover, .log-entry:hover, .check-entry:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .message:nth-child(odd), .user-entry:nth-child(odd), .log-entry:nth-child(odd), .check-entry:nth-child(odd) {
+            background-color: #f9fafb;
+        }
+        .timestamp { color: #6b7280; font-size: 12px; }
+        .platform { font-weight: 600; color: #1e40af; }
+        .sender { color: #374151; font-weight: 500; }
+        .field-label { font-weight: bold; color: #1f2937; }
+        .channel { color: #6b7280; font-style: italic; font-size: 12px; }
+        .reason { color: #dc2626; font-weight: 500; font-size: 12px; }
+        #auth {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-top: var(--top-ui-offset);
+        }
+        #auth input, #auth button {
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+        }
+        #auth button {
+            background-color: #10b981;
+            color: #ffffff;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #auth button:hover {
+            background-color: #059669;
+        }
+        #discordMessages, #discordDeletedMessages, #discordUserDetails, #telegramMessages, #telegramDeletedMessages, #telegramUserDetails, #pennaLogs, #chanLogs, #pennaChecks, #chanChecks, #tamChecks {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .pagination {
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        .pagination button {
+            padding: 8px 16px;
+            background-color: #10b981;
+            color: #ffffff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .pagination button:hover {
+            background-color: #059669;
+        }
+        .pagination button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .subtab {
+            display: flex;
+            border-bottom: 2px solid #e5e7eb;
+            background-color: #ffffff;
+            border-radius: 8px 8px 0 0;
+            overflow-x: auto;
+            margin-bottom: 10px;
+        }
+        .subtab button {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: #6b7280;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            min-width: 100px;
+        }
+        .subtab button:hover {
+            background-color: #f9fafb;
+            color: #3b82f6;
+        }
+        .subtab button.active {
+            background-color: #3b82f6;
+            color: #ffffff;
+        }
+        .subtabcontent {
+            display: none;
+            padding: 10px;
+            background-color: #ffffff;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .date-picker {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            display: none;
+        }
+        .date-picker input {
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        @media (max-width: 400px) {
+            .subtab {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+            }
+            .subtab button {
+                flex: 0 0 auto;
+                padding: 6px;
+                font-size: 12px;
+            }
+            .search {
+                flex-direction: column;
+            }
+        }
+        /* ── DARK MODE STYLES ──────────────────────────────────────────────────────── */
+        html.dark .tab,
+        html.dark .tabcontent,
+        html.dark .subtab,
+        html.dark .subtabcontent,
+        html.dark #auth,
+        html.dark .message,
+        html.dark .user-entry,
+        html.dark .log-entry,
+        html.dark .check-entry {
+            background-color: #1f2937 !important;
+            border-color: #374151 !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+        html.dark .tab button,
+        html.dark .subtab button {
+            color: #9ca3af;
+        }
+        html.dark .tab button:hover,
+        html.dark .subtab button:hover {
+            background-color: #374151;
+            color: #60a5fa;
+        }
+        html.dark .search input,
+        html.dark #discordUserFieldSelect,
+        html.dark #telegramUserFieldSelect,
+        html.dark .date-picker input {
+            background-color: #374151 !important;
+            border-color: #4b5563 !important;
+            color: #f3f4f6 !important;
+        }
+        html.dark .search button {
+            background-color: #059669;
+        }
+        html.dark .search button:hover {
+            background-color: #047857;
+        }
+        html.dark .pagination button {
+            background-color: #059669;
+        }
+        html.dark .pagination button:hover {
+            background-color: #047857;
+        }
+        html.dark .pagination button:disabled {
+            background-color: #4b5563;
+        }
+        html.dark .message:nth-child(odd),
+        html.dark .user-entry:nth-child(odd),
+        html.dark .log-entry:nth-child(odd),
+        html.dark .check-entry:nth-child(odd) {
+            background-color: #2d3748 !important;
+        }
+        html.dark .timestamp { color: #9ca3af; }
+        html.dark .platform { color: #60a5fa; }
+        html.dark .sender { color: #d1d5db; }
+        html.dark .field-label { color: #e5e7eb; }
+        html.dark .channel { color: #9ca3af; }
+        html.dark .reason { color: #f87171; }
+        /* Chart container styling */
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        html.dark .chart-container {
+            background: #1f2937;
+        }
+        #brand-banner {
+            margin-top: 12px;
+            margin-bottom: 16px;
+            padding: 14px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            border-radius: 12px;
+            background: linear-gradient(
+                135deg,
+                rgba(59,130,246,0.15),
+                rgba(16,185,129,0.15)
+            );
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            text-align: center;
+        }
+        .brand-primary {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            color: #2563eb;
+        }
+        .brand-secondary {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: #10b981;
+        }
+        .brand-separator {
+            font-size: 1.25rem;
+            font-weight: 600;
+            opacity: 0.6;
+        }
+        /* Dark mode banner */
+        html.dark #brand-banner {
+            background: linear-gradient(
+                135deg,
+                rgba(59,130,246,0.25),
+                rgba(16,185,129,0.25)
+            );
+        }
+        html.dark .brand-primary {
+            color: #60a5fa;
+        }
+        html.dark .brand-secondary {
+            color: #34d399;
+        }
+        :root {
+            --top-ui-offset: 72px;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>MT-ECO SYSTEM • Admin Tester Messages</h1>
-    <p><strong>This page is intentionally lightweight and static.</strong> It is served directly for testers and does not load the heavy admin dashboard JS.</p>
 
-    <div class="message">
-      <strong>Welcome, testers!</strong><br>
-      This is the official channel for important notes about the current playground builds (memetorrent-react + infinite-wallet).
+    <!-- Dark mode toggle -->
+    <div class="fixed top-4 right-4 z-20 pointer-events-auto">
+        <button id="theme-toggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors" aria-label="Toggle dark mode">
+            <span class="theme-sun">☀️</span>
+            <span class="theme-moon hidden">🌙</span>
+        </button>
     </div>
 
-    <div class="message warning">
-      <strong>Important:</strong><br>
-      • Developer Mode is now available inside the live Infinite Wallet (Settings tab → toggle "DEVELOPER MODE").<br>
-      • Use it to test tracking into the self-hosted admin, override nodes, view live logs, etc.<br>
-      • The full master dashboard is at <a href="/dashboard" style="color:#10b981">/dashboard</a> (requires X-Admin-Key for full data).
+    <div class="container">
+        <div id="brand-banner">
+            <span class="brand-primary">MemeTorrent</span>
+            <span class="brand-separator">|</span>
+            <span class="brand-secondary">FutureT3ch</span>
+        </div>
+
+        <div id="auth" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+            <div class="relative mb-4">
+                <input
+                    type="password"
+                    id="adminKey"
+                    placeholder="Enter Admin Key"
+                    class="w-full px-4 py-3 pr-12 text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                    autocomplete="off"
+                >
+                <button
+                    type="button"
+                    id="toggleAdminKey"
+                    class="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none"
+                    aria-label="Toggle password visibility"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                </button>
+            </div>
+            <button id="submitAuth" class="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition focus:outline-none focus:ring-2 focus:ring-green-400">
+                Submit
+            </button>
+        </div>
+
+        <div class="tab" id="tabs">
+            <button class="tablinks" onclick="openTab(event, 'Discord')">Discord</button>
+            <button class="tablinks" onclick="openTab(event, 'Telegram')">Telegram</button>
+            <button class="tablinks" onclick="openTab(event, 'Testers')">Testers</button>
+        </div>
+
+        <!-- Discord Tab -->
+        <div id="Discord" class="tabcontent">
+            <div class="subtab" id="discordSubtabs">
+                <button class="subtablinks active" onclick="openSubTab(event, 'DiscordMessages')">Messages</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'DiscordDeletedMessages')">Deleted Messages</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'DiscordUserDetails')">User Details</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'DiscordActivity')">Activity Chart</button>
+            </div>
+
+            <div id="DiscordMessages" class="subtabcontent">
+                <div class="search">
+                    <input type="text" id="discordSearch" placeholder="Search Discord messages...">
+                    <button id="discordSearchButton" onclick="searchDiscordMessages()">Search</button>
+                </div>
+                <div id="discordMessages"></div>
+                <div class="pagination" id="discordPagination"></div>
+            </div>
+
+            <div id="DiscordDeletedMessages" class="subtabcontent" style="display:none">
+                <div class="search">
+                    <input type="text" id="discordDeletedSearch" placeholder="Search deleted Discord messages...">
+                    <button id="discordDeletedSearchButton" onclick="searchDiscordDeletedMessages()">Search</button>
+                </div>
+                <div id="discordDeletedMessages"></div>
+                <div class="pagination" id="discordDeletedPagination"></div>
+            </div>
+
+            <div id="DiscordUserDetails" class="subtabcontent" style="display:none">
+                <div class="search">
+                    <select id="discordUserFieldSelect">
+                        <option value="discord_id">Discord ID</option>
+                        <option value="username" selected>Username</option>
+                        <option value="discriminator">Discriminator</option>
+                        <option value="wallet_address">Wallet Address</option>
+                    </select>
+                    <input type="text" id="discordUserSearch" placeholder="Search Discord user details...">
+                    <button id="discordUserSearchButton" onclick="searchDiscordUserDetails()">Search</button>
+                </div>
+                <div id="discordUserDetails"></div>
+                <div class="pagination" id="discordUserPagination"></div>
+            </div>
+
+            <div id="DiscordActivity" class="subtabcontent" style="display:none">
+                <div class="chart-container">
+                    <canvas id="discordActivityChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Telegram Tab -->
+        <div id="Telegram" class="tabcontent">
+            <div class="subtab" id="telegramSubtabs">
+                <button class="subtablinks active" onclick="openSubTab(event, 'TelegramMessages')">Messages</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'TelegramDeletedMessages')">Deleted Messages</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'TelegramUserDetails')">User Details</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'TelegramActivity')">Activity Chart</button>
+            </div>
+
+            <div id="TelegramMessages" class="subtabcontent">
+                <div class="search">
+                    <input type="text" id="telegramSearch" placeholder="Search Telegram messages...">
+                    <button id="telegramSearchButton" onclick="searchTelegramMessages()">Search</button>
+                </div>
+                <div id="telegramMessages"></div>
+                <div class="pagination" id="telegramPagination"></div>
+            </div>
+
+            <div id="TelegramDeletedMessages" class="subtabcontent" style="display:none">
+                <div class="search">
+                    <input type="text" id="telegramDeletedSearch" placeholder="Search deleted Telegram messages...">
+                    <button id="telegramDeletedSearchButton" onclick="searchTelegramDeletedMessages()">Search</button>
+                </div>
+                <div id="telegramDeletedMessages"></div>
+                <div class="pagination" id="telegramDeletedPagination"></div>
+            </div>
+
+            <div id="TelegramUserDetails" class="subtabcontent" style="display:none">
+                <div class="search">
+                    <select id="telegramUserFieldSelect">
+                        <option value="id">ID</option>
+                        <option value="first_name">First Name</option>
+                        <option value="last_name">Last Name</option>
+                        <option value="username" selected>Username</option>
+                        <option value="phone">Phone</option>
+                        <option value="wallet_address">Wallet Address</option>
+                    </select>
+                    <input type="text" id="telegramUserSearch" placeholder="Search Telegram user details...">
+                    <button id="telegramUserSearchButton" onclick="searchTelegramUserDetails()">Search</button>
+                </div>
+                <div id="telegramUserDetails"></div>
+                <div class="pagination" id="telegramUserPagination"></div>
+            </div>
+
+            <div id="TelegramActivity" class="subtabcontent" style="display:none">
+                <div class="chart-container">
+                    <canvas id="telegramActivityChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Testers Tab -->
+        <div id="Testers" class="tabcontent">
+            <div class="subtab" id="testersSubtabs">
+                <button class="subtablinks active" onclick="openSubTab(event, 'Penna')">Penna Log</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'PennaCheck')">Penna Chk List</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'Chan')">Chan Log</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'ChanCheck')">Chan Chk List</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'Tam')">Tam Log</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'TamCheck')">Tam Chk List</button>
+            </div>
+
+            <div class="date-picker" id="datePicker">
+                <input type="date" id="selectedDate" placeholder="Select Date">
+            </div>
+
+            <div id="Penna" class="subtabcontent">
+                <div id="pennaLogs"></div>
+                <div class="pagination" id="pennaPagination"></div>
+            </div>
+
+            <div id="PennaCheck" class="subtabcontent" style="display:none">
+                <div id="pennaChecks"></div>
+            </div>
+
+            <div id="Chan" class="subtabcontent" style="display:none">
+                <div id="chanLogs"></div>
+                <div class="pagination" id="chanPagination"></div>
+            </div>
+
+            <div id="ChanCheck" class="subtabcontent" style="display:none">
+                <div id="chanChecks"></div>
+            </div>
+
+            <div id="Tam" class="subtabcontent" style="display:none">
+                <div id="tamLogs"></div>
+                <div class="pagination" id="tamPagination"></div>
+            </div>
+
+            <div id="TamCheck" class="subtabcontent" style="display:none">
+                <div id="tamChecks"></div>
+            </div>
+        </div>
     </div>
 
-    <!-- 
-      Testers: Add new messages below this line as simple div.message blocks.
-      Keep this file simple — no heavy scripts or external dependencies.
-      The file lives at mt-admin-api/static/admin_messages.html in the repo.
-      It is served at https://admin.futuret3ch.com.au/static/admin_messages.html
-    -->
+    <!-- ────────────────────────────────────────────────────────────────────────────── -->
+    <!-- ALL JAVASCRIPT MOVED TO BOTTOM -->
+    <!-- ────────────────────────────────────────────────────────────────────────────── -->
 
-    <div class="message">
-      <strong>[YYYY-MM-DD] Example update</strong><br>
-      Replace this block with real tester communications. This path must remain working at all times.
-    </div>
+    <script>
+        let isAuthenticated = false;
+        const adminKey = "Hiptonic1@@";
 
-    <footer>
-      Served statically from the MT Admin API. Do not remove this file or change the /static/ path without coordinating with the team.
-      Main admin: <a href="/dashboard" style="color:#10b981">/dashboard</a>
-    </footer>
-  </div>
+        // DOM Elements
+        const discordMessages = document.getElementById('discordMessages');
+        const discordDeletedMessages = document.getElementById('discordDeletedMessages');
+        const discordUserDetails = document.getElementById('discordUserDetails');
+        const telegramMessages = document.getElementById('telegramMessages');
+        const telegramDeletedMessages = document.getElementById('telegramDeletedMessages');
+        const telegramUserDetails = document.getElementById('telegramUserDetails');
+        const pennaLogs = document.getElementById('pennaLogs');
+        const chanLogs = document.getElementById('chanLogs');
+        const tamLogs = document.getElementById('tamLogs');
+        const pennaChecks = document.getElementById('pennaChecks');
+        const chanChecks = document.getElementById('chanChecks');
+        const tamChecks = document.getElementById('tamChecks');
+
+        const discordPagination = document.getElementById('discordPagination');
+        const discordDeletedPagination = document.getElementById('discordDeletedPagination');
+        const discordUserPagination = document.getElementById('discordUserPagination');
+        const telegramPagination = document.getElementById('telegramPagination');
+        const telegramDeletedPagination = document.getElementById('telegramDeletedPagination');
+        const telegramUserPagination = document.getElementById('telegramUserPagination');
+        const pennaPagination = document.getElementById('pennaPagination');
+        const chanPagination = document.getElementById('chanPagination');
+        const tamPagination = document.getElementById('tamPagination');
+
+        const datePicker = document.getElementById('datePicker');
+        const selectedDate = document.getElementById('selectedDate');
+
+        // API Endpoints
+        const apiDiscordUrl = "https://admin.futuret3ch.com.au/api/discord_messages";
+	const apiDiscordDeletedUrl = "https://admin.futuret3ch.com.au/api/discord_deleted_messages";
+	const apiDiscordUserUrl = "https://admin.futuret3ch.com.au/api/discord_user_details";
+	const apiTelegramUrl = "https://admin.futuret3ch.com.au/api/telegram_messages";
+	const apiTelegramDeletedUrl = "https://admin.futuret3ch.com.au/api/telegram_deleted_messages";
+	const apiTelegramUserUrl = "https://admin.futuret3ch.com.au/api/user_details";
+	const apiTestersUrl = "https://admin.futuret3ch.com.au/api/tester_logs";
+	const apiCheckUrl = "https://admin.futuret3ch.com.au/api/check_commands";
+	const apiStatsBase = "https://admin.futuret3ch.com.au/api/activity_stats";
+
+        // Pagination state
+        let discordPage = 1;
+        let discordDeletedPage = 1;
+        let discordUserPage = 1;
+        let telegramPage = 1;
+        let telegramDeletedPage = 1;
+        let telegramUserPage = 1;
+        let pennaPage = 1;
+        let chanPage = 1;
+        let tamPage = 1;
+
+        // ── DARK MODE TOGGLE & PERSISTENCE ──────────────────────────────────────────
+        const themeToggle = document.getElementById('theme-toggle');
+        const html = document.documentElement;
+
+        function setTheme(theme) {
+            if (theme === 'dark') {
+                html.classList.remove('light');
+                html.classList.add('dark');
+                document.querySelector('.theme-sun').classList.add('hidden');
+                document.querySelector('.theme-moon').classList.remove('hidden');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                html.classList.remove('dark');
+                html.classList.add('light');
+                document.querySelector('.theme-sun').classList.remove('hidden');
+                document.querySelector('.theme-moon').classList.add('hidden');
+                localStorage.setItem('theme', 'light');
+            }
+        }
+
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        if (savedTheme) {
+            setTheme(savedTheme);
+        } else if (prefersDark) {
+            setTheme('dark');
+        } else {
+            setTheme('light');
+        }
+
+        themeToggle.addEventListener('click', () => {
+            setTheme(html.classList.contains('dark') ? 'light' : 'dark');
+        });
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+            if (!localStorage.getItem('theme')) {
+                setTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+
+        // ── CHART INSTANCES ──────────────────────────────────────────────────────────
+        let discordChartInstance = null;
+        let telegramChartInstance = null;
+
+        function renderActivityChart(platform) {
+            const canvasId = platform === 'discord' ? 'discordActivityChart' : 'telegramActivityChart';
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const isDark = html.classList.contains('dark');
+
+            if (platform === 'discord' && discordChartInstance) discordChartInstance.destroy();
+            if (platform === 'telegram' && telegramChartInstance) telegramChartInstance.destroy();
+
+            const statsUrl = `${apiStatsBase}?platform=${platform}&hours=24&key=${adminKey}`;
+
+            fetch(statsUrl)
+                .then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    return r.json();
+                })
+                .then(stats => {
+                    if (!stats || !stats.labels || !stats.data) {
+                        ctx.font = '16px Arial';
+                        ctx.fillStyle = isDark ? '#f87171' : '#dc2626';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('No data available', canvas.width / 2, canvas.height / 2);
+                        return;
+                    }
+
+                    const chartConfig = {
+                        type: 'line',
+                        data: {
+                            labels: stats.labels,
+                            datasets: [{
+                                label: `${platform.charAt(0).toUpperCase() + platform.slice(1)} Messages (Last 24h)`,
+                                data: stats.data,
+                                borderColor: platform === 'discord' ? '#3b82f6' : '#10b981',
+                                backgroundColor: platform === 'discord' ? 'rgba(59,130,246,0.2)' : 'rgba(16,185,129,0.2)',
+                                tension: 0.3,
+                                fill: true,
+                                pointBackgroundColor: platform === 'discord' ? '#3b82f6' : '#10b981',
+                                pointBorderColor: isDark ? '#1f2937' : '#fff',
+                                pointHoverRadius: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'top', labels: { color: isDark ? '#e5e7eb' : '#1f2937' } },
+                                title: {
+                                    display: true,
+                                    text: `${platform.toUpperCase()} Activity - Last 24 Hours`,
+                                    color: isDark ? '#e5e7eb' : '#1f2937',
+                                    font: { size: 16 }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: { display: true, text: 'Message Count' },
+                                    grid: { color: isDark ? '#374151' : '#e5e7eb' }
+                                },
+                                x: {
+                                    title: { display: true, text: 'Hour' },
+                                    grid: { color: isDark ? '#374151' : '#e5e7eb' }
+                                }
+                            }
+                        }
+                    };
+
+                    const chart = new Chart(ctx, chartConfig);
+                    if (platform === 'discord') discordChartInstance = chart;
+                    else telegramChartInstance = chart;
+                })
+                .catch(err => {
+                    console.error('Error loading activity stats:', err);
+                    ctx.font = '16px Arial';
+                    ctx.fillStyle = isDark ? '#f87171' : '#dc2626';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Failed to load chart', canvas.width / 2, canvas.height / 2);
+                });
+        }
+
+        // ── AUTHENTICATION ───────────────────────────────────────────────────────────
+        function authenticate() {
+            const inputKey = document.getElementById('adminKey')?.value || '';
+            if (inputKey === adminKey) {
+                isAuthenticated = true;
+                document.getElementById('auth').style.display = 'none';
+                document.getElementById('tabs').classList.add('visible');
+                startPolling();
+                openTab(null, 'Discord');
+                if (datePicker) datePicker.style.display = 'none';
+            } else {
+                alert("Invalid admin key!");
+            }
+        }
+
+        document.getElementById('submitAuth')?.addEventListener('click', authenticate);
+
+        // Password visibility toggle
+        const adminKeyInput = document.getElementById('adminKey');
+        const toggleAdminKey = document.getElementById('toggleAdminKey');
+        if (toggleAdminKey && adminKeyInput) {
+            toggleAdminKey.addEventListener('click', function() {
+                const type = adminKeyInput.type === 'password' ? 'text' : 'password';
+                adminKeyInput.type = type;
+                this.innerHTML = type === 'password' 
+                    ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>'
+                    : '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>';
+            });
+        }
+
+        // ── TAB & SUBTAB HANDLING ────────────────────────────────────────────────────
+        function openTab(evt, tabName) {
+            document.querySelectorAll('.tabcontent').forEach(el => el.style.display = "none");
+            document.querySelectorAll('.tablinks').forEach(el => el.classList.remove("active"));
+
+            const tab = document.getElementById(tabName);
+            if (tab) tab.style.display = "block";
+
+            if (evt?.currentTarget) {
+                evt.currentTarget.classList.add("active");
+            } else if (document.querySelector('.tablinks')) {
+                document.querySelector('.tablinks').classList.add("active");
+            }
+
+            if (tabName === 'Discord') openSubTab(null, 'DiscordMessages');
+            else if (tabName === 'Telegram') openSubTab(null, 'TelegramMessages');
+            else if (tabName === 'Testers') openSubTab(null, 'Penna');
+        }
+
+        function openSubTab(evt, subTabName) {
+            document.querySelectorAll('.subtabcontent').forEach(el => el.style.display = "none");
+            document.querySelectorAll('.subtablinks').forEach(el => el.classList.remove("active"));
+
+            const subTab = document.getElementById(subTabName);
+            if (subTab) subTab.style.display = "block";
+
+            if (evt?.currentTarget) {
+                evt.currentTarget.classList.add("active");
+            } else if (document.querySelector('.subtablinks')) {
+                document.querySelector('.subtablinks').classList.add("active");
+            }
+
+            const showDatePicker = ['PennaCheck', 'ChanCheck', 'TamCheck'].includes(subTabName);
+            if (datePicker) datePicker.style.display = showDatePicker ? 'flex' : 'none';
+
+            // Load content
+            if (subTabName === 'DiscordActivity') renderActivityChart('discord');
+            else if (subTabName === 'TelegramActivity') renderActivityChart('telegram');
+
+            if (subTabName === 'DiscordMessages') fetchDiscordMessages(discordPage);
+            else if (subTabName === 'DiscordDeletedMessages') fetchDiscordDeletedMessages(discordDeletedPage);
+            else if (subTabName === 'DiscordUserDetails') fetchDiscordUserDetails(discordUserPage);
+            else if (subTabName === 'TelegramMessages') fetchTelegramMessages(telegramPage);
+            else if (subTabName === 'TelegramDeletedMessages') fetchTelegramDeletedMessages(telegramDeletedPage);
+            else if (subTabName === 'TelegramUserDetails') fetchTelegramUserDetails(telegramUserPage);
+            else if (subTabName === 'Penna') fetchTestersLogs(pennaPage, 'penna');
+            else if (subTabName === 'PennaCheck') fetchCheckCommands('penna');
+            else if (subTabName === 'Chan') fetchTestersLogs(chanPage, 'chan');
+            else if (subTabName === 'ChanCheck') fetchCheckCommands('chan');
+            else if (subTabName === 'Tam') fetchTestersLogs(tamPage, 'tam');
+            else if (subTabName === 'TamCheck') fetchCheckCommands('tam');
+        }
+
+        // ── POLLING ──────────────────────────────────────────────────────────────────
+        function startPolling() {
+            const interval = 60000; // 1 minute
+
+            setInterval(() => fetchDiscordMessages(discordPage), interval);
+            setInterval(() => fetchDiscordDeletedMessages(discordDeletedPage), interval);
+            setInterval(() => fetchDiscordUserDetails(discordUserPage), interval);
+            setInterval(() => fetchTelegramMessages(telegramPage), interval);
+            setInterval(() => fetchTelegramDeletedMessages(telegramDeletedPage), interval);
+            setInterval(() => fetchTelegramUserDetails(telegramUserPage), interval);
+            setInterval(() => fetchTestersLogs(pennaPage, 'penna'), interval);
+            setInterval(() => fetchTestersLogs(chanPage, 'chan'), interval);
+            setInterval(() => fetchTestersLogs(tamPage, 'tam'), interval);
+
+            // Initial load
+            fetchDiscordMessages(discordPage);
+            fetchDiscordDeletedMessages(discordDeletedPage);
+            fetchDiscordUserDetails(discordUserPage);
+            fetchTelegramMessages(telegramPage);
+            fetchTelegramDeletedMessages(telegramDeletedPage);
+            fetchTelegramUserDetails(telegramUserPage);
+            fetchTestersLogs(pennaPage, 'penna');
+            fetchTestersLogs(chanPage, 'chan');
+            fetchTestersLogs(tamPage, 'tam');
+        }
+
+        // ── UTILITIES ────────────────────────────────────────────────────────────────
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        // ── DATA FETCHING FUNCTIONS ─────────────────────────────────────────────────
+        function fetchDiscordMessages(page) {
+            if (!isAuthenticated) return;
+            const search = document.getElementById('discordSearch')?.value || '';
+            const url = `${apiDiscordUrl}?key=${adminKey}${search ? `&search=${encodeURIComponent(search)}` : ''}&page=${page}`;
+
+            fetch(url, { headers: { 'X-Telegram-User-ID': adminKey } })
+                .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+                .then(data => {
+                    discordMessages.innerHTML = data.length === 0 
+                        ? '<div class="message">No messages found.</div>'
+                        : '';
+
+                    data.forEach(msg => {
+                        const div = document.createElement('div');
+                        div.className = 'message';
+                        div.innerHTML = `
+                            <span class="timestamp">${new Date(msg.timestamp).toLocaleString()}</span><br>
+                            <span class="platform">${msg.platform}</span>: ${escapeHtml(msg.content)}<br>
+                            <span class="sender">From: ${escapeHtml(msg.author_username)}</span><br>
+                            <span class="channel">Channel: ${escapeHtml(msg.channel_name)}</span>
+                        `;
+                        discordMessages.appendChild(div);
+                    });
+
+                    updatePagination('discord', page, data.length === 100);
+                })
+                .catch(err => {
+                    discordMessages.innerHTML = `<div class="message">Error: ${err}</div>`;
+                });
+        }
+
+        function fetchDiscordDeletedMessages(page) {
+            if (!isAuthenticated) return;
+            const search = document.getElementById('discordDeletedSearch')?.value || '';
+            const url = `${apiDiscordDeletedUrl}?key=${adminKey}${search ? `&search=${encodeURIComponent(search)}` : ''}&page=${page}`;
+
+            fetch(url, { headers: { 'X-Telegram-User-ID': adminKey } })
+                .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+                .then(data => {
+                    discordDeletedMessages.innerHTML = data.length === 0 
+                        ? '<div class="message">No deleted messages found.</div>'
+                        : '';
+
+                    data.forEach(msg => {
+                        const div = document.createElement('div');
+                        div.className = 'message';
+                        div.innerHTML = `
+                            <span class="timestamp">${new Date(msg.timestamp).toLocaleString()}</span><br>
+                            <span class="platform">${msg.platform}</span>: ${escapeHtml(msg.content)}<br>
+                            <span class="sender">From: ${escapeHtml(msg.author_username)}</span><br>
+                            <span class="channel">Channel: ${escapeHtml(msg.channel_name)}</span><br>
+                            <span class="reason">Reason: ${escapeHtml(msg.reason)}</span>
+                        `;
+                        discordDeletedMessages.appendChild(div);
+                    });
+
+                    updatePagination('discordDeleted', page, data.length === 100);
+                })
+                .catch(err => {
+                    discordDeletedMessages.innerHTML = `<div class="message">Error: ${err}</div>`;
+                });
+        }
+
+        function fetchDiscordUserDetails(page) {
+            if (!isAuthenticated) return;
+            const search = document.getElementById('discordUserSearch')?.value || '';
+            const field = document.getElementById('discordUserFieldSelect')?.value || 'username';
+            const url = `${apiDiscordUserUrl}?key=${adminKey}${search ? `&field=${field}&search=${encodeURIComponent(search)}` : ''}&page=${page}`;
+
+            fetch(url, { headers: { 'X-Telegram-User-ID': adminKey } })
+                .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+                .then(data => {
+                    discordUserDetails.innerHTML = data.length === 0 
+                        ? '<div class="user-entry">No Discord users found.</div>'
+                        : '';
+
+                    data.forEach(user => {
+                        const div = document.createElement('div');
+                        div.className = 'user-entry';
+                        div.innerHTML = `
+                            <span class="platform">Discord User</span><br>
+                            <span class="field-label">ID:</span> ${user.id}<br>
+                            <span class="field-label">Discord ID:</span> ${user.discord_id}<br>
+                            <span class="field-label">Username:</span> ${escapeHtml(user.username || 'N/A')}<br>
+                            <span class="field-label">Discriminator:</span> ${user.discriminator || 'N/A'}<br>
+                            <span class="field-label">Joined At:</span> ${new Date(user.joined_at).toLocaleString() || 'N/A'}<br>
+                            <span class="field-label">Verified:</span> ${user.verified ? 'Yes' : 'No'}<br>
+                            <span class="field-label">Verified At:</span> ${new Date(user.verified_at).toLocaleString() || 'N/A'}<br>
+                            <span class="field-label">Message Count:</span> ${user.message_count || '0'}<br>
+                            <span class="field-label">Wallet Address:</span> ${escapeHtml(user.wallet_address || 'N/A')}
+                        `;
+                        discordUserDetails.appendChild(div);
+                    });
+
+                    updatePagination('discordUser', page, data.length === 100);
+                })
+                .catch(err => {
+                    discordUserDetails.innerHTML = `<div class="user-entry">Error: ${err}</div>`;
+                });
+        }
+
+        function fetchTelegramMessages(page) {
+            if (!isAuthenticated) return;
+            const search = document.getElementById('telegramSearch')?.value || '';
+            const url = `${apiTelegramUrl}?key=${adminKey}${search ? `&search=${encodeURIComponent(search)}` : ''}&page=${page}`;
+
+            fetch(url, { headers: { 'X-Telegram-User-ID': adminKey } })
+                .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+                .then(data => {
+                    telegramMessages.innerHTML = data.length === 0 
+                        ? '<div class="message">No messages found.</div>'
+                        : '';
+
+                    data.forEach(msg => {
+                        const div = document.createElement('div');
+                        div.className = 'message';
+                        div.innerHTML = `
+                            <span class="timestamp">${new Date(msg.timestamp).toLocaleString()}</span><br>
+                            <span class="platform">${msg.platform}</span>: ${escapeHtml(msg.content)}<br>
+                            <span class="sender">From: ${escapeHtml(msg.username)}</span>
+                        `;
+                        telegramMessages.appendChild(div);
+                    });
+
+                    updatePagination('telegram', page, data.length === 100);
+                })
+                .catch(err => {
+                    telegramMessages.innerHTML = `<div class="message">Error: ${err}</div>`;
+                });
+        }
+
+        function fetchTelegramDeletedMessages(page) {
+            if (!isAuthenticated) return;
+            const search = document.getElementById('telegramDeletedSearch')?.value || '';
+            const url = `${apiTelegramDeletedUrl}?key=${adminKey}${search ? `&search=${encodeURIComponent(search)}` : ''}&page=${page}`;
+
+            fetch(url, { headers: { 'X-Telegram-User-ID': adminKey } })
+                .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+                .then(data => {
+                    telegramDeletedMessages.innerHTML = data.length === 0 
+                        ? '<div class="message">No deleted messages found.</div>'
+                        : '';
+
+                    data.forEach(msg => {
+                        const div = document.createElement('div');
+                        div.className = 'message';
+                        div.innerHTML = `
+                            <span class="timestamp">${new Date(msg.timestamp).toLocaleString()}</span><br>
+                            <span class="platform">Telegram</span>: ${escapeHtml(msg.content)}<br>
+                            <span class="sender">From: ${escapeHtml(msg.username)}</span><br>
+                            <span class="channel">Chat: ${escapeHtml(msg.chat_name || 'Private')}</span><br>
+                            <span class="reason">Reason: ${escapeHtml(msg.reason)}</span>
+                        `;
+                        telegramDeletedMessages.appendChild(div);
+                    });
+
+                    updatePagination('telegramDeleted', page, data.length === 100);
+                })
+                .catch(err => {
+                    telegramDeletedMessages.innerHTML = `<div class="message">Error: ${err}</div>`;
+                });
+        }
+
+        function fetchTelegramUserDetails(page) {
+            if (!isAuthenticated) return;
+            const search = document.getElementById('telegramUserSearch')?.value || '';
+            const field = document.getElementById('telegramUserFieldSelect')?.value || 'username';
+            const url = `${apiTelegramUserUrl}?key=${adminKey}${search ? `&field=${field}&search=${encodeURIComponent(search)}` : ''}&page=${page}`;
+
+            fetch(url, { headers: { 'X-Telegram-User-ID': adminKey } })
+                .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+                .then(data => {
+                    telegramUserDetails.innerHTML = !data || data.length === 0 
+                        ? '<div class="user-entry">No Telegram users found.</div>'
+                        : '';
+
+                    data.forEach(user => {
+                        const div = document.createElement('div');
+                        div.className = 'user-entry';
+                        div.innerHTML = `
+                            <span class="platform">Telegram User</span><br>
+                            <span class="field-label">ID:</span> ${user.id}<br>
+                            <span class="field-label">First Name:</span> ${escapeHtml(user.first_name || 'N/A')}<br>
+                            <span class="field-label">Last Name:</span> ${escapeHtml(user.last_name || 'N/A')}<br>
+                            <span class="field-label">Username:</span> ${escapeHtml(user.username || 'N/A')}<br>
+                            <span class="field-label">Phone:</span> ${escapeHtml(user.phone || 'N/A')}<br>
+                            <span class="field-label">Is Bot:</span> ${user.is_bot ? 'Yes' : 'No'}<br>
+                            <span class="field-label">Message Count:</span> ${user.message_count || '0'}<br>
+                            <span class="field-label">Verified:</span> ${user.verified ? 'Yes' : 'No'}<br>
+                            <span class="field-label">Date:</span> ${new Date(user.date).toLocaleString() || 'N/A'}<br>
+                            <span class="field-label">Wallet Address:</span> ${escapeHtml(user.wallet_address || 'N/A')}
+                        `;
+                        telegramUserDetails.appendChild(div);
+                    });
+
+                    updatePagination('telegramUser', page, data.length === 100);
+                })
+                .catch(err => {
+                    telegramUserDetails.innerHTML = `<div class="user-entry">Error: ${err}</div>`;
+                });
+        }
+
+        function fetchTestersLogs(page, logType) {
+            if (!isAuthenticated) return;
+
+            let logElement, paginationElement;
+
+            if (logType === 'penna') {
+                logElement = pennaLogs;
+                paginationElement = pennaPagination;
+            } else if (logType === 'chan') {
+                logElement = chanLogs;
+                paginationElement = chanPagination;
+            } else if (logType === 'tam') {
+                logElement = tamLogs;
+                paginationElement = tamPagination;
+            } else {
+                console.warn("Unknown log type:", logType);
+                return;
+            }
+
+            if (!logElement || !paginationElement) return;
+
+            const search = document.getElementById('testersSearch')?.value || '';
+            const url = `${apiTestersUrl}?key=${adminKey}${search ? `&search=${encodeURIComponent(search)}` : ''}&page=${page}&log=${logType}`;
+
+            fetch(url, { headers: { 'X-Telegram-User-ID': adminKey } })
+                .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+                .then(data => {
+                    logElement.innerHTML = data.length === 0 
+                        ? '<div class="log-entry">No logs found.</div>'
+                        : '';
+
+                    data.forEach(log => {
+                        if (log.log_file?.toLowerCase() === `${logType}.log`) {
+                            const div = document.createElement('div');
+                            div.className = 'log-entry';
+                            div.innerHTML = `
+                                <span class="timestamp">${new Date(log.timestamp).toLocaleString()}</span><br>
+                                <span class="platform">${escapeHtml(log.log_file)}</span>: ${escapeHtml(log.content || 'No content')}
+                            `;
+                            logElement.appendChild(div);
+                        }
+                    });
+
+                    updatePagination(logType, page, data.length === 100);
+                })
+                .catch(err => {
+                    logElement.innerHTML = `<div class="log-entry">Error: ${err}</div>`;
+                });
+        }
+
+        function fetchCheckCommands(logType) {
+            if (!isAuthenticated) return;
+
+            let checkElement;
+            if (logType === 'penna') checkElement = pennaChecks;
+            else if (logType === 'chan') checkElement = chanChecks;
+            else if (logType === 'tam') checkElement = tamChecks;
+            else return;
+
+            const dateVal = selectedDate?.value || '';
+            let url = `${apiCheckUrl}?key=${adminKey}&log=${logType}`;
+            if (dateVal) url += `&date=${dateVal}`;
+
+            fetch(url, { headers: { 'X-Telegram-User-ID': adminKey } })
+                .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+                .then(data => {
+                    checkElement.innerHTML = '';
+
+                    for (let category in data) {
+                        const div = document.createElement('div');
+                        div.className = 'check-entry';
+                        let html = `<h3>${escapeHtml(category)}</h3><ul>`;
+                        for (let item in data[category]) {
+                            html += `<li>${escapeHtml(data[category][item])} ${escapeHtml(item)}</li>`;
+                        }
+                        html += `</ul>`;
+                        div.innerHTML = html;
+                        checkElement.appendChild(div);
+                    }
+                })
+                .catch(err => {
+                    checkElement.innerHTML = `<div class="check-entry">Error: ${err}</div>`;
+                });
+        }
+
+        function updatePagination(type, currentPage, hasNext) {
+            const paginationMap = {
+                'discord': discordPagination,
+                'discordDeleted': discordDeletedPagination,
+                'discordUser': discordUserPagination,
+                'telegram': telegramPagination,
+                'telegramDeleted': telegramDeletedPagination,
+                'telegramUser': telegramUserPagination,
+                'penna': pennaPagination,
+                'chan': chanPagination,
+                'tam': tamPagination
+            };
+
+            const pagination = paginationMap[type];
+            if (!pagination) return;
+
+            pagination.innerHTML = '';
+
+            const prev = document.createElement('button');
+            prev.textContent = 'Previous';
+            prev.disabled = currentPage === 1;
+            prev.onclick = () => {
+                if (currentPage > 1) {
+                    window[`${type}Page`] = currentPage - 1;
+                    window[`fetch${type.charAt(0).toUpperCase() + type.slice(1)}`]?.(window[`${type}Page`]);
+                }
+            };
+
+            const next = document.createElement('button');
+            next.textContent = 'Next';
+            next.disabled = !hasNext;
+            next.onclick = () => {
+                if (hasNext) {
+                    window[`${type}Page`] = currentPage + 1;
+                    window[`fetch${type.charAt(0).toUpperCase() + type.slice(1)}`]?.(window[`${type}Page`]);
+                }
+            };
+
+            pagination.appendChild(prev);
+            pagination.appendChild(next);
+        }
+
+        // ── SEARCH HANDLERS ─────────────────────────────────────────────────────────
+        function searchDiscordMessages() { discordPage = 1; fetchDiscordMessages(discordPage); }
+        function searchDiscordDeletedMessages() { discordDeletedPage = 1; fetchDiscordDeletedMessages(discordDeletedPage); }
+        function searchDiscordUserDetails() { discordUserPage = 1; fetchDiscordUserDetails(discordUserPage); }
+        function searchTelegramMessages() { telegramPage = 1; fetchTelegramMessages(telegramPage); }
+        function searchTelegramDeletedMessages() { telegramDeletedPage = 1; fetchTelegramDeletedMessages(telegramDeletedPage); }
+        function searchTelegramUserDetails() { telegramUserPage = 1; fetchTelegramUserDetails(telegramUserPage); }
+
+        // Date change handler for check lists
+        selectedDate?.addEventListener('change', () => {
+            if (document.getElementById('PennaCheck')?.style.display === 'block') fetchCheckCommands('penna');
+            else if (document.getElementById('ChanCheck')?.style.display === 'block') fetchCheckCommands('chan');
+            else if (document.getElementById('TamCheck')?.style.display === 'block') fetchCheckCommands('tam');
+        });
+
+        // Start when page loads (but auth still required)
+        window.addEventListener('load', () => {
+            // Nothing automatic here - waiting for authentication
+        });
+    </script>
 </body>
 </html>
