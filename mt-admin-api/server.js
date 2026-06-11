@@ -2,12 +2,26 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
+const geoip = require('geoip-lite');
+const WebSocket = require('ws');
 const db = require('./src/db');
 
 const app = express();
 const PORT = process.env.PORT || 4003;
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'dev-key-change-me';
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+
+// WebSocket for live updates (globe dots, events as they happen)
+let wss;
+const broadcast = (data) => {
+  if (wss) {
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(data));
+      }
+    });
+  }
+};
 
 app.use(express.json({ limit: '1mb' }));
 
@@ -40,23 +54,50 @@ function requireAdminKey(req, res, next) {
 // No key required for basic tracking (can add rate limiting / bot detection later)
 app.post('/api/track', (req, res) => {
   try {
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.body.ip || '';
+    let geo = null;
+    if (ip) {
+      const lookup = geoip.lookup(ip);
+      if (lookup) {
+        geo = {
+          lat: lookup.ll[0],
+          lon: lookup.ll[1],
+          country: lookup.country,
+          city: lookup.city || null,
+          region: lookup.region || null
+        };
+      }
+    }
+    // Allow demo geo from payload (for testing the globe immediately)
+    if (req.body.data && req.body.data.geo) {
+      geo = req.body.data.geo;
+    }
+
+    // Simple bot scoring (expandable, no third parties)
+    let botScore = 0;
+    const uaLower = (req.body.ua || req.get('user-agent') || '').toLowerCase();
+    if (/bot|crawler|spider|headless|phantom|selenium|puppeteer|playwright|curl|wget|python-requests|go-http/.test(uaLower)) botScore += 60;
+    if (req.body.data && (req.body.data.rate > 5 || req.body.data.requestsPerMin > 10)) botScore += 30;
+
     const event = {
       id: uuidv4(),
       ts: Date.now(),
-      source: req.body.source || 'web-unknown', // 'web-marketing', 'web-wallet', 'game-pet', 'pm2', etc.
-      type: req.body.type || 'pageview',        // 'pageview', 'vital', 'custom', 'error', 'game_event'
+      source: req.body.source || 'web-unknown',
+      type: req.body.type || 'pageview',
       path: req.body.path || req.body.url || '/',
       referrer: req.body.referrer || '',
       ua: req.body.ua || req.get('user-agent') || '',
-      ip: req.ip || req.headers['x-forwarded-for'] || '',
+      ip: ip,
       session_id: req.body.session_id || null,
       user_id: req.body.user_id || null,
-      data: req.body.data || {}   // flexible: { fcp: 123, lcp: 456, ... } or { game: 'pet', action: 'feed' }
+      data: { ...(req.body.data || {}), geo, botScore }
     };
 
     db.insertEvent(event);
 
-    // Future: emit to websockets for real-time dashboard, trigger webhooks for Telegram/Discord bots
+    // Live broadcast for globe + real-time dashboard (red dots as events happen)
+    broadcast({ type: 'new_event', event });
+
     res.json({ ok: true, id: event.id });
   } catch (e) {
     console.error('Track error', e);
@@ -94,6 +135,25 @@ app.get('/api/admin/rules', requireAdminKey, (req, res) => {
   res.json(db.getRules());
 });
 
+app.get('/api/admin/geo', requireAdminKey, (req, res) => {
+  res.json(db.getRecentGeoEvents(parseInt(req.query.limit) || 300));
+});
+
+// Public test version (remove or protect later if needed)
+app.get('/api/geo', (req, res) => {
+  res.json(db.getRecentGeoEvents(parseInt(req.query.limit) || 50));
+});
+
+// Live geo data for the globe (recent events with lat/lon + botScore)
+app.get('/api/admin/geo', requireAdminKey, (req, res) => {
+  res.json(db.getRecentGeoEvents(parseInt(req.query.limit) || 300));
+});
+
+// Also expose a simple public-ish version for testing (remove or protect in prod if needed)
+app.get('/api/geo', (req, res) => {
+  res.json(db.getRecentGeoEvents(parseInt(req.query.limit) || 50));
+});
+
 // Health + future extensibility (webhooks, SDK info)
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'mt-admin-api', time: Date.now() }));
 
@@ -107,6 +167,7 @@ app.get('/dashboard', (req, res) => {
       <title>MT Admin — Master Observatory (Playgrounds)</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
       <style>
         body { font-family: system-ui, -apple-system, sans-serif; }
         .metric { font-variant-numeric: tabular-nums; }
@@ -137,10 +198,12 @@ app.get('/dashboard', (req, res) => {
         <!-- Tabs -->
         <div class="flex gap-1 mb-4 border-b border-zinc-800">
           <div onclick="showTab('analytics')" class="tab active" id="tab-analytics">Analytics</div>
+          <div onclick="showTab('globe')" class="tab" id="tab-globe">🌍 Live Globe</div>
           <div onclick="showTab('performance')" class="tab" id="tab-performance">Performance (Speed Insights)</div>
           <div onclick="showTab('traffic')" class="tab" id="tab-traffic">Traffic</div>
           <div onclick="showTab('firewall')" class="tab" id="tab-firewall">Firewall / Rules</div>
           <div onclick="showTab('events')" class="tab" id="tab-events">Events / Audit</div>
+          <div onclick="showTab('api')" class="tab" id="tab-api">API Playground</div>
         </div>
 
         <!-- ANALYTICS -->
@@ -235,6 +298,78 @@ app.get('/dashboard', (req, res) => {
               <button onclick="loadEvents()" class="text-xs px-3 py-1 bg-zinc-800 hover:bg-zinc-700 rounded">Refresh</button>
             </div>
             <div id="events-table" class="overflow-auto max-h-80 text-sm"></div>
+          </div>
+        </div>
+
+        <!-- LIVE GLOBE - full real-time 3D globe with red dots as events happen (bots = brighter red) -->
+        <div id="section-globe" class="section">
+          <div class="card">
+            <div class="flex justify-between items-center mb-3">
+              <div>
+                <div class="font-semibold">Live Globe — Events as they happen</div>
+                <div class="text-xs text-zinc-400">Red dots appear in real-time from the WebSocket feed. Brighter = higher bot score. Click dot for details. Self-hosted, no third-party maps.</div>
+              </div>
+              <div class="text-xs">
+                <button onclick="toggleGlobeRotation()" class="px-2 py-1 border border-white/20 rounded">Pause/Play Rotation</button>
+                <button onclick="clearGlobeDots()" class="px-2 py-1 border border-white/20 rounded ml-1">Clear Dots</button>
+              </div>
+            </div>
+            <div id="globe-container" style="width:100%; height:520px; background:#000; border-radius:12px; overflow:hidden; position:relative;">
+              <canvas id="globe-canvas" style="width:100%; height:100%; display:block;"></canvas>
+              <div id="globe-tooltip" style="position:absolute; display:none; background:#111; border:1px solid #333; padding:6px 10px; border-radius:6px; font-size:12px; pointer-events:none; z-index:10;"></div>
+            </div>
+            <div class="mt-2 text-xs text-zinc-400">Live dots are pushed via WebSocket from every /api/track. Geo resolved with self-hosted geoip-lite. Filter by source in Analytics above.</div>
+          </div>
+        </div>
+
+        <!-- API PLAYGROUND - developers can copy & run everything -->
+        <div id="section-api" class="section">
+          <div class="card">
+            <div class="font-semibold mb-2">API Playground — Copy & Run (self-hosted, no keys needed for /track)</div>
+            <div class="text-xs mb-3 opacity-70">All endpoints. Paste your ADMIN_API_KEY for protected calls. Everything the Vercel dashboard has, plus more (globe, bot scoring, custom sources).</div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Track -->
+              <div class="border border-white/10 rounded p-3">
+                <div class="font-medium text-emerald-400">POST /api/track (public)</div>
+                <pre class="text-[10px] bg-black p-2 rounded mt-1 overflow-auto">fetch('/api/track', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({
+    source: 'game-pet',
+    type: 'harvest',
+    path: '/garden',
+    data: { rockets: 42, user: 'demo' }
+  })
+}).then(r => r.json()).then(console.log)</pre>
+                <button onclick="tryTrack()" class="mt-2 text-xs px-3 py-1 bg-emerald-600 rounded">Run Example</button>
+              </div>
+
+              <!-- Overview -->
+              <div class="border border-white/10 rounded p-3">
+                <div class="font-medium text-emerald-400">GET /api/admin/overview</div>
+                <pre class="text-[10px] bg-black p-2 rounded mt-1 overflow-auto">fetch('/api/admin/overview?range=7d&key=YOUR_KEY')
+  .then(r => r.json()).then(console.log)</pre>
+                <button onclick="tryOverview()" class="mt-2 text-xs px-3 py-1 bg-emerald-600 rounded">Run</button>
+              </div>
+
+              <!-- Geo (for globe) -->
+              <div class="border border-white/10 rounded p-3">
+                <div class="font-medium text-emerald-400">GET /api/admin/geo (live globe data)</div>
+                <pre class="text-[10px] bg-black p-2 rounded mt-1 overflow-auto">fetch('/api/admin/geo?limit=200&key=YOUR_KEY')
+  .then(r => r.json()).then(d => console.log('Dots for globe:', d.length))</pre>
+                <button onclick="tryGeo()" class="mt-2 text-xs px-3 py-1 bg-emerald-600 rounded">Run</button>
+              </div>
+
+              <!-- Vitals -->
+              <div class="border border-white/10 rounded p-3">
+                <div class="font-medium text-emerald-400">GET /api/admin/vitals (RES like Vercel Speed Insights)</div>
+                <pre class="text-[10px] bg-black p-2 rounded mt-1 overflow-auto">fetch('/api/admin/vitals?key=YOUR_KEY').then(r=>r.json()).then(console.log)</pre>
+                <button onclick="tryVitals()" class="mt-2 text-xs px-3 py-1 bg-emerald-600 rounded">Run</button>
+              </div>
+            </div>
+
+            <div class="mt-3 text-xs">More endpoints: /api/admin/events, /traffic, /rules, POST /rule. Full source in mt-admin-api/server.js + src/db.js. Use the key from .env for protected calls.</div>
           </div>
         </div>
 
@@ -401,14 +536,156 @@ app.get('/dashboard', (req, res) => {
 
         // init on load
         window.onload = init;
+
+        // ==================== FULL AMBITIOUS LIVE GLOBE (self-contained 2D canvas, real-time dots) ====================
+        let globeCanvas, globeCtx, globeDots = [], globeAngle = 0, globeAnimating = true, globeWS;
+
+        function initGlobe() {
+          globeCanvas = document.getElementById('globe-canvas');
+          if (!globeCanvas) return;
+          globeCtx = globeCanvas.getContext('2d');
+          globeCanvas.width = 820;
+          globeCanvas.height = 520;
+
+          // mouse drag
+          let drag = false, last = 0;
+          globeCanvas.addEventListener('mousedown', e => { drag = true; last = e.clientX; });
+          window.addEventListener('mouseup', () => drag = false);
+          globeCanvas.addEventListener('mousemove', e => {
+            if (!drag) return;
+            globeAngle += (e.clientX - last) * 0.006;
+            last = e.clientX;
+            drawGlobe();
+          });
+
+          // live WS
+          try {
+            const p = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            globeWS = new WebSocket(`${p}//${location.host}`);
+            globeWS.onmessage = ev => {
+              try {
+                const m = JSON.parse(ev.data);
+                if (m.type === 'new_event' && m.event && m.event.data && m.event.data.geo) {
+                  addGlobeDot(m.event);
+                }
+              } catch(e){}
+            };
+          } catch(e){}
+
+          loadGlobeInitial();
+          setInterval(drawGlobe, 60);
+          drawGlobe();
+        }
+
+        function drawGlobe() {
+          if (!globeCtx) return;
+          const w = globeCanvas.width, h = globeCanvas.height, cx = w/2, cy = h/2, r = 195;
+          globeCtx.fillStyle = '#05070a'; globeCtx.fillRect(0,0,w,h);
+
+          // globe
+          globeCtx.strokeStyle = '#112233'; globeCtx.lineWidth = 1.5;
+          globeCtx.beginPath(); globeCtx.arc(cx, cy, r, 0, Math.PI*2); globeCtx.stroke();
+
+          // latitude
+          for (let i = -7; i <= 7; i++) {
+            const y = cy + i * 18;
+            const rw = Math.sqrt(r*r - (y-cy)*(y-cy));
+            if (rw > 2) {
+              globeCtx.beginPath(); globeCtx.arc(cx, y, rw, 0, Math.PI*2); globeCtx.stroke();
+            }
+          }
+
+          // live dots
+          const now = Date.now();
+          globeDots = globeDots.filter(d => now - d.ts < 38000);
+          globeDots.forEach(d => {
+            const age = (now - d.ts) / 38000;
+            const alpha = Math.max(0.15, 1 - age);
+            const isBot = d.botScore > 35;
+            globeCtx.fillStyle = isBot ? `rgba(255,40,40,${alpha})` : `rgba(255,90,90,${alpha})`;
+            const size = isBot ? 5.5 : 3.8;
+            const x = cx + Math.cos((d.lon + globeAngle) * Math.PI/180) * (r * Math.cos(d.lat * Math.PI/180));
+            const y = cy + Math.sin(d.lat * Math.PI/180) * (r * 0.55);
+            globeCtx.beginPath(); globeCtx.arc(x, y, size, 0, Math.PI*2); globeCtx.fill();
+            if (isBot) {
+              globeCtx.strokeStyle = `rgba(255,40,40,${alpha*0.6})`; globeCtx.lineWidth = 1.5;
+              globeCtx.beginPath(); globeCtx.arc(x, y, size+3, 0, Math.PI*2); globeCtx.stroke();
+            }
+            d.screenX = x; d.screenY = y;
+          });
+
+          // labels
+          globeCtx.fillStyle = '#556677'; globeCtx.font = '11px system-ui';
+          globeCtx.fillText('LIVE GLOBE — red dots = real /api/track events (brighter = bot)', 18, 24);
+          globeCtx.fillText('Drag to rotate • WS live updates • Self-hosted geoip', 18, h-18);
+        }
+
+        function addGlobeDot(ev) {
+          if (!ev.data || !ev.data.geo) return;
+          const g = ev.data.geo;
+          globeDots.push({
+            lat: g.lat, lon: g.lon, ts: Date.now(),
+            source: ev.source, type: ev.type, path: ev.path,
+            botScore: ev.data.botScore || 0,
+            ip: ev.ip
+          });
+          drawGlobe();
+        }
+
+        async function loadGlobeInitial() {
+          if (!ADMIN_KEY) return;
+          try {
+            const r = await fetch(`/api/admin/geo?limit=180&key=${ADMIN_KEY}`);
+            if (!r.ok) return;
+            const list = await r.json();
+            list.forEach(ev => addGlobeDot(ev));
+            drawGlobe();
+          } catch(e){}
+        }
+
+        function initGlobeFallback(c) { /* basic if needed */ }
+
+        // ==================== API PLAYGROUND ====================
+        function initAPIPlayground() {}
+
+        async function tryTrack() {
+          const r = await fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({source:'game-pet',type:'harvest',path:'/garden',data:{rockets:42}})});
+          alert('Track OK: ' + JSON.stringify(await r.json()));
+        }
+        async function tryOverview() {
+          const k = ADMIN_KEY || prompt('Key');
+          const r = await fetch(`/api/admin/overview?key=${k}`); console.log(await r.json()); alert('See console + Events');
+        }
+        async function tryGeo() {
+          const k = ADMIN_KEY || prompt('Key');
+          const r = await fetch(`/api/admin/geo?limit=60&key=${k}`); const d=await r.json(); console.log(d); alert(d.length + ' geo points');
+        }
+        async function tryVitals() {
+          const k = ADMIN_KEY || prompt('Key');
+          const r = await fetch(`/api/admin/vitals?key=${k}`); console.log(await r.json()); alert('Vitals+RES in console');
+        }
+
+        window.toggleGlobeRotation = () => { globeRotating = !globeRotating; };
+        window.clearGlobeDots = () => { globeDots = []; drawGlobe(); };
+
+        window.onload = init;
       </script>
     </body>
     </html>
   `);
 });
 
-app.listen(PORT, () => {
+// Create HTTP server so we can attach WebSocket for live globe dots + real-time events
+const server = require('http').createServer(app);
+wss = new WebSocket.Server({ server });
+
+wss.on('connection', (ws) => {
+  ws.send(JSON.stringify({ type: 'connected', message: 'Connected to live admin feed — red dots will appear on the globe as events happen' }));
+});
+
+server.listen(PORT, () => {
   console.log(`MT Admin API running on port ${PORT}`);
   console.log('Dashboard: /dashboard (use ?key= or X-Admin-Key header for full data)');
   console.log('Protected endpoints require X-Admin-Key header (or ?key=)');
+  console.log('WebSocket live updates (globe + events) available on same port');
 });
