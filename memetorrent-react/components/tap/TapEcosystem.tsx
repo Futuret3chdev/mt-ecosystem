@@ -23,7 +23,7 @@ const NFTS_GAMES = [
   { title: 'Dash', type: 'Game', status: 'Live • Endless Runner', desc: 'Fast-paced endless running with character unlocks, power-ups, and collectible Rockets along the way.' },
   { title: 'Chicken', type: 'Game', status: 'Live • Farm Adventure', desc: 'Humorous chicken-themed runner and collector game with unique MT ecosystem twists and rewards.' },
   { title: 'Clubpool', type: 'Game', status: 'In Development • Multiplayer Pool', desc: 'Strategic billiards and pool gameplay with friends, tournaments, and $MT-powered betting mechanics.' },
-  { title: 'MT WORLD', type: 'Game', status: 'In Development • Pet Metaverse', desc: 'Pet Meta World (METAVERSE) — explore a shared 3D world with TripoSR-generated pet models. Real-time multiplayer and transparent PNG-to-3D pipeline now live.' },
+  { title: 'MT WORLD', type: 'Game', status: 'In Development • Open Metaverse', desc: 'Explore, build, and socialize in the expansive MT metaverse with on-chain land ownership and assets.' },
   { title: 'NEON SALVAGE', type: 'Game', status: 'Live • Neon Crafting', desc: 'Salvage resources, craft items, and survive in vibrant neon worlds while earning NFTs and Rockets.' },
   { title: 'BLOCKCRAFT', type: 'Game', status: 'In Development • Creative World', desc: 'Build and craft in a block-based universe. Own your creations as NFTs and collaborate on-chain with others.' },
   { title: 'Artillery', type: 'Strategy', status: 'In Development • Tactical Combat', desc: 'Projectile and angle-based combat gameplay for tactical and competitive play sessions.' },
@@ -55,7 +55,7 @@ export default function TapEcosystem() {
           ))}
         </div>
 
-        <div id="games" className="scroll-mt-24">
+        <div>
           <div className="uppercase text-xs tracking-[3px] opacity-60 mb-4">LIVE &amp; UPCOMING • NFTS + GAMES</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {NFTS_GAMES.map((item, i) => (
