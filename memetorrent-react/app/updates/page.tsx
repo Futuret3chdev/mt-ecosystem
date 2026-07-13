@@ -10,17 +10,14 @@ export default function UpdatesPage() {
         <div className="space-y-8 text-sm">
           <div>
             <div className="text-[#19d37e] text-xs mb-1">JULY 2026</div>
-            <div className="font-medium">METAVERSE — Pet Meta World, 3D Pets &amp; Creative Tools</div>
+            <div className="font-medium">METAVERSE — Pet Meta World &amp; 3D Pets</div>
             <ul className="mt-2 space-y-1 text-[#97a7c6]">
               <li>• Pet Meta World (METAVERSE) — shared 3D world where you explore with your pets</li>
-              <li>• TripoSR pipeline — transparent PNG artwork converts to live 3D pet models in-world</li>
+              <li>• TripoSR pipeline generates live 3D pet models from transparent PNG artwork</li>
               <li>• Real-time multiplayer — see other players and their pets in the same world</li>
-              <li>• Pet customization — themes (Classic, Cosmic, Forest, Cyber, Royal, Ocean), accessories (Crown, Cape, Shades, Wings, Scarf), and colour palettes; apply to regenerate your pet portrait</li>
-              <li>• Pet video creation — AI-generated short videos of your pet with your chosen style, saved to your pet profile</li>
-              <li>• Evolution tree — track your pet&apos;s forms and unlock new portrait stages as you level up</li>
               <li>• New transparent pet assets released (Tony #131, Baby #664) with automatic 3D model generation</li>
               <li>• Telegram hub refreshed — /com shows MT Ecosystem stats; Play 2 Earn page carries the MetaVerse banner</li>
-              <li>• Pet care menus cleaned up — clearer messaging and streamlined creative hub navigation</li>
+              <li>• Pet care menus cleaned up — clearer messaging and streamlined pet hub navigation</li>
             </ul>
           </div>
 
