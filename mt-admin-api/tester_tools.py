@@ -1,14 +1,10 @@
-"""Shared tester-system helpers (logs, checklists, payroll sessions)."""
-import json
+"""Shared tester-system helpers (logs, checklists)."""
 import os
 import re
 from collections import defaultdict
-from datetime import datetime, timedelta
-from io import StringIO
-import csv
+from datetime import datetime
 
 TESTER_LOG_DIR = '/root/bot'
-STATUS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'tester_check_status.json')
 
 TIMESTAMP_FORMATS = [
     '%Y-%m-%d %H:%M:%S,%f',
@@ -166,28 +162,6 @@ def get_all_checklists():
     }
 
 
-def load_status_store():
-    os.makedirs(os.path.dirname(STATUS_FILE), exist_ok=True)
-    if not os.path.exists(STATUS_FILE):
-        return {}
-    try:
-        with open(STATUS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def save_status_store(data):
-    os.makedirs(os.path.dirname(STATUS_FILE), exist_ok=True)
-    with open(STATUS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2)
-
-
-def status_key(tester, item, date_str=None):
-    d = date_str or datetime.now().strftime('%Y-%m-%d')
-    return f'{tester}:{item}:{d}'
-
-
 def scan_executed_commands(log_type, base_dir, selected_date=None):
     executed = defaultdict(set)
     pattern = re.compile(r'(/\w+(?:\s+\w+)*)|(/\w+)', re.IGNORECASE)
@@ -216,125 +190,23 @@ def scan_executed_commands(log_type, base_dir, selected_date=None):
     return executed
 
 
-def build_check_response(log_type, base_dir, selected_date=None, template=None):
+def build_checklist(log_type, base_dir, selected_date=None):
     all_checks = get_all_checklists()
-    templates = all_checks.pop('_templates', {})
-    if template and template in templates:
-        cats = templates[template]
-        if cats:
-            all_checks = {k: v for k, v in all_checks.items() if k in cats}
-
+    all_checks.pop('_templates', None)
     executed = scan_executed_commands(log_type, base_dir, selected_date)
-    statuses = load_status_store()
-    date_key = selected_date or datetime.now().strftime('%Y-%m-%d')
-
     checklist = {}
-    done = 0
-    total = 0
-    item_statuses = {}
-
     for category, items in all_checks.items():
         checklist[category] = {}
         for item in items:
-            total += 1
             upper_item = item.upper()
             base_cmd = upper_item.split()[0] if ' ' in upper_item else upper_item
-            auto_pass = any(base_cmd in key for key in executed)
-            sk = status_key(log_type, item, date_key)
-            manual = statuses.get(sk, {})
-            status = manual.get('status')
-            if status == 'pass' or (not status and auto_pass):
-                mark = '✅'
-                done += 1
-            elif status == 'blocked':
-                mark = '⚠️'
-            elif status == 'fail':
-                mark = '❌'
-            else:
-                mark = '❌'
-            checklist[category][item] = mark
-            if manual:
-                item_statuses[item] = manual
-
-    return {
-        'checklist': checklist,
-        'progress': {
-            'done': done,
-            'total': total,
-            'percent': round((done / total) * 100, 1) if total else 0,
-            'date': date_key,
-            'tester': log_type,
-        },
-        'statuses': item_statuses,
-    }
-
-
-def compute_sessions(log_type, base_dir, log_date=None):
-    logs = load_all_logs(log_type, base_dir, log_filter='clock')
-    if log_date:
-        logs = [l for l in logs if l['_sort'].date() == datetime.strptime(log_date, '%Y-%m-%d').date()]
-    logs.sort(key=lambda x: x['_sort'])
-    sessions = []
-    open_in = None
-    total_seconds = 0
-    for entry in logs:
-        c = (entry.get('content') or '').upper()
-        if c.startswith('IN'):
-            open_in = entry['_sort']
-        elif c.startswith('OUT') and open_in:
-            delta = (entry['_sort'] - open_in).total_seconds()
-            if delta > 0:
-                sessions.append({
-                    'clock_in': open_in.isoformat(),
-                    'clock_out': entry['_sort'].isoformat(),
-                    'duration_minutes': round(delta / 60, 1),
-                    'duration_hours': round(delta / 3600, 2),
-                })
-                total_seconds += delta
-            open_in = None
-    return {
-        'sessions': sessions,
-        'total_hours': round(total_seconds / 3600, 2),
-        'session_count': len(sessions),
-        'open_session': open_in.isoformat() if open_in else None,
-    }
-
-
-def monthly_rollup(base_dir, year=None, month=None):
-    now = datetime.now()
-    year = int(year or now.year)
-    month = int(month or now.month)
-    testers = ['penna', 'chan', 'tam']
-    rollup = {}
-    for tester in testers:
-        logs = load_all_logs(tester, base_dir)
-        month_logs = [l for l in logs if l['_sort'].year == year and l['_sort'].month == month]
-        sessions = compute_sessions(tester, base_dir)
-        session_hours = 0
-        for s in sessions['sessions']:
-            dt_in = datetime.fromisoformat(s['clock_in'])
-            if dt_in.year == year and dt_in.month == month:
-                session_hours += s['duration_hours']
-        check = build_check_response(tester, base_dir)
-        rollup[tester] = {
-            'log_entries': len(month_logs),
-            'clock_hours': round(session_hours, 2),
-            'checklist_percent': check['progress']['percent'],
-            'notes': sum(1 for l in month_logs if l.get('log_type') in ('manual', 'check_note')),
-            'bot_commands': sum(1 for l in month_logs if l.get('log_type') == 'bot'),
-        }
-    return {'year': year, 'month': month, 'testers': rollup}
-
-
-def export_csv(log_type, base_dir, days=7):
-    since = datetime.now() - timedelta(days=int(days))
-    logs = [l for l in load_all_logs(log_type, base_dir) if l['_sort'] >= since]
-    buf = StringIO()
-    w = csv.writer(buf)
-    w.writerow(['timestamp', 'tester', 'type', 'content'])
-    for e in logs:
-        w.writerow([e['timestamp'], log_type, e.get('log_type', ''), e['content']])
-    return buf.getvalue()
+            item_key = upper_item.replace(' — ', ' ').strip()
+            auto_pass = (
+                any(base_cmd in key for key in executed)
+                or any(item_key in key or key in item_key for key in executed)
+            )
+            checklist[category][item] = '✅' if auto_pass else '❌'
+    return checklist
 
 
 def append_tester_log(tester, action, item='', notes=''):

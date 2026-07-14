@@ -713,54 +713,16 @@
                 <span id="logStatus" class="ml-2 text-xs text-emerald-400"></span>
             </div>
 
-            <div id="testerToast"></div>
-
-            <div class="tester-progress-grid" id="testerProgressDashboard">
-                <div class="tester-progress-card" id="progress-penna"></div>
-                <div class="tester-progress-card" id="progress-chan"></div>
-                <div class="tester-progress-card" id="progress-tam"></div>
-            </div>
-
-            <div class="tester-sticky-toolbar">
             <div class="tester-toolbar">
                 <input type="text" id="testersSearch" placeholder="Search logs (command, note, /pet...)">
                 <button id="testersSearchButton" onclick="searchTestersLogs()">Search</button>
                 <button type="button" onclick="refreshActiveTesterView()" style="background:#3b82f6;color:#fff;border:none;">Refresh</button>
-                <input type="date" id="testerLogDate" title="Filter logs by date" onchange="resetTesterPagesAndReload()">
-                <select id="testerLogFilter" onchange="resetTesterPagesAndReload()">
-                    <option value="all">All types</option>
-                    <option value="bot">Bot commands</option>
-                    <option value="manual">Manual notes</option>
-                    <option value="clock">Clock in/out</option>
-                    <option value="check_note">Check notes</option>
-                </select>
                 <select id="testerPerPage" onchange="resetTesterPagesAndReload()">
                     <option value="50">50 / page</option>
                     <option value="100" selected>100 / page</option>
                     <option value="200">200 / page</option>
                 </select>
-                <select id="testerTemplate" onchange="refreshActiveTesterView()" title="Checklist template">
-                    <option value="">Full checklist</option>
-                    <option value="pet_regression">Pet regression</option>
-                    <option value="games_smoke">Games smoke</option>
-                    <option value="hub_p2e">Hub / P2E</option>
-                    <option value="admin_smoke">Admin smoke</option>
-                </select>
-                <button type="button" onclick="TesterSuite.jumpLog('latest')" style="background:#6b7280;color:#fff;border:none;">Latest</button>
-                <button type="button" onclick="TesterSuite.jumpLog('oldest')" style="background:#6b7280;color:#fff;border:none;">Oldest</button>
-                <button type="button" onclick="TesterSuite.exportCsv()" style="background:#059669;color:#fff;border:none;">Export CSV</button>
-                <button type="button" onclick="TesterSuite.sendReminder()" style="background:#f59e0b;color:#fff;border:none;">Log Reminder</button>
-                <select id="exportDays" title="Export days">
-                    <option value="7">7 days</option>
-                    <option value="14">14 days</option>
-                    <option value="30">30 days</option>
-                </select>
-                <span class="tester-page-info" id="testerPageInfo">Page 1</span>
             </div>
-            <div id="testerQuickCommands" class="mb-2 flex flex-wrap"></div>
-            </div>
-
-            <div id="testerSessionsPanel" class="tester-sessions-panel"></div>
 
             <div class="subtab" id="testersSubtabs">
                 <button class="subtablinks active" onclick="openSubTab(event, 'Penna')">Penna Log</button>
@@ -769,27 +731,11 @@
                 <button class="subtablinks" onclick="openSubTab(event, 'ChanCheck')">Chan Chk</button>
                 <button class="subtablinks" onclick="openSubTab(event, 'Tam')">Tam Log</button>
                 <button class="subtablinks" onclick="openSubTab(event, 'TamCheck')">Tam Chk</button>
-                <button class="subtablinks" onclick="openSubTab(event, 'TesterRollup')">Monthly Rollup</button>
             </div>
 
             <div class="date-picker" id="datePicker">
                 <input type="date" id="selectedDate" placeholder="Select Date">
                 <span class="text-xs text-gray-500 ml-2">Checklist date filter</span>
-                <select id="rollupYear" class="ml-2" style="color:#111827;background:#fff;">
-                    <option value="2026">2026</option>
-                    <option value="2025">2025</option>
-                </select>
-                <select id="rollupMonth" style="color:#111827;background:#fff;">
-                    <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
-                    <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
-                    <option value="7" selected>Jul</option><option value="8">Aug</option><option value="9">Sep</option>
-                    <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
-                </select>
-                <button type="button" onclick="TesterSuite.loadRollup()" style="background:#3b82f6;color:#fff;border:none;padding:6px 12px;border-radius:6px;">Load Rollup</button>
-            </div>
-
-            <div id="TesterRollup" class="subtabcontent" style="display:none">
-                <div id="testerRollupPanel">Click <b>Load Rollup</b> above for monthly payroll summary.</div>
             </div>
 
             <div id="Penna" class="subtabcontent">
@@ -924,13 +870,6 @@
             if (/^OUT\b/i.test(content)) return `<span class="log-action-out">${safe}</span>`;
             if (/^(NOTE|CHECK_NOTE)\b/i.test(content)) return `<span class="log-action-note">${safe}</span>`;
             return safe;
-        }
-
-        function updateTesterPageInfo(logType, page, total, perPage) {
-            const el = document.getElementById('testerPageInfo');
-            if (!el) return;
-            const totalPages = Math.max(1, Math.ceil(total / perPage));
-            el.textContent = total ? `Page ${page} of ${totalPages} (${total} entries)` : 'No entries';
         }
 
         // ── DARK MODE TOGGLE & PERSISTENCE ──────────────────────────────────────────
@@ -1082,11 +1021,6 @@
                 document.getElementById('auth').style.display = 'none';
                 document.getElementById('tabs').classList.add('visible');
                 startPolling();
-                if (window.TesterSuite) {
-                    TesterSuite.init(adminKey);
-                    TesterSuite.wrapFetchTestersLogs();
-                    TesterSuite.wrapFetchCheckCommands();
-                }
                 openTab(null, 'Discord');
                 if (datePicker) datePicker.style.display = 'none';
                 // restore clock timer if was running
@@ -1166,9 +1100,6 @@
             else if (subTabName === 'ChanCheck') fetchCheckCommands('chan');
             else if (subTabName === 'Tam') fetchTestersLogs(tamPage, 'tam');
             else if (subTabName === 'TamCheck') fetchCheckCommands('tam');
-            else if (subTabName === 'TesterRollup') TesterSuite.loadRollup();
-            if (['Penna','Chan','Tam'].includes(subTabName) && window.TesterSuite) TesterSuite.loadSessions();
-            if (window.TesterSuite) TesterSuite.refreshProgressDashboard();
         }
 
         // ── POLLING ──────────────────────────────────────────────────────────────────
@@ -1455,7 +1386,6 @@
 
                     logElement.scrollTop = 0;
                     updatePagination(logType, currentPage, hasNext, total, perPage);
-                    updateTesterPageInfo(logType, currentPage, total, perPage);
                 })
                 .catch(err => {
                     logElement.innerHTML = `<div class="log-entry">Error: ${err}</div>`;
@@ -1664,14 +1594,15 @@
             fetch(url, { headers: { 'X-Telegram-User-ID': adminKey } })
                 .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
                 .then(data => {
+                    const checklist = data.checklist || data;
                     checkElement.innerHTML = '';
 
-                    for (let category in data) {
+                    for (let category in checklist) {
                         const div = document.createElement('div');
                         div.className = 'check-entry';
                         let html = `<h3>${escapeHtml(category)}</h3><ul>`;
-                        for (let item in data[category]) {
-                            const status = escapeHtml(data[category][item]);
+                        for (let item in checklist[category]) {
+                            const status = escapeHtml(checklist[category][item]);
                             const safeItem = escapeHtml(item).replace(/'/g, "\\'");
                             html += `<li>${status} ${escapeHtml(item)} <button onclick="toggleCommandNote(this, '${logType}', '${safeItem}')" class="ml-1 text-xs px-1 py-0 bg-blue-500 hover:bg-blue-600 text-white rounded">📝</button></li>`;
                         }
@@ -1777,6 +1708,5 @@
             // Nothing automatic here - waiting for authentication
         });
     </script>
-    <script src="/static/tester_suite.js"></script>
 </body>
 </html>

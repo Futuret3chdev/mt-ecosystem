@@ -8,7 +8,6 @@ import re
 from collections import defaultdict
 import time
 import os
-from flask import Response
 import tester_tools as tt
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -360,9 +359,8 @@ def check_commands():
         return jsonify({"error": "Unauthorized"}), 401
     log_type = request.args.get('log', 'penna')
     selected_date = request.args.get('date')
-    template = request.args.get('template')
-    result = tt.build_check_response(log_type, BASE_DIR, selected_date, template)
-    logger.debug(f"Command check for {log_type} date={selected_date} template={template}")
+    result = tt.build_checklist(log_type, BASE_DIR, selected_date)
+    logger.debug(f"Command check for {log_type} date={selected_date}")
     return jsonify(result)
 
 @app.route('/api/user_details')
@@ -445,95 +443,6 @@ def activity_stats():
         "platform": platform
     }
     return jsonify(response)
-
-@app.route('/api/tester_sessions', methods=['GET'])
-def tester_sessions():
-    if not is_admin():
-        return jsonify({"error": "Unauthorized"}), 401
-    log_type = request.args.get('log', 'penna')
-    log_date = request.args.get('date')
-    if log_type not in ('penna', 'chan', 'tam'):
-        return jsonify({'error': 'Invalid log type'}), 400
-    return jsonify(tt.compute_sessions(log_type, BASE_DIR, log_date))
-
-
-@app.route('/api/tester_progress', methods=['GET'])
-def tester_progress():
-    if not is_admin():
-        return jsonify({"error": "Unauthorized"}), 401
-    selected_date = request.args.get('date')
-    out = {}
-    for tester in ('penna', 'chan', 'tam'):
-        out[tester] = tt.build_check_response(tester, BASE_DIR, selected_date)['progress']
-    return jsonify(out)
-
-
-@app.route('/api/tester_status', methods=['GET', 'POST'])
-def tester_status():
-    if not is_admin():
-        return jsonify({"error": "Unauthorized"}), 401
-    if request.method == 'POST':
-        tester = request.form.get('tester') or request.args.get('tester')
-        item = request.form.get('item') or request.args.get('item')
-        status = request.form.get('status') or request.args.get('status')
-        reason = request.form.get('reason') or request.args.get('reason') or ''
-        date_str = request.form.get('date') or request.args.get('date') or datetime.now().strftime('%Y-%m-%d')
-        if not tester or not item or status not in ('pass', 'fail', 'blocked', 'clear'):
-            return jsonify({'error': 'Invalid params'}), 400
-        store = tt.load_status_store()
-        sk = tt.status_key(tester, item, date_str)
-        if status == 'clear':
-            store.pop(sk, None)
-        else:
-            store[sk] = {
-                'status': status,
-                'reason': reason,
-                'updated': datetime.now().isoformat(),
-                'tester': tester,
-                'item': item,
-                'date': date_str,
-            }
-            tt.append_tester_log(tester, 'STATUS', item, f'{status}: {reason}'.strip(': '))
-        tt.save_status_store(store)
-        return jsonify({'status': 'saved'})
-    tester = request.args.get('log', 'penna')
-    date_str = request.args.get('date') or datetime.now().strftime('%Y-%m-%d')
-    store = tt.load_status_store()
-    prefix = f'{tester}:'
-    suffix = f':{date_str}'
-    filtered = {k: v for k, v in store.items() if k.startswith(prefix) and k.endswith(suffix)}
-    return jsonify(filtered)
-
-
-@app.route('/api/tester_export', methods=['GET'])
-def tester_export():
-    if not is_admin():
-        return jsonify({"error": "Unauthorized"}), 401
-    log_type = request.args.get('log', 'penna')
-    days = int(request.args.get('days', 7))
-    csv_data = tt.export_csv(log_type, BASE_DIR, days)
-    filename = f'{log_type}_tester_export_{datetime.now().strftime("%Y%m%d")}.csv'
-    return Response(csv_data, mimetype='text/csv', headers={'Content-Disposition': f'attachment; filename={filename}'})
-
-
-@app.route('/api/tester_rollup', methods=['GET'])
-def tester_rollup():
-    if not is_admin():
-        return jsonify({"error": "Unauthorized"}), 401
-    year = request.args.get('year')
-    month = request.args.get('month')
-    return jsonify(tt.monthly_rollup(BASE_DIR, year, month))
-
-
-@app.route('/api/tester_notify', methods=['POST'])
-def tester_notify():
-    if not is_admin():
-        return jsonify({"error": "Unauthorized"}), 401
-    tester = request.form.get('tester') or request.args.get('tester', 'penna')
-    message = request.form.get('message') or request.args.get('message', 'Reminder: complete open checklist items')
-    tt.append_tester_log(tester, 'NOTIFY', 'checklist', message)
-    return jsonify({'status': 'logged', 'message': f'Reminder logged for {tester}'})
-
 
 if __name__ == '__main__':
     app.run(debug=False)
