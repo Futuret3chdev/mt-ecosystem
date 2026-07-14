@@ -145,15 +145,186 @@
         #auth button:hover {
             background-color: #059669;
         }
-        #discordMessages, #discordDeletedMessages, #discordUserDetails, #telegramMessages, #telegramDeletedMessages, #telegramUserDetails, #pennaLogs, #chanLogs, #pennaChecks, #chanChecks, #tamChecks {
+        #discordMessages, #discordDeletedMessages, #discordUserDetails, #telegramMessages, #telegramDeletedMessages, #telegramUserDetails, #pennaChecks, #chanChecks, #tamChecks {
             max-height: 600px;
             overflow-y: auto;
         }
+        /* Testers tab — taller scrollable panels + sticky pagination */
+        #pennaLogs, #chanLogs, #tamLogs {
+            max-height: 70vh;
+            min-height: 320px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+        html.dark #pennaLogs, html.dark #chanLogs, html.dark #tamLogs {
+            background: #1f2937;
+            border-color: #374151;
+        }
+        .tester-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 10px;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+        }
+        html.dark .tester-toolbar { background: #1f2937; border-color: #374151; }
+        .tester-toolbar input, .tester-toolbar select, .tester-toolbar button {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        /* Tester search + per-page — always dark text on white (sun & night mode) */
+        #testersSearch,
+        #testerPerPage,
+        .tester-toolbar input,
+        .tester-toolbar select,
+        .tester-toolbar select option {
+            color: #111827 !important;
+            background-color: #ffffff !important;
+            border: 1px solid #9ca3af !important;
+            -webkit-text-fill-color: #111827 !important;
+        }
+        #testersSearch::placeholder,
+        .tester-toolbar input::placeholder {
+            color: #6b7280 !important;
+            opacity: 1 !important;
+            -webkit-text-fill-color: #6b7280 !important;
+        }
+        html.dark #testersSearch,
+        html.dark #testerPerPage,
+        html.dark .tester-toolbar input,
+        html.dark .tester-toolbar select,
+        html.dark .tester-toolbar select option {
+            color: #111827 !important;
+            background-color: #ffffff !important;
+            -webkit-text-fill-color: #111827 !important;
+        }
+        #testersSearch {
+            flex: 1;
+            min-width: 200px;
+        }
+        .tester-page-info {
+            font-size: 13px;
+            color: #374151;
+            font-weight: 600;
+            min-width: 140px;
+            text-align: center;
+        }
+        html.dark .tester-page-info {
+            color: #374151;
+        }
+        .tester-sticky-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: #f3f4f6;
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        html.dark .tester-sticky-toolbar { background: #111827; border-color: #374151; }
+        .tester-progress-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .tester-progress-card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .tester-progress-bar {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 6px 0;
+        }
+        .tester-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #059669);
+        }
+        .tester-progress-label { font-size: 12px; color: #374151; font-weight: 600; }
+        .tester-quick-btn {
+            font-size: 11px;
+            padding: 4px 8px;
+            margin: 2px;
+            border-radius: 6px;
+            border: 1px solid #9ca3af;
+            background: #fff;
+            color: #111827;
+            cursor: pointer;
+        }
+        .tester-quick-btn:hover { background: #ecfdf5; }
+        .tester-status-btn {
+            font-size: 11px;
+            padding: 2px 5px;
+            margin-left: 3px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+        }
+        .tester-check-row { margin: 4px 0; line-height: 1.8; }
+        .log-type-badge {
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            background: #e5e7eb;
+            color: #374151;
+        }
+        .log-type-bot { background: #dbeafe; color: #1e40af; }
+        .log-type-clock { background: #d1fae5; color: #065f46; }
+        .log-type-manual, .log-type-check_note { background: #fef3c7; color: #92400e; }
+        .tester-sessions-panel, .tester-rollup-card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .tester-session-list { font-size: 13px; margin: 0; padding-left: 18px; }
+        #testerToast {
+            display: none;
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            background: #111827;
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            z-index: 9999;
+            font-size: 13px;
+        }
+        @media (max-width: 640px) {
+            .tester-toolbar { flex-direction: column; align-items: stretch; }
+            .tester-toolbar button, .tester-toolbar select, .tester-toolbar input { width: 100%; }
+        }
+        .log-entry .log-action-in { color: #059669; font-weight: 600; }
+        .log-entry .log-action-out { color: #dc2626; font-weight: 600; }
+        .log-entry .log-action-note { color: #2563eb; font-weight: 600; }
         .pagination {
             margin-top: 15px;
             display: flex;
             justify-content: center;
+            align-items: center;
             gap: 10px;
+            flex-wrap: wrap;
+            position: sticky;
+            bottom: 0;
+            background: inherit;
+            padding: 10px 0;
+            z-index: 5;
         }
         .pagination button {
             padding: 8px 16px;
@@ -375,19 +546,22 @@
             <span class="brand-secondary">FutureT3ch</span>
         </div>
 
-        <form id="auth" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md" onsubmit="authenticate(event); return false;">
+        <form id="auth" class="bg-gray-800 text-white p-6 rounded-lg shadow-md border-l-4 border-emerald-500" onsubmit="authenticate(event); return false;">
+            <div class="flex items-center justify-between mb-3">
+                <div class="text-emerald-400 font-semibold">Admin Access</div>
+            </div>
             <div class="relative mb-4">
                 <input
                     type="password"
                     id="adminKey"
                     placeholder="Enter Admin Key"
-                    class="w-full px-4 py-3 pr-12 text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                    class="w-full px-4 py-3 pr-12 text-white bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
                     autocomplete="off"
                 >
                 <button
                     type="button"
                     id="toggleAdminKey"
-                    class="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none"
+                    class="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 hover:text-white focus:outline-none"
                     aria-label="Toggle password visibility"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -396,8 +570,8 @@
                     </svg>
                 </button>
             </div>
-            <button type="submit" id="submitAuth" class="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition focus:outline-none focus:ring-2 focus:ring-green-400">
-                Submit
+            <button type="submit" id="submitAuth" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                Submit Key
             </button>
         </form>
 
@@ -510,41 +684,118 @@
         <!-- Testers Tab -->
         <div id="Testers" class="tabcontent">
             <!-- Quick Log Entry for testers to add notes on commands (core of the proper testers system) -->
-            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-4 border-l-4 border-emerald-500">
+            <div class="bg-gray-800 text-gray-100 p-4 rounded-lg shadow mb-4 border-l-4 border-emerald-500">
                 <div class="flex items-center justify-between mb-2">
-                    <h4 class="font-semibold text-emerald-600 dark:text-emerald-400">Log Tester Action / Note</h4>
-                    <span class="text-xs text-gray-500">Saves to the tester's .log + powers checks</span>
+                    <h4 class="font-semibold text-emerald-400">Log Tester Action / Note</h4>
+                    <span class="text-xs text-gray-400">Saves to the tester's .log + powers checks</span>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
-                    <select id="logTester" class="px-3 py-2 border rounded dark:bg-gray-700 text-sm">
+                    <select id="logTester" class="px-3 py-2 border rounded bg-gray-700 text-white text-sm">
                         <option value="penna">Penna</option>
                         <option value="chan">Chan</option>
                         <option value="tam">Tam</option>
                     </select>
-                    <select id="logAction" class="px-3 py-2 border rounded dark:bg-gray-700 text-sm">
+                    <select id="logAction" class="px-3 py-2 border rounded bg-gray-700 text-white text-sm">
                         <option value="note">Note / Comment</option>
-                        <option value="in">In (started shift)</option>
-                        <option value="out">Out (finished)</option>
+                        <option value="in">Clock On (in)</option>
+                        <option value="out">Clock Off (out)</option>
                         <option value="check_note">Check Note</option>
                     </select>
-                    <input type="text" id="logItem" placeholder="Command or item (e.g. /PET adopt)" class="px-3 py-2 border rounded dark:bg-gray-700 text-sm">
-                    <input type="text" id="logNotes" placeholder="Notes / result / observation" class="md:col-span-2 px-3 py-2 border rounded dark:bg-gray-700 text-sm">
+                    <input type="text" id="logItem" placeholder="Command or item (e.g. /PET adopt)" class="px-3 py-2 border rounded bg-gray-700 text-white text-sm">
+                    <input type="text" id="logNotes" placeholder="Notes / result / observation" class="md:col-span-2 px-3 py-2 border rounded bg-gray-700 text-white text-sm">
                 </div>
-                <button onclick="submitTesterLog()" class="mt-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded transition">Log Entry</button>
-                <span id="logStatus" class="ml-2 text-xs text-emerald-500"></span>
+                <div class="mt-2 flex gap-2">
+                    <button onclick="submitTesterLog()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded transition">Log Entry</button>
+                    <button onclick="quickClock('in')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition">Clock On</button>
+                    <button onclick="quickClock('out')" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition">Clock Off</button>
+                </div>
+                <div id="clockTimer" class="mt-2 text-emerald-400 font-mono text-lg font-bold"></div>
+                <span id="logStatus" class="ml-2 text-xs text-emerald-400"></span>
             </div>
+
+            <div id="testerToast"></div>
+
+            <div class="tester-progress-grid" id="testerProgressDashboard">
+                <div class="tester-progress-card" id="progress-penna"></div>
+                <div class="tester-progress-card" id="progress-chan"></div>
+                <div class="tester-progress-card" id="progress-tam"></div>
+            </div>
+
+            <div class="tester-sticky-toolbar">
+            <div class="tester-toolbar">
+                <input type="text" id="testersSearch" placeholder="Search logs (command, note, /pet...)">
+                <button id="testersSearchButton" onclick="searchTestersLogs()">Search</button>
+                <button type="button" onclick="refreshActiveTesterView()" style="background:#3b82f6;color:#fff;border:none;">Refresh</button>
+                <input type="date" id="testerLogDate" title="Filter logs by date" onchange="resetTesterPagesAndReload()">
+                <select id="testerLogFilter" onchange="resetTesterPagesAndReload()">
+                    <option value="all">All types</option>
+                    <option value="bot">Bot commands</option>
+                    <option value="manual">Manual notes</option>
+                    <option value="clock">Clock in/out</option>
+                    <option value="check_note">Check notes</option>
+                </select>
+                <select id="testerPerPage" onchange="resetTesterPagesAndReload()">
+                    <option value="50">50 / page</option>
+                    <option value="100" selected>100 / page</option>
+                    <option value="200">200 / page</option>
+                </select>
+                <select id="testerTemplate" onchange="refreshActiveTesterView()" title="Checklist template">
+                    <option value="">Full checklist</option>
+                    <option value="pet_regression">Pet regression</option>
+                    <option value="games_smoke">Games smoke</option>
+                    <option value="hub_p2e">Hub / P2E</option>
+                    <option value="admin_smoke">Admin smoke</option>
+                </select>
+                <button type="button" onclick="TesterSuite.jumpLog('latest')" style="background:#6b7280;color:#fff;border:none;">Latest</button>
+                <button type="button" onclick="TesterSuite.jumpLog('oldest')" style="background:#6b7280;color:#fff;border:none;">Oldest</button>
+                <button type="button" onclick="TesterSuite.exportCsv()" style="background:#059669;color:#fff;border:none;">Export CSV</button>
+                <button type="button" onclick="TesterSuite.sendReminder()" style="background:#f59e0b;color:#fff;border:none;">Log Reminder</button>
+                <select id="exportDays" title="Export days">
+                    <option value="7">7 days</option>
+                    <option value="14">14 days</option>
+                    <option value="30">30 days</option>
+                </select>
+                <span class="tester-page-info" id="testerPageInfo">Page 1</span>
+            </div>
+            <div id="testerQuickCommands" class="mb-2 flex flex-wrap"></div>
+            </div>
+
+            <div id="testerSessionsPanel" class="tester-sessions-panel"></div>
 
             <div class="subtab" id="testersSubtabs">
                 <button class="subtablinks active" onclick="openSubTab(event, 'Penna')">Penna Log</button>
-                <button class="subtablinks" onclick="openSubTab(event, 'PennaCheck')">Penna Chk List</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'PennaCheck')">Penna Chk</button>
                 <button class="subtablinks" onclick="openSubTab(event, 'Chan')">Chan Log</button>
-                <button class="subtablinks" onclick="openSubTab(event, 'ChanCheck')">Chan Chk List</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'ChanCheck')">Chan Chk</button>
                 <button class="subtablinks" onclick="openSubTab(event, 'Tam')">Tam Log</button>
-                <button class="subtablinks" onclick="openSubTab(event, 'TamCheck')">Tam Chk List</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'TamCheck')">Tam Chk</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'TesterParity')">TG vs Discord</button>
+                <button class="subtablinks" onclick="openSubTab(event, 'TesterRollup')">Monthly Rollup</button>
             </div>
 
             <div class="date-picker" id="datePicker">
                 <input type="date" id="selectedDate" placeholder="Select Date">
+                <span class="text-xs text-gray-500 ml-2">Checklist date filter</span>
+                <select id="rollupYear" class="ml-2" style="color:#111827;background:#fff;">
+                    <option value="2026">2026</option>
+                    <option value="2025">2025</option>
+                </select>
+                <select id="rollupMonth" style="color:#111827;background:#fff;">
+                    <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+                    <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+                    <option value="7" selected>Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+                    <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+                </select>
+                <button type="button" onclick="TesterSuite.loadRollup()" style="background:#3b82f6;color:#fff;border:none;padding:6px 12px;border-radius:6px;">Load Rollup</button>
+            </div>
+
+            <div id="TesterParity" class="subtabcontent" style="display:none">
+                <p class="text-sm text-gray-600 mb-2">Mark parity after testing the same command on Telegram and Discord bots. Does not use the Discord/Telegram monitor tabs.</p>
+                <div id="testerParityPanel"></div>
+            </div>
+
+            <div id="TesterRollup" class="subtabcontent" style="display:none">
+                <div id="testerRollupPanel">Click <b>Load Rollup</b> above for monthly payroll summary.</div>
             </div>
 
             <div id="Penna" class="subtabcontent">
@@ -632,6 +883,61 @@
         let pennaPage = 1;
         let chanPage = 1;
         let tamPage = 1;
+        let pennaTotal = 0;
+        let chanTotal = 0;
+        let tamTotal = 0;
+
+        function getTesterPerPage() {
+            return parseInt(document.getElementById('testerPerPage')?.value || '100', 10);
+        }
+
+        function getActiveTesterLogType() {
+            const active = document.querySelector('#testersSubtabs .subtablinks.active');
+            if (!active) return 'penna';
+            const name = active.textContent.toLowerCase().replace(' log', '').replace(' chk list', '').trim();
+            return ['penna', 'chan', 'tam'].includes(name) ? name : 'penna';
+        }
+
+        function resetTesterPagesAndReload() {
+            pennaPage = chanPage = tamPage = 1;
+            const t = getActiveTesterLogType();
+            fetchTestersLogs(1, t);
+        }
+
+        function searchTestersLogs() {
+            pennaPage = chanPage = tamPage = 1;
+            const t = getActiveTesterLogType();
+            fetchTestersLogs(1, t);
+        }
+
+        function refreshActiveTesterView() {
+            const activeSub = document.querySelector('#testersSubtabs .subtablinks.active');
+            if (!activeSub) return;
+            const label = activeSub.textContent.toLowerCase();
+            if (label.includes('chk')) {
+                const logType = label.replace(' chk list', '').trim();
+                fetchCheckCommands(logType);
+            } else {
+                const logType = label.replace(' log', '').trim();
+                const pageMap = { penna: pennaPage, chan: chanPage, tam: tamPage };
+                fetchTestersLogs(pageMap[logType] || 1, logType);
+            }
+        }
+
+        function formatLogEntryHtml(content) {
+            const safe = escapeHtml(content || 'No content');
+            if (/^IN\b/i.test(content)) return `<span class="log-action-in">${safe}</span>`;
+            if (/^OUT\b/i.test(content)) return `<span class="log-action-out">${safe}</span>`;
+            if (/^(NOTE|CHECK_NOTE)\b/i.test(content)) return `<span class="log-action-note">${safe}</span>`;
+            return safe;
+        }
+
+        function updateTesterPageInfo(logType, page, total, perPage) {
+            const el = document.getElementById('testerPageInfo');
+            if (!el) return;
+            const totalPages = Math.max(1, Math.ceil(total / perPage));
+            el.textContent = total ? `Page ${page} of ${totalPages} (${total} entries)` : 'No entries';
+        }
 
         // ── DARK MODE TOGGLE & PERSISTENCE ──────────────────────────────────────────
         const themeToggle = document.getElementById('theme-toggle');
@@ -677,6 +983,10 @@
         // ── CHART INSTANCES ──────────────────────────────────────────────────────────
         let discordChartInstance = null;
         let telegramChartInstance = null;
+
+        // ── CLOCK TIMER ──────────────────────────────────────────────────────────────
+        let clockStartTime = localStorage.getItem('clockStartTime') ? parseInt(localStorage.getItem('clockStartTime')) : null;
+        let clockInterval = null;
 
         function renderActivityChart(platform) {
             const canvasId = platform === 'discord' ? 'discordActivityChart' : 'telegramActivityChart';
@@ -778,8 +1088,19 @@
                 document.getElementById('auth').style.display = 'none';
                 document.getElementById('tabs').classList.add('visible');
                 startPolling();
+                if (window.TesterSuite) {
+                    TesterSuite.init(adminKey);
+                    TesterSuite.wrapFetchTestersLogs();
+                    TesterSuite.wrapFetchCheckCommands();
+                }
                 openTab(null, 'Discord');
                 if (datePicker) datePicker.style.display = 'none';
+                // restore clock timer if was running
+                if (clockStartTime) {
+                    if (clockInterval) clearInterval(clockInterval);
+                    clockInterval = setInterval(updateClockTimer, 1000);
+                    updateClockTimer();
+                }
             } else {
                 alert("Invalid admin key!");
             }
@@ -851,6 +1172,10 @@
             else if (subTabName === 'ChanCheck') fetchCheckCommands('chan');
             else if (subTabName === 'Tam') fetchTestersLogs(tamPage, 'tam');
             else if (subTabName === 'TamCheck') fetchCheckCommands('tam');
+            else if (subTabName === 'TesterParity') TesterSuite.loadParity('penna');
+            else if (subTabName === 'TesterRollup') TesterSuite.loadRollup();
+            if (['Penna','Chan','Tam'].includes(subTabName) && window.TesterSuite) TesterSuite.loadSessions();
+            if (window.TesterSuite) TesterSuite.refreshProgressDashboard();
         }
 
         // ── POLLING ──────────────────────────────────────────────────────────────────
@@ -1092,47 +1417,52 @@
         function fetchTestersLogs(page, logType) {
             if (!isAuthenticated) return;
 
-            let logElement, paginationElement;
+            let logElement;
+            if (logType === 'penna') { logElement = pennaLogs; pennaPage = page; }
+            else if (logType === 'chan') { logElement = chanLogs; chanPage = page; }
+            else if (logType === 'tam') { logElement = tamLogs; tamPage = page; }
+            else return;
 
-            if (logType === 'penna') {
-                logElement = pennaLogs;
-                paginationElement = pennaPagination;
-            } else if (logType === 'chan') {
-                logElement = chanLogs;
-                paginationElement = chanPagination;
-            } else if (logType === 'tam') {
-                logElement = tamLogs;
-                paginationElement = tamPagination;
-            } else {
-                console.warn("Unknown log type:", logType);
-                return;
-            }
-
-            if (!logElement || !paginationElement) return;
+            if (!logElement) return;
 
             const search = document.getElementById('testersSearch')?.value || '';
-            const url = `${apiTestersUrl}?key=${adminKey}${search ? `&search=${encodeURIComponent(search)}` : ''}&page=${page}&log=${logType}`;
+            const perPage = getTesterPerPage();
+            const url = `${apiTestersUrl}?key=${adminKey}&page=${page}&log=${logType}&per_page=${perPage}${search ? `&search=${encodeURIComponent(search)}` : ''}`;
+
+            logElement.innerHTML = '<div class="log-entry text-gray-500">Loading logs...</div>';
 
             fetch(url, { headers: { 'X-Telegram-User-ID': adminKey } })
                 .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
-                .then(data => {
-                    logElement.innerHTML = data.length === 0 
-                        ? '<div class="log-entry">No logs found.</div>'
+                .then(payload => {
+                    const data = Array.isArray(payload) ? payload : (payload.logs || []);
+                    const total = payload.total ?? data.length;
+                    const hasNext = Array.isArray(payload) ? data.length >= perPage : !!payload.has_next;
+                    const currentPage = payload.page || page;
+
+                    if (logType === 'penna') pennaTotal = total;
+                    else if (logType === 'chan') chanTotal = total;
+                    else if (logType === 'tam') tamTotal = total;
+
+                    logElement.innerHTML = data.length === 0
+                        ? '<div class="log-entry">No logs found for this page.</div>'
                         : '';
 
                     data.forEach(log => {
-                        if (log.log_file?.toLowerCase() === `${logType}.log`) {
-                            const div = document.createElement('div');
-                            div.className = 'log-entry';
-                            div.innerHTML = `
-                                <span class="timestamp">${new Date(log.timestamp).toLocaleString()}</span><br>
-                                <span class="platform">${escapeHtml(log.log_file)}</span>: ${escapeHtml(log.content || 'No content')}
-                            `;
-                            logElement.appendChild(div);
-                        }
+                        const div = document.createElement('div');
+                        div.className = 'log-entry';
+                        const ts = log.timestamp && log.timestamp !== '0001-01-01T00:00:00'
+                            ? new Date(log.timestamp).toLocaleString()
+                            : '—';
+                        div.innerHTML = `
+                            <span class="timestamp">${ts}</span><br>
+                            <span class="platform">${escapeHtml(log.log_file || logType + '.log')}</span>: ${formatLogEntryHtml(log.content)}
+                        `;
+                        logElement.appendChild(div);
                     });
 
-                    updatePagination(logType, page, data.length === 100);
+                    logElement.scrollTop = 0;
+                    updatePagination(logType, currentPage, hasNext, total, perPage);
+                    updateTesterPageInfo(logType, currentPage, total, perPage);
                 })
                 .catch(err => {
                     logElement.innerHTML = `<div class="log-entry">Error: ${err}</div>`;
@@ -1194,6 +1524,137 @@
             });
         }
 
+        function quickClock(action) {
+            const tester = document.getElementById('logTester').value;
+            const statusEl = document.getElementById('logStatus');
+            statusEl.textContent = 'Saving...';
+            const params = new URLSearchParams({
+                key: adminKey,
+                tester: tester,
+                action: action,
+                item: '',
+                notes: new Date().toLocaleTimeString() + ' clock ' + action
+            });
+            fetch(apiTestersUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Telegram-User-ID': adminKey },
+                body: params.toString()
+            }).then(r => r.json()).then(data => {
+                if (data.status === 'logged') {
+                    statusEl.textContent = action === 'in' ? 'Clocked On!' : 'Clocked Off!';
+                    const current = document.querySelector('#testersSubtabs .subtablinks.active');
+                    if (current) {
+                        let logName = current.textContent.toLowerCase().replace(' log','').replace(' chk list','').trim();
+                        if (['penna','chan','tam'].includes(logName)) fetchTestersLogs(1, logName);
+                    }
+                    if (action === 'in') {
+                        clockStartTime = Date.now();
+                        localStorage.setItem('clockStartTime', clockStartTime);
+                        if (clockInterval) clearInterval(clockInterval);
+                        clockInterval = setInterval(updateClockTimer, 1000);
+                        updateClockTimer();
+                    } else if (action === 'out') {
+                        if (clockInterval) {
+                            clearInterval(clockInterval);
+                            clockInterval = null;
+                        }
+                        clockStartTime = null;
+                        localStorage.removeItem('clockStartTime');
+                        const timerEl = document.getElementById('clockTimer');
+                        if (timerEl) timerEl.textContent = '';
+                    }
+                    setTimeout(() => statusEl.textContent = '', 1500);
+                } else {
+                    statusEl.textContent = data.error || 'Failed';
+                }
+            }).catch(err => { statusEl.textContent = 'Error: ' + err; });
+        }
+
+        function updateClockTimer() {
+            const timerEl = document.getElementById('clockTimer');
+            if (!timerEl || !clockStartTime) return;
+            const elapsed = Math.floor((Date.now() - clockStartTime) / 1000);
+            const mins = Math.floor(elapsed / 60);
+            const secs = elapsed % 60;
+            timerEl.textContent = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+        }
+
+        // Per-command expandable note box for the check lists
+        function toggleCommandNote(btn, logType, item) {
+            const li = btn.closest('li');
+            let noteDiv = li.querySelector('.cmd-note');
+            if (noteDiv) {
+                noteDiv.remove();
+                btn.textContent = '📝';
+                return;
+            }
+            noteDiv = document.createElement('div');
+            noteDiv.className = 'cmd-note mt-1 p-2 bg-gray-700 rounded text-sm text-gray-100';
+            noteDiv.innerHTML = `
+                <textarea class="w-full p-1 text-xs border border-gray-600 rounded bg-gray-800 text-gray-100" rows="2" placeholder="Note for ${item}"></textarea>
+                <div class="mt-1 flex gap-1">
+                    <button class="px-2 py-0.5 bg-emerald-600 text-white text-xs rounded" onclick="saveCommandNote(this, '${logType}', '${item.replace(/'/g, "\\'")}')">Save</button>
+                    <button class="px-2 py-0.5 bg-gray-500 text-white text-xs rounded" onclick="this.closest('.cmd-note').remove(); this.closest('li').querySelector('button').textContent='📝';">Close</button>
+                </div>
+            `;
+            li.appendChild(noteDiv);
+            btn.textContent = '✕';
+            const ta = noteDiv.querySelector('textarea');
+            loadLastNoteForItem(logType, item, ta);
+        }
+
+        function loadLastNoteForItem(logType, item, textarea) {
+            const url = `${apiTestersUrl}?key=${adminKey}&page=1&log=${logType}`;
+            fetch(url, { headers: { 'X-Telegram-User-ID': adminKey } })
+                .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+                .then(payload => {
+                    const data = Array.isArray(payload) ? payload : (payload.logs || []);
+                    for (let i = data.length - 1; i >= 0; i--) {
+                        const entry = data[i];
+                        const content = entry.content || '';
+                        if (content.includes(item)) {
+                            const parts = content.split(' - ');
+                            if (parts.length > 2) {
+                                textarea.value = parts.slice(2).join(' - ').trim();
+                            }
+                            break;
+                        }
+                    }
+                })
+                .catch(() => {});
+        }
+
+        function saveCommandNote(btn, logType, item) {
+            const ta = btn.parentElement.previousElementSibling;
+            const notes = ta.value.trim();
+            if (!notes) return;
+            const params = new URLSearchParams({
+                key: adminKey,
+                tester: logType,
+                action: 'check_note',
+                item: item,
+                notes: notes
+            });
+            fetch(apiTestersUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Telegram-User-ID': adminKey },
+                body: params.toString()
+            }).then(r => r.json()).then(data => {
+                if (data.status === 'logged') {
+                    btn.parentElement.innerHTML = '<span class="text-emerald-500 text-xs">Saved ✓</span>';
+                    setTimeout(() => {
+                        const nd = btn.closest('.cmd-note');
+                        if (nd) nd.remove();
+                        const li = nd ? nd.closest('li') : null;
+                        if (li) {
+                            const b = li.querySelector('button');
+                            if (b) b.textContent = '📝';
+                        }
+                    }, 1200);
+                }
+            }).catch(() => { btn.textContent = 'Err'; });
+        }
+
         function fetchCheckCommands(logType) {
             if (!isAuthenticated) return;
 
@@ -1217,7 +1678,9 @@
                         div.className = 'check-entry';
                         let html = `<h3>${escapeHtml(category)}</h3><ul>`;
                         for (let item in data[category]) {
-                            html += `<li>${escapeHtml(data[category][item])} ${escapeHtml(item)}</li>`;
+                            const status = escapeHtml(data[category][item]);
+                            const safeItem = escapeHtml(item).replace(/'/g, "\\'");
+                            html += `<li>${status} ${escapeHtml(item)} <button onclick="toggleCommandNote(this, '${logType}', '${safeItem}')" class="ml-1 text-xs px-1 py-0 bg-blue-500 hover:bg-blue-600 text-white rounded">📝</button></li>`;
                         }
                         html += `</ul>`;
                         div.innerHTML = html;
@@ -1229,7 +1692,7 @@
                 });
         }
 
-        function updatePagination(type, currentPage, hasNext) {
+        function updatePagination(type, currentPage, hasNext, total, perPage) {
             const paginationMap = {
                 'discord': discordPagination,
                 'discordDeleted': discordDeletedPagination,
@@ -1242,33 +1705,59 @@
                 'tam': tamPagination
             };
 
+            const fetchHandlers = {
+                'discord': (p) => { discordPage = p; fetchDiscordMessages(p); },
+                'discordDeleted': (p) => { discordDeletedPage = p; fetchDiscordDeletedMessages(p); },
+                'discordUser': (p) => { discordUserPage = p; fetchDiscordUserDetails(p); },
+                'telegram': (p) => { telegramPage = p; fetchTelegramMessages(p); },
+                'telegramDeleted': (p) => { telegramDeletedPage = p; fetchTelegramDeletedMessages(p); },
+                'telegramUser': (p) => { telegramUserPage = p; fetchTelegramUserDetails(p); },
+                'penna': (p) => fetchTestersLogs(p, 'penna'),
+                'chan': (p) => fetchTestersLogs(p, 'chan'),
+                'tam': (p) => fetchTestersLogs(p, 'tam'),
+            };
+
             const pagination = paginationMap[type];
-            if (!pagination) return;
+            const fetchPage = fetchHandlers[type];
+            if (!pagination || !fetchPage) return;
 
             pagination.innerHTML = '';
 
+            const first = document.createElement('button');
+            first.textContent = 'First';
+            first.disabled = currentPage <= 1;
+            first.onclick = () => fetchPage(1);
+
             const prev = document.createElement('button');
             prev.textContent = 'Previous';
-            prev.disabled = currentPage === 1;
-            prev.onclick = () => {
-                if (currentPage > 1) {
-                    window[`${type}Page`] = currentPage - 1;
-                    window[`fetch${type.charAt(0).toUpperCase() + type.slice(1)}`]?.(window[`${type}Page`]);
-                }
-            };
+            prev.disabled = currentPage <= 1;
+            prev.onclick = () => fetchPage(currentPage - 1);
+
+            const label = document.createElement('span');
+            label.className = 'tester-page-info';
+            if (total != null && perPage) {
+                const totalPages = Math.max(1, Math.ceil(total / perPage));
+                label.textContent = `Page ${currentPage} / ${totalPages}`;
+            } else {
+                label.textContent = `Page ${currentPage}`;
+            }
 
             const next = document.createElement('button');
             next.textContent = 'Next';
             next.disabled = !hasNext;
-            next.onclick = () => {
-                if (hasNext) {
-                    window[`${type}Page`] = currentPage + 1;
-                    window[`fetch${type.charAt(0).toUpperCase() + type.slice(1)}`]?.(window[`${type}Page`]);
-                }
-            };
+            next.onclick = () => fetchPage(currentPage + 1);
 
+            const last = document.createElement('button');
+            const totalPages = (total != null && perPage) ? Math.max(1, Math.ceil(total / perPage)) : null;
+            last.textContent = 'Last';
+            last.disabled = !hasNext && (!totalPages || currentPage >= totalPages);
+            last.onclick = () => { if (totalPages) fetchPage(totalPages); };
+
+            pagination.appendChild(first);
             pagination.appendChild(prev);
+            pagination.appendChild(label);
             pagination.appendChild(next);
+            if (totalPages) pagination.appendChild(last);
         }
 
         // ── SEARCH HANDLERS ─────────────────────────────────────────────────────────
@@ -1278,6 +1767,10 @@
         function searchTelegramMessages() { telegramPage = 1; fetchTelegramMessages(telegramPage); }
         function searchTelegramDeletedMessages() { telegramDeletedPage = 1; fetchTelegramDeletedMessages(telegramDeletedPage); }
         function searchTelegramUserDetails() { telegramUserPage = 1; fetchTelegramUserDetails(telegramUserPage); }
+
+        document.getElementById('testersSearch')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') searchTestersLogs();
+        });
 
         // Date change handler for check lists
         selectedDate?.addEventListener('change', () => {
@@ -1291,5 +1784,6 @@
             // Nothing automatic here - waiting for authentication
         });
     </script>
+    <script src="/static/tester_suite.js"></script>
 </body>
 </html>
