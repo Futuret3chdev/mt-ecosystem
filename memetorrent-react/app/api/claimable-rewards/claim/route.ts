@@ -8,7 +8,7 @@ import {
 import { sendMtFromTreasury, treasuryConfigured } from '@/lib/treasury-send';
 
 export async function POST(request: NextRequest) {
-  if (!treasuryConfigured()) {
+  if (!(await treasuryConfigured())) {
     return Response.json(
       { error: 'treasury_not_configured', message: 'Rewards wallet not set up yet. Try again soon.' },
       { status: 503 }

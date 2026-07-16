@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const payload = {
       updated_at: new Date().toISOString(),
-      treasury_configured: treasuryConfigured(),
+      treasury_configured: await treasuryConfigured(),
       summary: {
         total_users: users.length,
         users_with_balance: withBalance.length,

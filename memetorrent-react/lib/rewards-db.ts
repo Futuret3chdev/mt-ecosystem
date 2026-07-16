@@ -34,6 +34,20 @@ export async function getTrackingDb() {
   });
 }
 
+export async function getSettingValue(key: string): Promise<string | null> {
+  const conn = await getTrackingDb();
+  try {
+    const [rows] = await conn.execute(
+      'SELECT value FROM settings WHERE setting_key = ? LIMIT 1',
+      [key]
+    );
+    const v = (rows as any[])[0]?.value;
+    return v ? String(v).trim() : null;
+  } finally {
+    await conn.end();
+  }
+}
+
 export type ClaimableUserRow = {
   user_id: string;
   username: string | null;
