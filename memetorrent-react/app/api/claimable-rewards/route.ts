@@ -4,7 +4,7 @@ import {
   staffKeyFromRequest,
   verifyStaffKey,
 } from '@/lib/rewards-db';
-import { treasuryConfigured } from '@/lib/treasury-send';
+import { getTreasurySolBalance, treasuryConfigured } from '@/lib/treasury-send';
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
@@ -16,9 +16,14 @@ export async function GET(request: NextRequest) {
     const withBalance = users.filter((u) => u.claimable_mt > 0);
     const pendingTotal = withBalance.reduce((s, u) => s + u.claimable_mt, 0);
 
+    const treasuryReady = await treasuryConfigured();
+    const treasurySol = treasuryReady ? await getTreasurySolBalance() : 0;
+
     const payload = {
       updated_at: new Date().toISOString(),
-      treasury_configured: await treasuryConfigured(),
+      treasury_configured: treasuryReady,
+      treasury_sol_balance: treasurySol,
+      treasury_can_send: treasuryReady && treasurySol >= 0.001,
       summary: {
         total_users: users.length,
         users_with_balance: withBalance.length,

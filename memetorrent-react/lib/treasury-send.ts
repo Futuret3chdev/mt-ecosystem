@@ -2,6 +2,7 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  SendTransactionError,
   Transaction,
 } from '@solana/web3.js';
 import {
@@ -18,8 +19,29 @@ export const MT_MINT = new PublicKey('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pu
 export const MT_DECIMALS = 6;
 export const TREASURY_PUBKEY = '35hMAzLD99oag1RUjBTNUoJuwqso4xvKEYsWHsvjskqD';
 
-function rpcUrl() {
-  return process.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const HELIUS_RPC =
+  'https://mainnet.helius-rpc.com/?api-key=61a3cb76-ffd8-4dde-bb49-35cae29566c8';
+
+function rpcCandidates(): string[] {
+  return [
+    process.env.VITE_SOLANA_RPC_URL,
+    process.env.SOLANA_RPC_URL,
+    HELIUS_RPC,
+    'https://api.mainnet-beta.solana.com',
+  ].filter((u): u is string => !!u && u.trim().length > 0);
+}
+
+async function getConnection(): Promise<Connection> {
+  for (const url of rpcCandidates()) {
+    try {
+      const conn = new Connection(url, 'confirmed');
+      await conn.getLatestBlockhash('confirmed');
+      return conn;
+    } catch (e) {
+      console.warn('treasury RPC skip', url, (e as Error)?.message);
+    }
+  }
+  return new Connection(HELIUS_RPC, 'confirmed');
 }
 
 let cachedKeypair: Keypair | null | undefined;
@@ -61,9 +83,29 @@ export async function treasuryConfigured(): Promise<boolean> {
   return kp !== null;
 }
 
+export async function getTreasurySolBalance(): Promise<number> {
+  const kp = await getTreasuryKeypair();
+  if (!kp) return 0;
+  const connection = await getConnection();
+  const lamports = await connection.getBalance(kp.publicKey);
+  return lamports / 1e9;
+}
+
 async function accountExists(connection: Connection, address: PublicKey): Promise<boolean> {
   const info = await connection.getAccountInfo(address);
   return info !== null;
+}
+
+async function formatSendError(connection: Connection, err: unknown): Promise<string> {
+  if (err instanceof SendTransactionError) {
+    try {
+      const logs = await err.getLogs(connection);
+      if (logs?.length) return `Transaction failed: ${logs.join(' | ')}`;
+    } catch {}
+    return err.message || 'Transaction send failed';
+  }
+  if (err instanceof Error) return err.message;
+  return 'On-chain send failed';
 }
 
 export async function sendMtFromTreasury(
@@ -78,7 +120,7 @@ export async function sendMtFromTreasury(
     throw new Error('Invalid claim amount.');
   }
 
-  const connection = new Connection(rpcUrl(), 'confirmed');
+  const connection = await getConnection();
   const sender = treasury.publicKey;
   const recipient = new PublicKey(recipientWallet);
   const transaction = new Transaction();
@@ -98,7 +140,8 @@ export async function sendMtFromTreasury(
     ASSOCIATED_TOKEN_PROGRAM_ID
   );
 
-  if (!(await accountExists(connection, recipientAta))) {
+  const recipientHasAta = await accountExists(connection, recipientAta);
+  if (!recipientHasAta) {
     transaction.add(
       createAssociatedTokenAccountInstruction(
         sender,
@@ -108,6 +151,16 @@ export async function sendMtFromTreasury(
         TOKEN_PROGRAM_ID,
         ASSOCIATED_TOKEN_PROGRAM_ID
       )
+    );
+  }
+
+  const solBal = await connection.getBalance(sender);
+  const minLamports = recipientHasAta ? 5000 : 2_500_000;
+  if (solBal < minLamports) {
+    throw new Error(
+      `Treasury has ${(solBal / 1e9).toFixed(4)} SOL but needs ~${(minLamports / 1e9).toFixed(3)} SOL for fees` +
+        (recipientHasAta ? '' : ' (includes creating recipient token account)') +
+        `. Send SOL to ${sender.toBase58()} then try again.`
     );
   }
 
@@ -123,13 +176,23 @@ export async function sendMtFromTreasury(
   transaction.feePayer = sender;
   transaction.sign(treasury);
 
-  const signature = await connection.sendRawTransaction(transaction.serialize(), {
-    skipPreflight: false,
-    preflightCommitment: 'confirmed',
-    maxRetries: 3,
-  });
+  const simulation = await connection.simulateTransaction(transaction);
+  if (simulation.value.err) {
+    const logs = simulation.value.logs?.join(' | ') || JSON.stringify(simulation.value.err);
+    throw new Error(`Simulation failed: ${logs}`);
+  }
 
-  await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+  try {
+    const signature = await connection.sendRawTransaction(transaction.serialize(), {
+      skipPreflight: true,
+      preflightCommitment: 'confirmed',
+      maxRetries: 3,
+    });
 
-  return { signature, senderWallet: sender.toBase58() };
+    await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+
+    return { signature, senderWallet: sender.toBase58() };
+  } catch (err) {
+    throw new Error(await formatSendError(connection, err));
+  }
 }

@@ -32,6 +32,7 @@ export default function ClaimsPortal() {
   const [success, setSuccess] = useState<{ amount: number; tx: string; solscan: string } | null>(null);
   const [summary, setSummary] = useState({ pending: 0, withBalance: 0, total: 0 });
   const [treasuryReady, setTreasuryReady] = useState(true);
+  const [treasurySol, setTreasurySol] = useState<number | null>(null);
   const [selectedWallet, setSelectedWallet] = useState('Phantom');
   const [showAllMembers, setShowAllMembers] = useState(false);
   const [memberPage, setMemberPage] = useState(0);
@@ -81,12 +82,21 @@ export default function ClaimsPortal() {
       withBalance: data.summary?.users_with_balance || 0,
       total: data.summary?.total_users || 0,
     });
+    setTreasurySol(typeof data.treasury_sol_balance === 'number' ? data.treasury_sol_balance : null);
     if (!data.treasury_configured) {
       setStatus('Rewards wallet is being set up — balances show below; claims open once treasury is live.');
       setStatusErr(false);
       setTreasuryReady(false);
+    } else if (!data.treasury_can_send) {
+      setStatus(
+        `Treasury needs SOL for fees (currently ${(data.treasury_sol_balance || 0).toFixed(4)} SOL). Claims resume once funded.`
+      );
+      setStatusErr(true);
+      setTreasuryReady(false);
     } else {
       setTreasuryReady(true);
+      setStatus('');
+      setStatusErr(false);
     }
   }, []);
 
