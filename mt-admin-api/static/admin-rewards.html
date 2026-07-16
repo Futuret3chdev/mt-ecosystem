@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — Assign $MT Rewards | MemeTorrent</title>
+    <meta name="robots" content="noindex, nofollow">
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: linear-gradient(135deg, #111 0%, #1f2937 100%); color: #fff; margin: 0; padding: 20px; min-height: 100vh; }
+        .header { text-align: center; margin-bottom: 16px; }
+        .header h1 { margin: 0; font-size: 2em; background: linear-gradient(45deg, #7c3aed, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .subtitle { color: #9ca3af; margin-top: 8px; font-size: 0.95em; }
+        .nav { text-align: center; margin-bottom: 14px; }
+        .nav a { color: #93c5fd; margin: 0 10px; font-size: 13px; }
+        .panel { max-width: 1100px; margin: 0 auto 16px; padding: 16px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; }
+        .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; }
+        .toolbar input[type="text"], .toolbar input[type="search"], .toolbar input[type="number"] {
+            padding: 10px 12px; border-radius: 8px; border: 1px solid #4b5563; background: #fff; color: #111827; font-size: 14px;
+        }
+        .toolbar input[type="search"] { flex: 1; min-width: 200px; }
+        .toolbar input[type="number"] { width: 100px; }
+        .btn { padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 13px; }
+        .btn-primary { background: linear-gradient(45deg, #7c3aed, #a855f7); color: #fff; }
+        .btn-add { background: linear-gradient(45deg, #16a34a, #22c55e); color: #fff; }
+        .btn-set { background: #374151; color: #e5e7eb; border: 1px solid #6b7280; }
+        .btn-secondary { background: #334155; color: #e2e8f0; }
+        .btn-sm { padding: 5px 10px; font-size: 11px; }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .stats { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 12px; }
+        .stat { background: rgba(0,0,0,0.25); padding: 10px 16px; border-radius: 10px; text-align: center; min-width: 110px; }
+        .stat b { display: block; font-size: 1.3em; color: #a78bfa; }
+        .stat span { font-size: 10px; color: #9ca3af; text-transform: uppercase; }
+        .locked { text-align: center; padding: 40px 20px; color: #9ca3af; }
+        .status { margin-top: 10px; font-size: 13px; min-height: 1.2em; text-align: center; }
+        .status.err { color: #fca5a5; }
+        .status.ok { color: #86efac; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+        th, td { padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left; vertical-align: middle; }
+        th { background: rgba(124,58,237,0.35); font-size: 11px; text-transform: uppercase; }
+        tr:hover { background: rgba(124,58,237,0.08); }
+        tr.selected { background: rgba(124,58,237,0.18); outline: 1px solid rgba(167,139,250,0.45); }
+        .claimable { text-align: right; font-weight: 700; color: #4ade80; }
+        .claimable.zero { color: #64748b; font-weight: normal; }
+        .wallet-cell { font-family: monospace; font-size: 11px; color: #a7f3d0; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #334155; color: #cbd5e1; }
+        .badge.ok { background: rgba(34,197,94,0.2); color: #86efac; }
+        .assign-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); }
+        .assign-bar label { font-size: 12px; color: #9ca3af; }
+        .presets { display: flex; gap: 6px; flex-wrap: wrap; }
+        .presets button { padding: 6px 10px; border-radius: 6px; border: 1px solid #6b7280; background: #374151; color: #e5e7eb; cursor: pointer; font-size: 12px; }
+        .hint { font-size: 12px; color: #9ca3af; text-align: center; margin-top: 8px; line-height: 1.45; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Assign Claimable $MT</h1>
+        <div class="subtitle">Staff only — add rewards to user balances; they claim themselves on the public page</div>
+    </div>
+    <div class="nav">
+        <a href="/claims">Public claims page →</a>
+        <a href="tally.html">← Leaderboard</a>
+        <span style="color:#9ca3af;font-size:12px">Staff panel — open from bot Admin menu</span>
+    </div>
+
+    <div id="lockedView" class="panel locked">
+        <p>🔐 Australian staff only — secure admin access.</p>
+        <p style="font-size:12px;color:#64748b">Australia only · staff key + authenticator app · session 2 hours</p>
+        <div class="toolbar">
+            <input type="password" id="staffKeyInput" placeholder="Staff key" autocomplete="current-password">
+            <input type="text" id="totpInput" placeholder="6-digit 2FA code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" style="width:130px">
+            <button type="button" class="btn btn-primary" id="btnUnlock">Unlock</button>
+        </div>
+        <div class="status err" id="unlockStatus"></div>
+    </div>
+
+    <div id="adminView" style="display:none">
+        <div class="panel">
+            <div class="stats" id="summaryStats">
+                <div class="stat"><b id="statPending">—</b><span>Pending $MT</span></div>
+                <div class="stat"><b id="statUsers">—</b><span>With balance</span></div>
+                <div class="stat"><b id="statMembers">—</b><span>Total users</span></div>
+            </div>
+            <div class="toolbar">
+                <input type="search" id="search" placeholder="Search @username, user ID, or wallet…">
+                <button type="button" class="btn btn-secondary" id="btnRefresh">Refresh</button>
+                <button type="button" class="btn btn-secondary" id="btnLock">Lock</button>
+            </div>
+            <div class="assign-bar">
+                <label>Selected: <strong id="selectedLabel">none</strong></label>
+                <input type="number" id="amountInput" min="0" step="0.000001" placeholder="MT" value="5">
+                <div class="presets">
+                    <button type="button" data-amt="5">5</button>
+                    <button type="button" data-amt="10">10</button>
+                    <button type="button" data-amt="50">50</button>
+                    <button type="button" data-amt="100">100</button>
+                    <button type="button" data-amt="500">500</button>
+                </div>
+                <input type="text" id="noteInput" placeholder="Note (optional)" style="flex:1;min-width:160px">
+                <button type="button" class="btn btn-add" id="btnAdd" disabled>Add $MT</button>
+                <button type="button" class="btn btn-set" id="btnSet" disabled>Set balance</button>
+            </div>
+            <div class="status" id="actionStatus"></div>
+            <p class="hint">Add increases their claimable balance (e.g. +5 MT). Set replaces the balance. Users see updates on <a href="claims.html" style="color:#93c5fd">claims.html</a> and claim to their linked wallet.</p>
+        </div>
+
+        <div class="panel">
+            <p class="hint" style="margin-top:0">Members with $MT balances appear at the end of each page — search to jump to a user.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Streak</th>
+                        <th>Wallet</th>
+                        <th class="claimable">Claimable $MT</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody"><tr><td colspan="5" style="text-align:center;padding:24px;color:#94a3b8">Loading…</td></tr></tbody>
+            </table>
+            <div id="memberPager" class="assign-bar" style="justify-content:center;display:none">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnPrevPage">Prev</button>
+                <span id="pageLabel" style="font-size:12px;color:#9ca3af"></span>
+                <button type="button" class="btn btn-secondary btn-sm" id="btnNextPage">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        const STORAGE_KEY = 'mt_admin_session_token';
+        const EXPIRES_KEY = 'mt_admin_session_exp';
+        let adminToken = null;
+        let allUsers = [];
+        let selectedUserId = null;
+        let memberPage = 0;
+        const MEMBERS_PER_PAGE = 50;
+
+        function isBlankMember(u) {
+            const name = (u.username || '').trim().toLowerCase();
+            return (!name || name === 'user') && !u.wallet_linked
+                && !u.total_checkins && !u.current_streak && !u.claimable_mt;
+        }
+        function memberTier(u) {
+            if (isBlankMember(u)) return 2;
+            if (u.claimable_mt > 0) return 1;
+            return 0;
+        }
+        function sortUsers(users) {
+            return [...users].sort((a, b) => {
+                const tierDiff = memberTier(a) - memberTier(b);
+                if (tierDiff !== 0) return tierDiff;
+                if (a.claimable_mt !== b.claimable_mt) return b.claimable_mt - a.claimable_mt;
+                const nameCmp = (a.username || '').localeCompare(b.username || '');
+                if (nameCmp !== 0) return nameCmp;
+                return String(a.user_id).localeCompare(String(b.user_id));
+            });
+        }
+
+        function esc(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        function setStatus(el, msg, isErr) {
+            el.textContent = msg || '';
+            el.className = 'status' + (isErr ? ' err' : msg ? ' ok' : '');
+        }
+
+        function showAdmin(unlocked) {
+            document.getElementById('lockedView').style.display = unlocked ? 'none' : 'block';
+            document.getElementById('adminView').style.display = unlocked ? 'block' : 'none';
+        }
+
+        function updateSelected() {
+            const row = allUsers.find(u => u.user_id === selectedUserId);
+            document.getElementById('selectedLabel').textContent = row
+                ? `@${row.username || 'user'} (${row.user_id})`
+                : 'none';
+            const has = !!row;
+            document.getElementById('btnAdd').disabled = !has;
+            document.getElementById('btnSet').disabled = !has;
+            renderTable();
+        }
+
+        function adminHeaders() {
+            return { 'x-admin-token': adminToken };
+        }
+
+        async function loadUsers() {
+            const res = await fetch('/api/rewards-admin/users', {
+                headers: adminHeaders(),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Load failed');
+            allUsers = data.users || [];
+            document.getElementById('statPending').textContent = (data.summary?.pending_mt_total || 0).toLocaleString();
+            document.getElementById('statUsers').textContent = data.summary?.users_with_balance || 0;
+            document.getElementById('statMembers').textContent = data.summary?.total_users || 0;
+            renderTable();
+        }
+
+        function renderTable() {
+            const q = (document.getElementById('search')?.value || '').toLowerCase().trim();
+            const tbody = document.getElementById('tbody');
+            const pager = document.getElementById('memberPager');
+            const filtered = sortUsers(allUsers.filter(u => {
+                if (!q) return true;
+                return String(u.user_id).includes(q)
+                    || (u.username || '').toLowerCase().includes(q)
+                    || (u.wallet_address || '').toLowerCase().includes(q);
+            }));
+            const totalPages = Math.max(1, Math.ceil(filtered.length / MEMBERS_PER_PAGE));
+            if (memberPage >= totalPages) memberPage = totalPages - 1;
+            const slice = filtered.slice(memberPage * MEMBERS_PER_PAGE, (memberPage + 1) * MEMBERS_PER_PAGE);
+            if (!filtered.length) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8">No matches</td></tr>';
+                if (pager) pager.style.display = 'none';
+                return;
+            }
+            if (pager) {
+                pager.style.display = totalPages > 1 ? 'flex' : 'none';
+                document.getElementById('pageLabel').textContent = `Page ${memberPage + 1} of ${totalPages} (${filtered.length} users, blank last)`;
+            }
+            tbody.innerHTML = slice.map(u => {
+                const sel = u.user_id === selectedUserId ? 'selected' : '';
+                const bal = u.claimable_mt > 0
+                    ? u.claimable_mt.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                    : '—';
+                const balCls = u.claimable_mt > 0 ? 'claimable' : 'claimable zero';
+                const wallet = u.wallet_address
+                    ? `<span class="badge ok">Linked</span> <span class="wallet-cell" title="${esc(u.wallet_address)}">${esc(u.wallet_address.slice(0,4))}…${esc(u.wallet_address.slice(-4))}</span>`
+                    : '<span class="badge">None</span>';
+                return `<tr class="${sel}" data-uid="${esc(u.user_id)}">
+                    <td>@${esc(u.username || 'user')}<br><span style="font-size:11px;color:#64748b">${esc(u.user_id)}</span></td>
+                    <td>${u.current_streak}d <span style="color:#64748b">(max ${u.max_streak})</span></td>
+                    <td>${wallet}</td>
+                    <td class="${balCls}">${bal}</td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-secondary btn-pick" data-uid="${esc(u.user_id)}">Select</button>
+                        <button type="button" class="btn btn-sm btn-add btn-quick-add" data-uid="${esc(u.user_id)}">+5</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function assign(userId, mode) {
+            const amount = parseFloat(document.getElementById('amountInput').value);
+            const note = document.getElementById('noteInput').value.trim();
+            const statusEl = document.getElementById('actionStatus');
+            if (!Number.isFinite(amount) || amount < 0) {
+                setStatus(statusEl, 'Enter a valid amount.', true);
+                return;
+            }
+            if (mode === 'add' && amount === 0) {
+                setStatus(statusEl, 'Add amount must be > 0.', true);
+                return;
+            }
+            setStatus(statusEl, 'Updating balance…', false);
+            try {
+                const res = await fetch('/api/rewards-admin/assign', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...adminHeaders(),
+                    },
+                    body: JSON.stringify({ user_id: userId, amount_mt: amount, mode, note: note || null }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Assign failed');
+                setStatus(statusEl,
+                    `✓ @${data.username || userId}: ${data.previous_claimable_mt} → ${data.claimable_mt} $MT (${mode})`,
+                    false);
+                await loadUsers();
+                selectedUserId = userId;
+                updateSelected();
+            } catch (e) {
+                setStatus(statusEl, e.message || 'Failed', true);
+            }
+        }
+
+        async function tryUnlock(key) {
+            const statusEl = document.getElementById('unlockStatus');
+            const totp = (document.getElementById('totpInput').value || '').replace(/\D/g, '');
+            setStatus(statusEl, 'Verifying…', false);
+            try {
+                const res = await fetch('/api/rewards-admin/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ staff_key: key, totp_code: totp }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    if (data.error === 'geo_restricted' || data.error === 'geo_unknown') {
+                        throw new Error(data.message || 'Australian connection required.');
+                    }
+                    if (data.error === 'rate_limited') {
+                        throw new Error(data.message || 'Too many attempts. Wait and retry.');
+                    }
+                    if (data.error === 'invalid_2fa') {
+                        throw new Error(data.message || 'Invalid authenticator code.');
+                    }
+                    if (data.error === '2fa_not_configured') {
+                        throw new Error(data.message || '2FA not configured on server.');
+                    }
+                    throw new Error(data.message || 'Invalid staff key.');
+                }
+                adminToken = data.token;
+                try {
+                    sessionStorage.setItem(STORAGE_KEY, adminToken);
+                    sessionStorage.setItem(EXPIRES_KEY, data.expires_at || '');
+                } catch {}
+                showAdmin(true);
+                document.getElementById('staffKeyInput').value = '';
+                document.getElementById('totpInput').value = '';
+                await loadUsers();
+            } catch (e) {
+                setStatus(statusEl, e.message || 'Login failed.', true);
+            }
+        }
+
+        document.getElementById('btnUnlock').addEventListener('click', () => {
+            const key = document.getElementById('staffKeyInput').value.trim();
+            const totp = (document.getElementById('totpInput').value || '').replace(/\D/g, '');
+            if (!key) {
+                setStatus(document.getElementById('unlockStatus'), 'Enter staff key.', true);
+                return;
+            }
+            if (!/^\d{6}$/.test(totp)) {
+                setStatus(document.getElementById('unlockStatus'), 'Enter your 6-digit authenticator code.', true);
+                document.getElementById('totpInput').focus();
+                return;
+            }
+            tryUnlock(key);
+        });
+
+        document.getElementById('totpInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('btnUnlock').click();
+        });
+
+        (function init2faField() {
+            const totpEl = document.getElementById('totpInput');
+            totpEl.required = true;
+            totpEl.style.display = '';
+            totpEl.placeholder = '6-digit 2FA code (Google Authenticator)';
+            fetch('/api/rewards-admin/auth')
+                .then((r) => (r.ok ? r.json() : null))
+                .then((cfg) => {
+                    if (cfg?.admin_count > 0) {
+                        totpEl.placeholder = `2FA code (${cfg.admin_count} admin${cfg.admin_count === 1 ? '' : 's'} enrolled)`;
+                    }
+                })
+                .catch(() => {});
+        })();
+
+        document.getElementById('btnLock').addEventListener('click', () => {
+            if (!confirm('Lock admin panel?')) return;
+            adminToken = null;
+            selectedUserId = null;
+            try {
+                sessionStorage.removeItem(STORAGE_KEY);
+                sessionStorage.removeItem(EXPIRES_KEY);
+            } catch {}
+            showAdmin(false);
+            document.getElementById('staffKeyInput').value = '';
+            document.getElementById('totpInput').value = '';
+        });
+
+        document.getElementById('btnRefresh').addEventListener('click', () => {
+            loadUsers().catch(e => setStatus(document.getElementById('actionStatus'), e.message, true));
+        });
+
+        document.getElementById('search').addEventListener('input', () => { memberPage = 0; renderTable(); });
+        document.getElementById('btnPrevPage').addEventListener('click', () => { if (memberPage > 0) { memberPage--; renderTable(); } });
+        document.getElementById('btnNextPage').addEventListener('click', () => { memberPage++; renderTable(); });
+
+        document.getElementById('btnAdd').addEventListener('click', () => {
+            if (selectedUserId) assign(selectedUserId, 'add');
+        });
+        document.getElementById('btnSet').addEventListener('click', () => {
+            if (!selectedUserId) return;
+            if (!confirm('Set balance to ' + document.getElementById('amountInput').value + ' MT?')) return;
+            assign(selectedUserId, 'set');
+        });
+
+        document.querySelectorAll('.presets button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.getElementById('amountInput').value = btn.dataset.amt;
+            });
+        });
+
+        document.getElementById('tbody').addEventListener('click', e => {
+            const pick = e.target.closest('.btn-pick');
+            const quick = e.target.closest('.btn-quick-add');
+            if (pick) {
+                selectedUserId = pick.dataset.uid;
+                updateSelected();
+            }
+            if (quick) {
+                selectedUserId = quick.dataset.uid;
+                document.getElementById('amountInput').value = '5';
+                assign(selectedUserId, 'add');
+            }
+        });
+
+        const saved = (() => { try { return sessionStorage.getItem(STORAGE_KEY); } catch { return null; } })();
+        const savedExp = (() => { try { return sessionStorage.getItem(EXPIRES_KEY); } catch { return null; } })();
+        if (saved && savedExp && new Date(savedExp).getTime() > Date.now()) {
+            adminToken = saved;
+            showAdmin(true);
+            loadUsers().catch(() => {
+                adminToken = null;
+                showAdmin(false);
+            });
+        } else if (saved) {
+            try {
+                sessionStorage.removeItem(STORAGE_KEY);
+                sessionStorage.removeItem(EXPIRES_KEY);
+            } catch {}
+        }
+    </script>
+</body>
+</html>

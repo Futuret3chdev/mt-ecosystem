@@ -8,6 +8,7 @@ const WebSocket = require('ws');
 const db = require('./src/db');
 const path = require('path');
 const { isAdmin2faEnabled, admin2faConfigured, verifyAdminTotp } = require('./src/admin-totp');
+const rewardsAdmin = require('./src/rewards-admin');
 
 // Staff system (additive only — does not touch existing key auth or admin APIs)
 const {
@@ -360,6 +361,86 @@ app.get('/api/staff/resources', requireStaffAuthAu, (req, res) => {
 app.get('/api/staff/directory', requireStaffAuthAu, (req, res) => {
   const users = getAllStaffUsers();
   res.json({ ok: true, users });
+});
+
+/* ====================== REWARDS ADMIN (staff key + 2FA, AU only) ====================== */
+
+app.get('/api/rewards-admin/auth', requireAustralianAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(rewardsAdmin.handleAuthGet());
+});
+
+app.post('/api/rewards-admin/auth', requireAustralianAdmin, (req, res) => {
+  const result = rewardsAdmin.handleAuthPost(req.body || {});
+  if (result.error) {
+    return res.status(result.status || 400).json(result);
+  }
+  res.json(result);
+});
+
+function requireRewardsAdminSession(req, res, next) {
+  if (!rewardsAdmin.isRewardsAdminAuthorized(req)) {
+    return res.status(401).json({ error: 'unauthorized', message: 'Valid admin session required.' });
+  }
+  next();
+}
+
+app.get('/api/rewards-admin/users', requireAustralianAdmin, requireRewardsAdminSession, async (req, res) => {
+  try {
+    const users = await rewardsAdmin.fetchAllClaimableUsers();
+    const withBalance = users.filter((u) => u.claimable_mt > 0);
+    const pendingTotal = withBalance.reduce((s, u) => s + u.claimable_mt, 0);
+    res.json({
+      updated_at: new Date().toISOString(),
+      treasury_configured: false,
+      treasury_can_send: false,
+      user_pays_sol_fees: true,
+      summary: {
+        total_users: users.length,
+        users_with_balance: withBalance.length,
+        pending_mt_total: pendingTotal,
+        wallets_linked: users.filter((u) => u.wallet_linked).length,
+      },
+      users: users.map((u) => ({
+        ...u,
+        wallet_short: u.wallet_address
+          ? `${u.wallet_address.slice(0, 4)}…${u.wallet_address.slice(-4)}`
+          : null,
+      })),
+    });
+  } catch (err) {
+    console.error('rewards-admin users', err?.message);
+    res.status(500).json({ error: 'database_error' });
+  }
+});
+
+app.post('/api/rewards-admin/assign', requireAustralianAdmin, requireRewardsAdminSession, async (req, res) => {
+  const userId = String(req.body?.user_id || '').trim();
+  const amount = Number(req.body?.amount_mt);
+  const mode = req.body?.mode === 'set' ? 'set' : 'add';
+  const note = req.body?.note ? String(req.body.note).slice(0, 500) : null;
+
+  if (!userId || !/^\d+$/.test(userId)) {
+    return res.status(400).json({ error: 'user_id required' });
+  }
+  if (!Number.isFinite(amount) || amount < 0) {
+    return res.status(400).json({ error: 'amount_mt must be a non-negative number' });
+  }
+  if (mode === 'add' && amount === 0) {
+    return res.status(400).json({ error: 'amount_mt must be > 0 for add' });
+  }
+
+  const result = await rewardsAdmin.assignClaimableReward({ userId, amount, mode, note });
+  if (result.error) {
+    return res.status(result.status || 400).json({ error: result.error });
+  }
+  res.json(result);
+});
+
+app.get('/admin-rewards.html', requireAustralianAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'static', 'admin-rewards.html'));
 });
 
 // Convenience route: /staff serves the staff portal (in addition to /static/staff.html via nginx)
