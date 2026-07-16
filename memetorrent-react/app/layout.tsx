@@ -15,6 +15,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <script
+          src="https://admin.futuret3ch.com.au/static/mt-tracker.js"
+          data-source="memetorrent-web"
+          defer
+        />
         {/* Font Awesome for social icons in original brand colors */}
         <link 
           rel="stylesheet" 
