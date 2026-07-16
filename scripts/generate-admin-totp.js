@@ -27,19 +27,6 @@ console.log('Option B — JSON map (recommended, one entry per admin):');
 console.log('ADMIN_TOTP_ADMINS=' + JSON.stringify({ [label]: secret }, null, 0));
 console.log('\n(Merge into one JSON object if you already have other admins.)\n');
 
-console.log('Example for your two admins:');
-console.log(
-  'ADMIN_TOTP_ADMINS=' +
-    JSON.stringify(
-      {
-        'yourname@memetorrent': 'I56U2UBCH43FG72D',
-        'pcwarrior39@gmail.com': 'EBCES5R5LQ4CWNJJ',
-      },
-      null,
-      0
-    )
-);
-
-console.log('\nScan this URI in Google Authenticator / Authy:\n');
+console.log('Scan this URI in Google Authenticator / Authy:\n');
 console.log(uri);
 console.log('\nQR: npx qrcode-terminal "' + uri + '"\n');
