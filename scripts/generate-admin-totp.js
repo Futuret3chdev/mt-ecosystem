@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 /** Generate ADMIN_TOTP_SECRET for Vercel / mt-admin-api .env */
-const { authenticator } = require('otplib');
+const path = require('path');
+let authenticator;
+try {
+  ({ authenticator } = require('otplib'));
+} catch {
+  ({ authenticator } = require(path.join(__dirname, '../memetorrent-react/node_modules/otplib')));
+}
 
 const secret = authenticator.generateSecret();
 const label = encodeURIComponent(process.argv[2] || 'futuret3chdev@memetorrent');
