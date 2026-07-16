@@ -108,6 +108,147 @@ async function formatSendError(connection: Connection, err: unknown): Promise<st
   return 'On-chain send failed';
 }
 
+export type PreparedClaimTx = {
+  transactionBase64: string;
+  blockhash: string;
+  lastValidBlockHeight: number;
+  needsAta: boolean;
+  estimatedUserSol: number;
+  senderWallet: string;
+  amountMt: number;
+};
+
+/** User wallet pays network + ATA fees; treasury only authorizes the $MT transfer. */
+export async function buildUserPaidClaimTransaction(
+  recipientWallet: string,
+  amountMt: number
+): Promise<PreparedClaimTx> {
+  const treasury = await getTreasuryKeypair();
+  if (!treasury) {
+    throw new Error('Rewards treasury wallet is not configured on the server.');
+  }
+  if (amountMt <= 0) {
+    throw new Error('Invalid claim amount.');
+  }
+
+  const connection = await getConnection();
+  const sender = treasury.publicKey;
+  const recipient = new PublicKey(recipientWallet);
+  const transaction = new Transaction();
+
+  const senderAta = await getAssociatedTokenAddress(
+    MT_MINT,
+    sender,
+    false,
+    TOKEN_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
+  const recipientAta = await getAssociatedTokenAddress(
+    MT_MINT,
+    recipient,
+    false,
+    TOKEN_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
+
+  const recipientHasAta = await accountExists(connection, recipientAta);
+  if (!recipientHasAta) {
+    transaction.add(
+      createAssociatedTokenAccountInstruction(
+        recipient,
+        recipientAta,
+        recipient,
+        MT_MINT,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
+      )
+    );
+  }
+
+  const raw = BigInt(Math.round(amountMt * Math.pow(10, MT_DECIMALS)));
+  if (raw <= BigInt(0)) throw new Error('Amount too small.');
+
+  transaction.add(
+    createTransferInstruction(senderAta, recipientAta, sender, raw, [], TOKEN_PROGRAM_ID)
+  );
+
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+  transaction.recentBlockhash = blockhash;
+  transaction.feePayer = recipient;
+  transaction.partialSign(treasury);
+
+  const simulation = await connection.simulateTransaction(transaction);
+  if (simulation.value.err) {
+    const logs = simulation.value.logs?.join(' | ') || JSON.stringify(simulation.value.err);
+    throw new Error(`Simulation failed: ${logs}`);
+  }
+
+  return {
+    transactionBase64: Buffer.from(
+      transaction.serialize({ requireAllSignatures: false })
+    ).toString('base64'),
+    blockhash,
+    lastValidBlockHeight,
+    needsAta: !recipientHasAta,
+    estimatedUserSol: recipientHasAta ? 0.000015 : 0.00205,
+    senderWallet: sender.toBase58(),
+    amountMt,
+  };
+}
+
+export async function verifyClaimTransaction(
+  signature: string,
+  recipientWallet: string,
+  amountMt: number
+): Promise<boolean> {
+  const connection = await getConnection();
+  const treasury = await getTreasuryKeypair();
+  if (!treasury) return false;
+
+  const parsed = await connection.getParsedTransaction(signature, {
+    maxSupportedTransactionVersion: 0,
+    commitment: 'confirmed',
+  });
+  if (!parsed?.meta || parsed.meta.err) return false;
+
+  const expectedRaw = BigInt(Math.round(amountMt * Math.pow(10, MT_DECIMALS)));
+  const recipient = new PublicKey(recipientWallet);
+  const recipientAta = await getAssociatedTokenAddress(
+    MT_MINT,
+    recipient,
+    false,
+    TOKEN_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
+
+  for (const inner of parsed.meta.innerInstructions || []) {
+    for (const ix of inner.instructions) {
+      if (
+        'parsed' in ix &&
+        ix.parsed?.type === 'transfer' &&
+        ix.parsed?.info?.destination === recipientAta.toBase58()
+      ) {
+        const amt = BigInt(ix.parsed.info.amount || 0);
+        if (amt === expectedRaw) return true;
+      }
+    }
+  }
+
+  const topLevel = parsed.transaction.message.instructions;
+  for (const ix of topLevel) {
+    if (
+      'parsed' in ix &&
+      ix.parsed?.type === 'transfer' &&
+      ix.parsed?.info?.destination === recipientAta.toBase58()
+    ) {
+      const amt = BigInt(ix.parsed.info.amount || 0);
+      if (amt === expectedRaw) return true;
+    }
+  }
+
+  return false;
+}
+
 export async function sendMtFromTreasury(
   recipientWallet: string,
   amountMt: number
