@@ -102,6 +102,7 @@
         </div>
 
         <div class="panel">
+            <p class="hint" style="margin-top:0">Members with $MT balances appear at the end of each page — search to jump to a user.</p>
             <table>
                 <thead>
                     <tr>
@@ -114,6 +115,11 @@
                 </thead>
                 <tbody id="tbody"><tr><td colspan="5" style="text-align:center;padding:24px;color:#94a3b8">Loading…</td></tr></tbody>
             </table>
+            <div id="memberPager" class="assign-bar" style="justify-content:center;display:none">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnPrevPage">Prev</button>
+                <span id="pageLabel" style="font-size:12px;color:#9ca3af"></span>
+                <button type="button" class="btn btn-secondary btn-sm" id="btnNextPage">Next</button>
+            </div>
         </div>
     </div>
 
@@ -122,6 +128,18 @@
         let staffKey = null;
         let allUsers = [];
         let selectedUserId = null;
+        let memberPage = 0;
+        const MEMBERS_PER_PAGE = 50;
+
+        function sortUsers(users) {
+            return [...users].sort((a, b) => {
+                const aHas = a.claimable_mt > 0 ? 1 : 0;
+                const bHas = b.claimable_mt > 0 ? 1 : 0;
+                if (aHas !== bHas) return aHas - bHas;
+                if (a.claimable_mt !== b.claimable_mt) return a.claimable_mt - b.claimable_mt;
+                return (a.username || '').localeCompare(b.username || '');
+            });
+        }
 
         function esc(s) {
             return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -164,17 +182,26 @@
         function renderTable() {
             const q = (document.getElementById('search')?.value || '').toLowerCase().trim();
             const tbody = document.getElementById('tbody');
-            const filtered = allUsers.filter(u => {
+            const pager = document.getElementById('memberPager');
+            const filtered = sortUsers(allUsers.filter(u => {
                 if (!q) return true;
                 return String(u.user_id).includes(q)
                     || (u.username || '').toLowerCase().includes(q)
                     || (u.wallet_address || '').toLowerCase().includes(q);
-            });
+            }));
+            const totalPages = Math.max(1, Math.ceil(filtered.length / MEMBERS_PER_PAGE));
+            if (memberPage >= totalPages) memberPage = totalPages - 1;
+            const slice = filtered.slice(memberPage * MEMBERS_PER_PAGE, (memberPage + 1) * MEMBERS_PER_PAGE);
             if (!filtered.length) {
                 tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8">No matches</td></tr>';
+                if (pager) pager.style.display = 'none';
                 return;
             }
-            tbody.innerHTML = filtered.map(u => {
+            if (pager) {
+                pager.style.display = totalPages > 1 ? 'flex' : 'none';
+                document.getElementById('pageLabel').textContent = `Page ${memberPage + 1} of ${totalPages} (${filtered.length} users, rewards last)`;
+            }
+            tbody.innerHTML = slice.map(u => {
                 const sel = u.user_id === selectedUserId ? 'selected' : '';
                 const bal = u.claimable_mt > 0
                     ? u.claimable_mt.toLocaleString(undefined, { maximumFractionDigits: 2 })
@@ -264,7 +291,9 @@
             loadUsers().catch(e => setStatus(document.getElementById('actionStatus'), e.message, true));
         });
 
-        document.getElementById('search').addEventListener('input', renderTable);
+        document.getElementById('search').addEventListener('input', () => { memberPage = 0; renderTable(); });
+        document.getElementById('btnPrevPage').addEventListener('click', () => { if (memberPage > 0) { memberPage--; renderTable(); } });
+        document.getElementById('btnNextPage').addEventListener('click', () => { memberPage++; renderTable(); });
 
         document.getElementById('btnAdd').addEventListener('click', () => {
             if (selectedUserId) assign(selectedUserId, 'add');

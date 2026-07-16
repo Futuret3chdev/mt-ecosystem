@@ -33,8 +33,24 @@ export default function ClaimsPortal() {
   const [summary, setSummary] = useState({ pending: 0, withBalance: 0, total: 0 });
   const [treasuryReady, setTreasuryReady] = useState(true);
   const [selectedWallet, setSelectedWallet] = useState('Phantom');
+  const [showAllMembers, setShowAllMembers] = useState(false);
+  const [memberPage, setMemberPage] = useState(0);
+  const MEMBERS_PER_PAGE = 50;
 
   const walletAddress = publicKey?.toBase58() ?? null;
+
+  const sortForDisplay = (users: ClaimUser[]) =>
+    [...users].sort((a, b) => {
+      const aHas = a.claimable_mt > 0 ? 1 : 0;
+      const bHas = b.claimable_mt > 0 ? 1 : 0;
+      if (aHas !== bHas) return aHas - bHas;
+      if (a.claimable_mt !== b.claimable_mt) return a.claimable_mt - b.claimable_mt;
+      return (a.username || '').localeCompare(b.username || '');
+    });
+
+  const withRewards = allUsers
+    .filter((u) => u.claimable_mt > 0)
+    .sort((a, b) => b.claimable_mt - a.claimable_mt);
 
   const loadList = useCallback(async () => {
     const res = await fetch('/api/claimable-rewards');
@@ -134,11 +150,62 @@ export default function ClaimsPortal() {
     }
   }
 
-  const filtered = allUsers.filter((u) => {
-    const q = search.toLowerCase().trim();
-    if (!q) return true;
-    return String(u.user_id).includes(q) || (u.username || '').toLowerCase().includes(q);
-  });
+  const q = search.toLowerCase().trim();
+  const filteredMembers = sortForDisplay(
+    allUsers.filter((u) => {
+      if (!q) return true;
+      return String(u.user_id).includes(q) || (u.username || '').toLowerCase().includes(q);
+    })
+  );
+  const memberSlice = filteredMembers.slice(
+    memberPage * MEMBERS_PER_PAGE,
+    (memberPage + 1) * MEMBERS_PER_PAGE
+  );
+  const memberPages = Math.max(1, Math.ceil(filteredMembers.length / MEMBERS_PER_PAGE));
+
+  function UserRow({ u, highlightYou }: { u: ClaimUser; highlightYou?: boolean }) {
+    const isYou = highlightYou && myRow?.user_id === u.user_id;
+    return (
+      <tr
+        className={`border-b border-white/5 ${isYou ? 'bg-emerald-400/10' : ''} ${u.claimable_mt > 0 ? '' : 'opacity-70'}`}
+      >
+        <td className="py-2.5 pr-2">
+          @{u.username || 'user'}
+          <div className="text-[11px] opacity-50">{u.user_id}</div>
+        </td>
+        <td className="py-2.5 pr-2">
+          {u.current_streak}d <span className="opacity-50">(max {u.max_streak})</span>
+        </td>
+        <td className="py-2.5 pr-2">{u.total_checkins}</td>
+        <td className="py-2.5 pr-2">
+          {u.wallet_linked ? (
+            <span className="text-xs">
+              <span className="text-emerald-400">Linked</span> {u.wallet_short}
+            </span>
+          ) : (
+            <span className="text-xs opacity-50">None</span>
+          )}
+        </td>
+        <td className={`py-2.5 text-right font-semibold ${u.claimable_mt > 0 ? 'text-emerald-400' : ''}`}>
+          {u.claimable_mt > 0
+            ? u.claimable_mt.toLocaleString(undefined, { maximumFractionDigits: 2 })
+            : '—'}
+        </td>
+      </tr>
+    );
+  }
+
+  const tableHead = (
+    <thead>
+      <tr className="text-left text-[11px] uppercase opacity-60 border-b border-white/10">
+        <th className="pb-2 pr-2">User</th>
+        <th className="pb-2 pr-2">Streak</th>
+        <th className="pb-2 pr-2">Check-ins</th>
+        <th className="pb-2 pr-2">Wallet</th>
+        <th className="pb-2 text-right">Claimable $MT</th>
+      </tr>
+    </thead>
+  );
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
@@ -228,59 +295,86 @@ export default function ClaimsPortal() {
         )}
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search @username or user ID…"
-          className="w-full mb-4 px-4 py-2.5 rounded-xl border border-white/15 bg-black/40 text-sm focus:outline-none focus:border-violet-400/50"
-        />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-[11px] uppercase opacity-60 border-b border-white/10">
-                <th className="pb-2 pr-2">User</th>
-                <th className="pb-2 pr-2">Streak</th>
-                <th className="pb-2 pr-2">Check-ins</th>
-                <th className="pb-2 pr-2">Wallet</th>
-                <th className="pb-2 text-right">Claimable $MT</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr><td colSpan={5} className="py-8 text-center opacity-50">No matches</td></tr>
-              ) : (
-                filtered.map((u) => {
-                  const isYou = myRow?.user_id === u.user_id;
-                  return (
-                    <tr
-                      key={u.user_id}
-                      className={`border-b border-white/5 ${isYou ? 'bg-emerald-400/10' : ''} ${u.claimable_mt > 0 ? '' : 'opacity-70'}`}
-                    >
-                      <td className="py-2.5 pr-2">
-                        @{u.username || 'user'}
-                        <div className="text-[11px] opacity-50">{u.user_id}</div>
-                      </td>
-                      <td className="py-2.5 pr-2">{u.current_streak}d <span className="opacity-50">(max {u.max_streak})</span></td>
-                      <td className="py-2.5 pr-2">{u.total_checkins}</td>
-                      <td className="py-2.5 pr-2">
-                        {u.wallet_linked ? (
-                          <span className="text-xs"><span className="text-emerald-400">Linked</span> {u.wallet_short}</span>
-                        ) : (
-                          <span className="text-xs opacity-50">None</span>
-                        )}
-                      </td>
-                      <td className={`py-2.5 text-right font-semibold ${u.claimable_mt > 0 ? 'text-emerald-400' : ''}`}>
-                        {u.claimable_mt > 0 ? u.claimable_mt.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+      {withRewards.length > 0 && (
+        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.04] p-4 sm:p-6 mb-6">
+          <h2 className="text-sm font-semibold text-emerald-300 mb-3">
+            Members with rewards to claim ({withRewards.length})
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              {tableHead}
+              <tbody>
+                {withRewards.map((u) => (
+                  <UserRow key={u.user_id} u={u} highlightYou />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+      )}
+
+      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">
+        <button
+          type="button"
+          onClick={() => {
+            setShowAllMembers((v) => !v);
+            setMemberPage(0);
+          }}
+          className="w-full flex items-center justify-between text-left text-sm font-medium opacity-80 hover:opacity-100 py-1"
+        >
+          <span>All members ({summary.total.toLocaleString()}) — rewards listed last</span>
+          <span className="text-xs opacity-60">{showAllMembers ? 'Hide ▲' : 'Show ▼'}</span>
+        </button>
+
+        {showAllMembers && (
+          <>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setMemberPage(0);
+              }}
+              placeholder="Search @username or user ID…"
+              className="w-full mt-4 mb-4 px-4 py-2.5 rounded-xl border border-white/15 bg-black/40 text-sm focus:outline-none focus:border-violet-400/50"
+            />
+            <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+              <table className="w-full text-sm">
+                {tableHead}
+                <tbody>
+                  {memberSlice.length === 0 ? (
+                    <tr><td colSpan={5} className="py-8 text-center opacity-50">No matches</td></tr>
+                  ) : (
+                    memberSlice.map((u) => <UserRow key={u.user_id} u={u} highlightYou />)
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {memberPages > 1 && (
+              <div className="flex items-center justify-center gap-3 mt-4 text-xs opacity-70">
+                <button
+                  type="button"
+                  disabled={memberPage === 0}
+                  onClick={() => setMemberPage((p) => Math.max(0, p - 1))}
+                  className="px-3 py-1 rounded-lg border border-white/15 disabled:opacity-30"
+                >
+                  Prev
+                </button>
+                <span>
+                  Page {memberPage + 1} of {memberPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={memberPage >= memberPages - 1}
+                  onClick={() => setMemberPage((p) => Math.min(memberPages - 1, p + 1))}
+                  className="px-3 py-1 rounded-lg border border-white/15 disabled:opacity-30"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
