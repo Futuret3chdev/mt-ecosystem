@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { Transaction } from '@solana/web3.js';
 import Link from 'next/link';
 
@@ -23,9 +23,7 @@ type MyRow = {
 };
 
 export default function ClaimsPortal() {
-  const { connection } = useConnection();
-  const { publicKey, connected, connect, disconnect, select, wallets, signTransaction, sendTransaction } =
-    useWallet();
+  const { publicKey, connected, connect, disconnect, select, wallets, signTransaction } = useWallet();
   const [allUsers, setAllUsers] = useState<ClaimUser[]>([]);
   const [myRow, setMyRow] = useState<MyRow | null>(null);
   const [search, setSearch] = useState('');
@@ -147,9 +145,21 @@ export default function ClaimsPortal() {
     }
   }
 
+  async function waitForConfirmation(signature: string, timeoutMs = 60000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const res = await fetch(`/api/solana/signature-status?signature=${encodeURIComponent(signature)}`);
+      const data = await res.json();
+      if (data.confirmed) return;
+      if (data.err) throw new Error('Transaction failed on-chain');
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    throw new Error('Transaction confirmation timed out — check Solscan for status');
+  }
+
   async function handleClaim() {
     if (!walletAddress || !myRow || myRow.claimable_mt <= 0) return;
-    if (!signTransaction && !sendTransaction) {
+    if (!signTransaction) {
       setStatus('Your wallet does not support signing — try Phantom, Solflare, or Backpack.');
       setStatusErr(true);
       return;
@@ -179,31 +189,23 @@ export default function ClaimsPortal() {
       const tx = Transaction.from(Buffer.from(prep.transaction_base64, 'base64'));
       setStatus('Approve the transaction in your wallet…');
 
-      let sig: string;
-      if (sendTransaction) {
-        sig = await sendTransaction(tx, connection, {
-          skipPreflight: false,
-          preflightCommitment: 'confirmed',
-          maxRetries: 3,
-        });
-      } else {
-        const signed = await signTransaction!(tx);
-        setStatus('Submitting transaction…');
-        sig = await connection.sendRawTransaction(signed.serialize(), {
-          skipPreflight: false,
-          preflightCommitment: 'confirmed',
-          maxRetries: 3,
-        });
-      }
+      // Partial-signed treasury tx: Phantom requires signTransaction (not sendTransaction).
+      const signed = await signTransaction(tx);
+      setStatus('Submitting transaction…');
 
-      await connection.confirmTransaction(
-        {
-          signature: sig,
-          blockhash: prep.blockhash,
-          lastValidBlockHeight: prep.last_valid_block_height,
-        },
-        'confirmed'
-      );
+      const sendRes = await fetch('/api/solana/send-transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transaction: Buffer.from(signed.serialize()).toString('base64'),
+        }),
+      });
+      const sendData = await sendRes.json();
+      if (!sendRes.ok) throw new Error(sendData.error || 'Submit failed');
+
+      const sig = sendData.signature as string;
+      setStatus('Waiting for on-chain confirmation…');
+      await waitForConfirmation(sig);
 
       const confirmRes = await fetch('/api/claimable-rewards/claim/confirm', {
         method: 'POST',
@@ -230,6 +232,10 @@ export default function ClaimsPortal() {
       const msg = e?.message || 'Claim failed';
       if (msg.includes('User rejected') || msg.includes('rejected')) {
         setStatus('Claim cancelled — no SOL charged, balance unchanged.');
+      } else if (/blocked|403|forbidden/i.test(msg)) {
+        setStatus(
+          'Request blocked by wallet or browser. Disable ad blockers for this site, refresh, connect wallet again, then claim. If Phantom shows a security warning, choose “Proceed anyway” — you only approve a $MT transfer to your wallet.'
+        );
       } else {
         setStatus(msg);
       }

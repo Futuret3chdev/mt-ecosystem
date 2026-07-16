@@ -1,8 +1,8 @@
 import { Connection } from '@solana/web3.js';
+import { getSolanaRpcUrl } from '@/lib/solana-rpc';
 
 export async function GET() {
-  const rpcUrl = process.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-  const connection = new Connection(rpcUrl, 'confirmed');
+  const connection = new Connection(getSolanaRpcUrl(), 'confirmed');
   try {
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
     return Response.json({ blockhash, lastValidBlockHeight });
