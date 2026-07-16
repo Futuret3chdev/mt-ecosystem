@@ -131,13 +131,24 @@
         let memberPage = 0;
         const MEMBERS_PER_PAGE = 50;
 
+        function isBlankMember(u) {
+            const name = (u.username || '').trim().toLowerCase();
+            return (!name || name === 'user') && !u.wallet_linked
+                && !u.total_checkins && !u.current_streak && !u.claimable_mt;
+        }
+        function memberTier(u) {
+            if (isBlankMember(u)) return 2;
+            if (u.claimable_mt > 0) return 1;
+            return 0;
+        }
         function sortUsers(users) {
             return [...users].sort((a, b) => {
-                const aHas = a.claimable_mt > 0 ? 1 : 0;
-                const bHas = b.claimable_mt > 0 ? 1 : 0;
-                if (aHas !== bHas) return aHas - bHas;
-                if (a.claimable_mt !== b.claimable_mt) return a.claimable_mt - b.claimable_mt;
-                return (a.username || '').localeCompare(b.username || '');
+                const tierDiff = memberTier(a) - memberTier(b);
+                if (tierDiff !== 0) return tierDiff;
+                if (a.claimable_mt !== b.claimable_mt) return b.claimable_mt - a.claimable_mt;
+                const nameCmp = (a.username || '').localeCompare(b.username || '');
+                if (nameCmp !== 0) return nameCmp;
+                return String(a.user_id).localeCompare(String(b.user_id));
             });
         }
 
@@ -199,7 +210,7 @@
             }
             if (pager) {
                 pager.style.display = totalPages > 1 ? 'flex' : 'none';
-                document.getElementById('pageLabel').textContent = `Page ${memberPage + 1} of ${totalPages} (${filtered.length} users, rewards last)`;
+                document.getElementById('pageLabel').textContent = `Page ${memberPage + 1} of ${totalPages} (${filtered.length} users, blank last)`;
             }
             tbody.innerHTML = slice.map(u => {
                 const sel = u.user_id === selectedUserId ? 'selected' : '';

@@ -111,7 +111,19 @@ export async function fetchAllClaimableUsers(): Promise<ClaimableUserRow[]> {
          dc.last_checkin
        FROM user_details u
        LEFT JOIN tcvkxete_message_tracking.daily_checkins dc ON u.id = dc.user_id
-       ORDER BY (COALESCE(dc.claimable_mt, 0) > 0) ASC, COALESCE(dc.claimable_mt, 0) ASC, u.username ASC`
+       ORDER BY
+         CASE
+           WHEN (u.username IS NULL OR TRIM(u.username) = '' OR LOWER(TRIM(u.username)) = 'user')
+                AND (u.wallet_address IS NULL OR TRIM(u.wallet_address) = '')
+                AND COALESCE(dc.total_checkins, 0) = 0
+                AND COALESCE(dc.current_streak, 0) = 0
+                AND COALESCE(dc.claimable_mt, 0) = 0 THEN 2
+           WHEN COALESCE(dc.claimable_mt, 0) > 0 THEN 1
+           ELSE 0
+         END,
+         COALESCE(dc.claimable_mt, 0) DESC,
+         u.username ASC,
+         u.id ASC`
     );
     return (rows as any[]).map((r) => {
       const wallet = (r.wallet_address || '').trim();

@@ -39,13 +39,32 @@ export default function ClaimsPortal() {
 
   const walletAddress = publicKey?.toBase58() ?? null;
 
+  const isBlankMember = (u: ClaimUser) => {
+    const name = (u.username || '').trim().toLowerCase();
+    return (
+      (!name || name === 'user') &&
+      !u.wallet_linked &&
+      u.total_checkins === 0 &&
+      u.current_streak === 0 &&
+      u.claimable_mt === 0
+    );
+  };
+
+  /** Active members first → rewards to claim → blank @user rows last */
+  const memberTier = (u: ClaimUser) => {
+    if (isBlankMember(u)) return 2;
+    if (u.claimable_mt > 0) return 1;
+    return 0;
+  };
+
   const sortForDisplay = (users: ClaimUser[]) =>
     [...users].sort((a, b) => {
-      const aHas = a.claimable_mt > 0 ? 1 : 0;
-      const bHas = b.claimable_mt > 0 ? 1 : 0;
-      if (aHas !== bHas) return aHas - bHas;
-      if (a.claimable_mt !== b.claimable_mt) return a.claimable_mt - b.claimable_mt;
-      return (a.username || '').localeCompare(b.username || '');
+      const tierDiff = memberTier(a) - memberTier(b);
+      if (tierDiff !== 0) return tierDiff;
+      if (a.claimable_mt !== b.claimable_mt) return b.claimable_mt - a.claimable_mt;
+      const nameCmp = (a.username || '').localeCompare(b.username || '');
+      if (nameCmp !== 0) return nameCmp;
+      return String(a.user_id).localeCompare(String(b.user_id));
     });
 
   const withRewards = allUsers
@@ -153,6 +172,7 @@ export default function ClaimsPortal() {
   const q = search.toLowerCase().trim();
   const filteredMembers = sortForDisplay(
     allUsers.filter((u) => {
+      if (u.claimable_mt > 0) return false;
       if (!q) return true;
       return String(u.user_id).includes(q) || (u.username || '').toLowerCase().includes(q);
     })
@@ -322,7 +342,7 @@ export default function ClaimsPortal() {
           }}
           className="w-full flex items-center justify-between text-left text-sm font-medium opacity-80 hover:opacity-100 py-1"
         >
-          <span>All members ({summary.total.toLocaleString()}) — rewards listed last</span>
+          <span>All members ({(summary.total - withRewards.length).toLocaleString()}) — blank accounts last</span>
           <span className="text-xs opacity-60">{showAllMembers ? 'Hide ▲' : 'Show ▼'}</span>
         </button>
 
