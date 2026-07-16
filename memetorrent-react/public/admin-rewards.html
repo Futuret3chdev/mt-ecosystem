@@ -310,6 +310,7 @@
                 } catch {}
                 showAdmin(true);
                 document.getElementById('staffKeyInput').value = '';
+                document.getElementById('totpInput').value = '';
                 await loadUsers();
             } catch (e) {
                 setStatus(statusEl, e.message || 'Login failed.', true);
@@ -318,7 +319,16 @@
 
         document.getElementById('btnUnlock').addEventListener('click', () => {
             const key = document.getElementById('staffKeyInput').value.trim();
-            if (!key) return;
+            const totp = (document.getElementById('totpInput').value || '').replace(/\D/g, '');
+            if (!key) {
+                setStatus(document.getElementById('unlockStatus'), 'Enter staff key.', true);
+                return;
+            }
+            if (!/^\d{6}$/.test(totp)) {
+                setStatus(document.getElementById('unlockStatus'), 'Enter your 6-digit authenticator code.', true);
+                document.getElementById('totpInput').focus();
+                return;
+            }
             tryUnlock(key);
         });
 
@@ -326,15 +336,20 @@
             if (e.key === 'Enter') document.getElementById('btnUnlock').click();
         });
 
-        fetch('/api/admin/auth').then(r => r.json()).then((cfg) => {
+        (function init2faField() {
             const totpEl = document.getElementById('totpInput');
-            if (cfg.requires_2fa) {
-                totpEl.required = true;
-                totpEl.placeholder = '2FA code (Google Authenticator)';
-            } else {
-                totpEl.style.display = 'none';
-            }
-        }).catch(() => {});
+            totpEl.required = true;
+            totpEl.style.display = '';
+            totpEl.placeholder = '6-digit 2FA code (Google Authenticator)';
+            fetch('/api/admin/auth')
+                .then((r) => (r.ok ? r.json() : null))
+                .then((cfg) => {
+                    if (cfg?.admin_count > 0) {
+                        totpEl.placeholder = `2FA code (${cfg.admin_count} admin${cfg.admin_count === 1 ? '' : 's'} enrolled)`;
+                    }
+                })
+                .catch(() => {});
+        })();
 
         document.getElementById('btnLock').addEventListener('click', () => {
             if (!confirm('Lock admin panel?')) return;
@@ -346,6 +361,7 @@
             } catch {}
             showAdmin(false);
             document.getElementById('staffKeyInput').value = '';
+            document.getElementById('totpInput').value = '';
         });
 
         document.getElementById('btnRefresh').addEventListener('click', () => {
