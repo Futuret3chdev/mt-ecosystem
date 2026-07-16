@@ -75,7 +75,7 @@ export function verifyStaffKey(key: string | null | undefined): boolean {
 export function issueAdminSessionToken(): { token: string; expires_at: string } {
   const exp = Date.now() + SESSION_TTL_MS;
   const payload = Buffer.from(
-    JSON.stringify({ exp, n: randomBytes(12).toString('hex'), v: 1 })
+    JSON.stringify({ exp, n: randomBytes(12).toString('hex'), v: 2, mfa: true })
   ).toString('base64url');
   const sig = createHmac('sha256', sessionSecret()).update(payload).digest('base64url');
   return {
@@ -113,12 +113,14 @@ export function adminTokenFromRequest(request: NextRequest | Request): string | 
   );
 }
 
-/** Staff key (legacy) or short-lived admin session token. */
+/** Admin session token issued after staff key + 2FA login. */
 export function isAdminAuthorized(request: NextRequest | Request): boolean {
   const token = adminTokenFromRequest(request);
   if (token && verifyAdminSessionToken(token)) return true;
-  const staffKeyHeader = request.headers.get('x-staff-key');
-  if (staffKeyHeader && verifyStaffKey(staffKeyHeader)) return true;
+  if (process.env.NODE_ENV !== 'production') {
+    const staffKeyHeader = request.headers.get('x-staff-key');
+    if (staffKeyHeader && verifyStaffKey(staffKeyHeader)) return true;
+  }
   return false;
 }
 

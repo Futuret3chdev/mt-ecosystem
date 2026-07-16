@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>MT Staff Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; }
+    .staff-tab { padding: 0.5rem 1rem; cursor: pointer; border-bottom: 3px solid transparent; font-size: 14px; font-weight: 500; }
+    .staff-tab.active { border-bottom-color: #10b981; color: #10b981; }
+    .staff-section { display: none; }
+    .staff-section.active { display: block; }
+    .card { background: #18181b; border: 1px solid #27272a; border-radius: 0.75rem; }
+    .role-badge { font-size: 10px; padding: 1px 6px; border-radius: 9999px; font-weight: 600; }
+    .message { transition: all 0.1s ease; }
+    .message.unread { border-left: 3px solid #10b981; }
+    .mt-input { background: #111; border: 1px solid #333; color: #eee; padding: 0.5rem 0.75rem; border-radius: 0.375rem; width: 100%; }
+    .mt-input:focus { outline: none; border-color: #10b981; }
+    .mt-btn { background: #10b981; color: black; font-weight: 600; padding: 0.5rem 1rem; border-radius: 0.375rem; }
+    .mt-btn:hover { background: #059669; }
+    .mt-btn-secondary { background: transparent; border: 1px solid #444; color: #ddd; padding: 0.4rem 0.9rem; border-radius: 0.375rem; font-size: 0.875rem; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-white">
+  <div class="max-w-6xl mx-auto p-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="text-3xl font-semibold tracking-tight">MT Staff</span>
+          <span class="text-emerald-400 text-sm align-super font-mono">INTERNAL</span>
+        </div>
+        <div class="text-zinc-500 text-sm">admin.futuret3ch.com.au • Role-based access for the team</div>
+      </div>
+      <div id="header-user" class="hidden items-center gap-3 text-sm">
+        <div>
+          <span id="user-name" class="font-medium"></span>
+          <span id="user-role" class="role-badge ml-2"></span>
+        </div>
+        <button onclick="logout()" class="mt-btn-secondary text-xs">Logout</button>
+      </div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="login-screen">
+      <div class="max-w-md mx-auto">
+        <div class="card p-8">
+          <h2 class="text-2xl font-semibold mb-1">Staff Portal <span class="text-xs text-emerald-400 align-super">v2</span></h2>
+          <p class="text-zinc-400 text-sm mb-3">One-click test logins (passwords will be added later).</p>
+
+          <div class="mb-4 text-xs text-amber-400 bg-amber-950/30 border border-amber-900 px-3 py-2 rounded">
+            Hard refresh (Ctrl+Shift+R) if you see old UI. Prefer <a href="/staff" class="underline">/staff</a> over /static/staff.html.
+          </div>
+
+          <div id="login-error" class="hidden mb-4 text-sm text-red-400 bg-red-950/50 border border-red-900 px-3 py-2 rounded"></div>
+
+          <!-- One-click role buttons -->
+          <div class="grid grid-cols-1 gap-3 mb-6">
+            <button onclick="quickLogin('admin')" 
+                    class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold flex items-center justify-between px-4">
+              <span>Login as <strong>Admin</strong><br>full access • all resources</span>
+            </button>
+
+            <button onclick="quickLogin('developer')" 
+                    class="w-full py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-semibold flex items-center justify-between px-4">
+              <span>Login as <strong>Developer</strong><br>dev tools • test builds</span>
+            </button>
+
+            <button onclick="quickLogin('marketer')" 
+                    class="w-full py-3 rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-semibold flex items-center justify-between px-4">
+              <span>Login as <strong>Marketer</strong><br>analytics • campaigns • social</span>
+            </button>
+
+            <button onclick="quickLogin('tester')" 
+                    class="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-semibold flex items-center justify-between px-4">
+              <span>Login as <strong>Tester</strong><br>legacy monitor • test tools</span>
+            </button>
+
+            <button onclick="quickLogin('moderator')" 
+                    class="w-full py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-semibold flex items-center justify-between px-4">
+              <span>Login as <strong>Moderator</strong><br>moderation • studio • social posts</span>
+            </button>
+          </div>
+
+          <div class="text-center text-[10px] text-zinc-500 mb-4">— or —</div>
+
+          <!-- Fallback traditional form (still works) -->
+          <details class="text-sm">
+            <summary class="cursor-pointer text-zinc-400 hover:text-white mb-3">Traditional username + password (legacy)</summary>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Username</label>
+                <input id="login-username" type="text" class="mt-input" placeholder="admin, dev, marketing or tester" value="admin">
+              </div>
+              <div>
+                <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Password</label>
+                <input id="login-password" type="password" class="mt-input" placeholder="••••••" value="admin123">
+              </div>
+              <div>
+                <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-1">Authenticator (2FA)</label>
+                <input id="login-totp" type="text" class="mt-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit code" autocomplete="one-time-code">
+              </div>
+              <button onclick="staffLogin()" class="mt-btn w-full text-sm py-2">Sign in with password + 2FA</button>
+            </div>
+            <div class="mt-3 text-[10px] text-zinc-500">
+              Default accounts (for the password form):<br>
+              <span class="font-mono text-emerald-400">admin/admin123</span> • 
+              <span class="font-mono text-emerald-400">dev/dev123</span> • 
+              <span class="font-mono text-emerald-400">marketing/mkt123</span> • 
+              <span class="font-mono text-emerald-400">tester/test123</span>
+            </div>
+          </details>
+        </div>
+
+        <div class="text-center mt-4 text-xs text-zinc-500">
+          This is separate from the master dashboard key.<br>
+          Legacy tester page: <a href="/static/admin_messages.html" class="text-emerald-400 underline">/static/admin_messages.html</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Staff UI -->
+    <div id="staff-ui" class="hidden">
+      <!-- Role-aware welcome -->
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-sm text-zinc-400">Welcome back,</div>
+          <div class="text-2xl font-semibold" id="welcome-name"></div>
+        </div>
+        <div>
+          <a href="/dashboard" class="text-xs px-3 py-1.5 border border-white/20 rounded hover:bg-white/5">Master Dashboard (key)</a>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex gap-1 border-b border-zinc-800 mb-6 text-sm">
+        <div onclick="showStaffTab('home')" class="staff-tab active" id="tab-home">Home</div>
+        <div onclick="showStaffTab('messages')" class="staff-tab" id="tab-messages">Internal Messages</div>
+        <div onclick="showStaffTab('resources')" class="staff-tab" id="tab-resources">Resources</div>
+        <div onclick="showStaffTab('directory')" class="staff-tab" id="tab-directory">Staff Directory</div>
+      </div>
+
+      <!-- HOME -->
+      <div id="section-home" class="staff-section active">
+        <div class="grid md:grid-cols-3 gap-4">
+          <div class="card p-5">
+            <div class="text-emerald-400 text-xs tracking-widest">YOUR ROLE</div>
+            <div id="home-role" class="text-3xl font-semibold mt-1"></div>
+            <div class="mt-3 text-sm text-zinc-400">You have access to role-specific tools and the internal messaging system.</div>
+          </div>
+          <div class="card p-5 md:col-span-2">
+            <div class="text-emerald-400 text-xs tracking-widest mb-2">QUICK LINKS</div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+              <a href="https://memetorrent.futuret3ch.com.au" target="_blank" class="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 rounded">Marketing Site</a>
+              <a href="https://wallet.futuret3ch.com.au" target="_blank" class="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 rounded">Infinite Wallet</a>
+              <a href="/static/admin_messages.html" target="_blank" class="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 rounded">Legacy Tester Monitor</a>
+              <a href="/dashboard" class="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 rounded">Master Observatory</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- MARKETER-SPECIFIC ONBOARDING (shown only for marketer + admin roles) -->
+        <div id="marketer-onboarding" class="hidden mt-8">
+          <div class="rounded-3xl border border-emerald-400/40 bg-zinc-950/60 p-6">
+            <div class="uppercase tracking-[3px] text-emerald-400 text-xs mb-2">MARKETING &amp; GROWTH SPECIALIST</div>
+            <h3 class="text-2xl font-semibold tracking-[-0.5px] mb-1">2-Week Trial Plan + Onboarding</h3>
+            <p class="text-sm opacity-70 mb-4">Immediate focus: Pause on new developer feature work. Your job is to make the current live MT + TAP experience (Infinite Wallet + games + $MT utility + TAP modules) impossible to ignore.</p>
+
+            <div class="flex flex-wrap gap-3 mb-6">
+              <a href="/static/MT_TAP_Marketing_Growth_Specialist_2Week_Trial_Plan.docx" download class="inline-flex items-center rounded-2xl bg-white px-5 py-2 text-sm font-semibold text-black hover:bg-white/90">Download Full Trial Plan (.docx)</a>
+              <a href="/static/MT_TAP_Onboarding_Plan.docx" download class="inline-flex items-center rounded-2xl border border-white/30 px-5 py-2 text-sm hover:bg-white/5">Download Short Version (.docx)</a>
+            </div>
+
+            <div class="grid gap-6 md:grid-cols-2">
+              <div>
+                <div class="mb-2 text-xs uppercase tracking-widest text-emerald-400">Mandatory Immersion (Complete in First ~5 Days)</div>
+                <ul class="space-y-1 text-sm opacity-85">
+                  <li>• Create Infinite Wallet (email + phone), set strong password, verify local encryption</li>
+                  <li>• Mint 2+ NFTs directly in wallet on MT chain</li>
+                  <li>• Buy/sell small amounts of $MT inside the wallet (Jupiter routing)</li>
+                  <li>• Play foundational Tap game extensively + Pet, Soccer, Chicken, Puck, Racer + several arcades. Earn Rockets.</li>
+                  <li>• Read full marketing site, whitepaper (PDF + flipbook), status page, updates, media page</li>
+                  <li>• Review TAP modules (Shop, Match, Transport, Studio) + full live games list</li>
+                  <li>• Deep dive $MT token page + trade links (Raydium, Jupiter, pump.fun)</li>
+                  <li>• Audit last 60+ days of @MemeTorrent and @futuret3chdev</li>
+                </ul>
+              </div>
+
+              <div class="space-y-4">
+                <div>
+                  <div class="mb-1 text-xs uppercase tracking-widest text-emerald-400">Week 1 — Immersion + Foundation</div>
+                  <div class="text-sm opacity-80">Full wallet creation + NFT mint + in-wallet $MT trade. Extensive Tap + flagship games play. Site + whitepaper + X audit + competitive set (min 5 projects). TAP 1-pager. Metrics pull. Synthesize into memo + first 8 tweet/thread ideas grounded in real usage.</div>
+                </div>
+                <div>
+                  <div class="mb-1 text-xs uppercase tracking-widest text-emerald-400">Week 2 — Execution + Strategy</div>
+                  <div class="text-sm opacity-80">Publish real content on @MemeTorrent. Set up basic tracking. 3 scoped growth experiments (Tap activation, wallet virality, TAP/creator teaser). 30-day content calendar + 3 sample assets. 90-day Growth Roadmap. 15-20 min walkthrough + dev spotlight recommendations.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-6 grid gap-4 border-t border-white/10 pt-6 text-sm md:grid-cols-3">
+              <div>
+                <div class="font-semibold mb-1 text-emerald-400">Deliverables</div>
+                <ul class="space-y-0.5 text-xs opacity-80">
+                  <li>Week 1 Immersion Memo</li>
+                  <li>Competitive &amp; positioning one-pager + map</li>
+                  <li>3 fully-scoped growth experiments</li>
+                  <li>30-day content calendar + samples</li>
+                  <li>Post-Trial 90-Day Growth Roadmap</li>
+                  <li>Live walkthrough deck</li>
+                </ul>
+              </div>
+              <div>
+                <div class="font-semibold mb-1 text-emerald-400">Success Criteria</div>
+                <ul class="space-y-0.5 text-xs opacity-80">
+                  <li>Genuine product fluency (wallet, games, TAP, self-built philosophy)</li>
+                  <li>High-quality, grounded output</li>
+                  <li>Real initiative (content shipped, experiments prepped)</li>
+                  <li>Clear 90-day roadmap thinking</li>
+                  <li>Professional presentation</li>
+                </ul>
+              </div>
+              <div>
+                <div class="font-semibold mb-1 text-emerald-400">Post-Trial (Full Role)</div>
+                <ul class="space-y-0.5 text-xs opacity-80">
+                  <li>Own @MemeTorrent + @futuret3chdev</li>
+                  <li>Weekly content + growth experiments (Tap + wallet first)</li>
+                  <li>TAP Studio / creator flywheel prep</li>
+                  <li>Weekly metrics snapshot</li>
+                  <li>External relationships (KOLs, press, partners)</li>
+                  <li>Marketing Spotlight Queue for dev team</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="mt-4 text-[10px] text-emerald-400/70">Strategic context: Pause on new developer features. Make the current live experience impossible to ignore.</div>
+          </div>
+        </div>
+
+        <!-- TESTER TOOLS (shown for tester + admin) -->
+        <div id="tester-tools" class="hidden mt-8">
+          <div class="rounded-3xl border border-amber-400/40 bg-zinc-950/60 p-6">
+            <div class="uppercase tracking-[3px] text-amber-400 text-xs mb-2">TESTER TOOLS</div>
+            <h3 class="text-2xl font-semibold tracking-[-0.5px] mb-1">Current &amp; Upcoming Testing</h3>
+            <p class="text-sm opacity-70 mb-4">Currently: TG &amp; Discord bot monitoring and testing. Soon: full game, wallet, Tap, and website testing across the ecosystem.</p>
+
+            <div class="grid md:grid-cols-2 gap-6">
+              <div>
+                <div class="font-semibold mb-2 text-amber-400">Bot Testing (Now)</div>
+                <div class="space-y-2 text-sm">
+                  <a href="/static/admin_messages.html" target="_blank" class="block px-4 py-2 bg-zinc-900 hover:bg-zinc-800 rounded">Open TG/Discord Message Monitor (admin_messages.html)</a>
+                  <div class="text-xs opacity-70">Monitor and test bot messages, replies, and trends in Telegram and Discord.</div>
+                </div>
+              </div>
+              <div>
+                <div class="font-semibold mb-2 text-amber-400">Game / Wallet / TAP / Site Testing (Soon)</div>
+                <ul class="text-sm space-y-1 opacity-85">
+                  <li>• <a href="https://wallet.futuret3ch.com.au" target="_blank" class="underline">Infinite Wallet</a> – test creation, NFT mint, $MT send/receive, cross-device</li>
+                  <li>• <a href="https://memetorrent.futuret3ch.com.au" target="_blank" class="underline">Main Site + TAP section</a> – UI, links, game embeds</li>
+                  <li>• Live Games: Tap (core), Pet, Soccer, Chicken, Puck, Racer, arcades, NEON SALVAGE</li>
+                  <li>• Status page for service health during tests</li>
+                  <li>• Test faucets and dev endpoints (use TEST key where available)</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="mt-6">
+              <div class="font-semibold mb-2 text-amber-400">Real Reports for Testers</div>
+              <div class="flex flex-wrap gap-2">
+                <button onclick="runTesterReport('events')" class="text-xs px-3 py-1.5 border border-white/20 rounded hover:bg-white/5">Recent Events (bots &amp; web)</button>
+                <button onclick="runTesterReport('geo')" class="text-xs px-3 py-1.5 border border-white/20 rounded hover:bg-white/5">Geo / Globe Data</button>
+                <button onclick="runTesterReport('traffic')" class="text-xs px-3 py-1.5 border border-white/20 rounded hover:bg-white/5">Traffic &amp; Bot Scores</button>
+                <button onclick="runTesterReport('vitals')" class="text-xs px-3 py-1.5 border border-white/20 rounded hover:bg-white/5">Vitals / Performance</button>
+              </div>
+              <div id="tester-report-output" class="mt-3 text-xs font-mono bg-black/60 p-3 rounded max-h-40 overflow-auto hidden"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ADMIN REPORTS -->
+        <div id="admin-reports" class="hidden mt-8">
+          <div class="rounded-3xl border border-blue-400/40 bg-zinc-950/60 p-6">
+            <div class="uppercase tracking-[3px] text-blue-400 text-xs mb-2">ADMIN</div>
+            <h3 class="text-2xl font-semibold tracking-[-0.5px] mb-1">Real Reports &amp; Admin Tools</h3>
+            <p class="text-sm opacity-70 mb-4">Run live reports from the master observatory. Provide your ADMIN_API_KEY or TEST_API_KEY for full access (stored locally in this browser session only).</p>
+
+            <div class="mb-4">
+              <label class="text-xs text-blue-400">Admin / Test Key (for reports)</label>
+              <input id="admin-key-input" type="password" class="mt-input text-sm" placeholder="Paste ADMIN_API_KEY or TEST_API_KEY">
+            </div>
+
+            <div class="flex flex-wrap gap-2 mb-4">
+              <button onclick="runAdminReport('overview')" class="text-xs px-3 py-1.5 border border-white/20 rounded hover:bg-white/5">Overview (7d)</button>
+              <button onclick="runAdminReport('events')" class="text-xs px-3 py-1.5 border border-white/20 rounded hover:bg-white/5">Recent Events</button>
+              <button onclick="runAdminReport('vitals')" class="text-xs px-3 py-1.5 border border-white/20 rounded hover:bg-white/5">Vitals / RES</button>
+              <button onclick="runAdminReport('traffic')" class="text-xs px-3 py-1.5 border border-white/20 rounded hover:bg-white/5">Traffic &amp; Bots</button>
+              <button onclick="runAdminReport('geo')" class="text-xs px-3 py-1.5 border border-white/20 rounded hover:bg-white/5">Geo Events</button>
+              <button onclick="runAdminReport('rules')" class="text-xs px-3 py-1.5 border border-white/20 rounded hover:bg-white/5">Firewall Rules</button>
+            </div>
+
+            <div id="admin-report-output" class="text-xs font-mono bg-black/60 p-3 rounded max-h-60 overflow-auto hidden"></div>
+          </div>
+        </div>
+
+        <!-- DEVELOPER APIs & COMMANDS -->
+        <div id="developer-apis" class="hidden mt-8">
+          <div class="rounded-3xl border border-violet-400/40 bg-zinc-950/60 p-6">
+            <div class="uppercase tracking-[3px] text-violet-400 text-xs mb-2">DEVELOPER</div>
+            <h3 class="text-2xl font-semibold tracking-[-0.5px] mb-1">Full APIs &amp; Runnable Commands</h3>
+            <p class="text-sm opacity-70 mb-4">Staff APIs (auto-auth with your session token) + main ecosystem endpoints. Run real commands. Use TEST key for protected admin endpoints.</p>
+
+            <div class="mb-4">
+              <label class="text-xs text-violet-400">Admin/Test Key (for /api/admin/* calls)</label>
+              <input id="dev-admin-key" type="password" class="mt-input text-sm" placeholder="Optional for full admin endpoints">
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <div class="font-semibold mb-2 text-violet-400">Staff APIs (use your token)</div>
+                <div class="space-y-2">
+                  <button onclick="runDevCommand('staff-me')" class="w-full text-left px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 rounded">GET /api/staff/me</button>
+                  <button onclick="runDevCommand('staff-messages')" class="w-full text-left px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 rounded">GET /api/staff/messages</button>
+                  <button onclick="runDevCommand('staff-resources')" class="w-full text-left px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 rounded">GET /api/staff/resources</button>
+                  <button onclick="runDevCommand('staff-directory')" class="w-full text-left px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 rounded">GET /api/staff/directory</button>
+                </div>
+              </div>
+              <div>
+                <div class="font-semibold mb-2 text-violet-400">Main / Ecosystem APIs</div>
+                <div class="space-y-2">
+                  <button onclick="runDevCommand('admin-overview')" class="w-full text-left px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 rounded">GET /api/admin/overview (key)</button>
+                  <button onclick="runDevCommand('admin-events')" class="w-full text-left px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 rounded">GET /api/admin/events (key)</button>
+                  <button onclick="runDevCommand('admin-geo')" class="w-full text-left px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 rounded">GET /api/geo (public limited)</button>
+                  <button onclick="runDevCommand('admin-health')" class="w-full text-left px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 rounded">GET /api/health</button>
+                </div>
+                <div class="mt-3 text-xs opacity-70">Use the key field above for protected endpoints. Full MT-Connect sandbox and wallet deeplinks are on the main /developers page.</div>
+              </div>
+            </div>
+
+            <div id="dev-command-output" class="mt-4 text-xs font-mono bg-black/60 p-3 rounded max-h-40 overflow-auto hidden"></div>
+          </div>
+        </div>
+
+        <!-- MODERATOR CONTENT STUDIO (shown for moderator + admin) -->
+        <div id="moderator-studio" class="hidden mt-8">
+          <div class="rounded-3xl border border-purple-400/40 bg-zinc-950/60 p-6">
+            <div class="uppercase tracking-[3px] text-purple-400 text-xs mb-2">MODERATOR STUDIO</div>
+            <h3 class="text-2xl font-semibold tracking-[-0.5px] mb-1">Content &amp; Social Studio</h3>
+            <p class="text-sm opacity-70 mb-4">Directly compose and "post" to X, Telegram, Discord, and other channels. Monitor real-time stats and trends from the ecosystem. (Simulated posting for now — creates internal log + updates stats. Hook real APIs later.)</p>
+
+            <div class="grid md:grid-cols-2 gap-6">
+              <!-- Compose & Post -->
+              <div>
+                <div class="font-semibold mb-2 text-purple-400">Compose &amp; Post</div>
+                <textarea id="studio-text" class="mt-input h-24 mb-2" placeholder="Message to post across channels..."></textarea>
+                <div class="mb-2 text-xs">Platforms:</div>
+                <div class="flex flex-wrap gap-3 mb-3 text-sm">
+                  <label><input type="checkbox" id="platform-x" checked> X / Twitter</label>
+                  <label><input type="checkbox" id="platform-telegram" checked> Telegram</label>
+                  <label><input type="checkbox" id="platform-discord" checked> Discord</label>
+                  <label><input type="checkbox" id="platform-other"> Other / All</label>
+                </div>
+                <button onclick="postToStudio()" class="mt-btn w-full">Post to Selected Channels</button>
+                <div id="studio-post-status" class="mt-2 text-xs text-emerald-400 hidden"></div>
+              </div>
+
+              <!-- Real-time Stats -->
+              <div>
+                <div class="font-semibold mb-2 text-purple-400">Real-time Stats &amp; Trends</div>
+                <button onclick="refreshStudioStats()" class="text-xs px-3 py-1 border border-white/20 rounded mb-3">Refresh Stats Now</button>
+                <div id="studio-stats" class="grid grid-cols-2 gap-3 text-sm">
+                  <div class="card p-3">
+                    <div class="text-[10px] text-purple-400">Recent Events</div>
+                    <div id="stat-events" class="text-2xl font-semibold">—</div>
+                  </div>
+                  <div class="card p-3">
+                    <div class="text-[10px] text-purple-400">Geo Hits (last hr)</div>
+                    <div id="stat-geo" class="text-2xl font-semibold">—</div>
+                  </div>
+                  <div class="card p-3">
+                    <div class="text-[10px] text-purple-400">Bot Score Avg</div>
+                    <div id="stat-bots" class="text-2xl font-semibold">—</div>
+                  </div>
+                  <div class="card p-3">
+                    <div class="text-[10px] text-purple-400">Internal Messages</div>
+                    <div id="stat-msgs" class="text-2xl font-semibold">—</div>
+                  </div>
+                </div>
+                <div class="mt-3 text-xs opacity-70">Stats pulled live from the master observatory. Click refresh for latest trends.</div>
+              </div>
+            </div>
+
+            <div class="mt-6">
+              <div class="font-semibold mb-2 text-purple-400">Recent Activity Feed (Trends)</div>
+              <div id="studio-feed" class="text-xs bg-black/50 p-3 rounded max-h-32 overflow-auto font-mono">
+                Loading trends...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 text-xs text-zinc-500">
+          This portal is for MT-ECO SYSTEM team members only. All activity is logged.
+        </div>
+      </div>
+
+      <!-- INTERNAL MESSAGES (the email system) -->
+      <div id="section-messages" class="staff-section">
+        <div class="flex justify-between items-center mb-4">
+          <div class="font-semibold">Internal Messages</div>
+          <button onclick="showComposeModal()" class="mt-btn text-sm">Compose Message</button>
+        </div>
+
+        <div class="card p-4">
+          <div id="messages-list" class="space-y-2 min-h-[320px]">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+        <div class="text-[10px] text-zinc-500 mt-2">Messages sent to your username, your role, or "all" appear here. Click a message to mark it read. Use Reply to continue a thread/trend.</div>
+      </div>
+
+      <!-- RESOURCES -->
+      <div id="section-resources" class="staff-section">
+        <div class="font-semibold mb-3">Role-aware Resources &amp; Tools</div>
+        <div id="resources-list" class="grid md:grid-cols-2 gap-3">
+          <!-- Populated by JS based on role -->
+        </div>
+      </div>
+
+      <!-- DIRECTORY -->
+      <div id="section-directory" class="staff-section">
+        <div class="font-semibold mb-3">Team Directory</div>
+        <div id="directory-list" class="card p-4 grid md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compose Modal -->
+  <div id="compose-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div class="card w-full max-w-lg p-6 m-4">
+      <div class="font-semibold mb-4">New Internal Message</div>
+      <div class="space-y-3 text-sm">
+        <div>
+          <label class="text-xs text-zinc-400">To (username, role, or "all")</label>
+          <input id="compose-to" class="mt-input" placeholder="all, admin, developer, marketer, tester, or specific username">
+        </div>
+        <div>
+          <label class="text-xs text-zinc-400">Subject</label>
+          <input id="compose-subject" class="mt-input" placeholder="Update on...">
+        </div>
+        <div>
+          <label class="text-xs text-zinc-400">Message</label>
+          <textarea id="compose-body" class="mt-input h-32" placeholder="Details..."></textarea>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-5">
+        <button onclick="sendMessage()" class="mt-btn flex-1">Send</button>
+        <button onclick="hideComposeModal()" class="mt-btn-secondary flex-1">Cancel</button>
+      </div>
+      <div class="text-[10px] text-zinc-500 mt-3">Recipients see it in their inbox based on the address (username / role / all).</div>
+    </div>
+  </div>
+
+  <script>
+    // Tailwind script (same style as other admin pages)
+    function initTailwind() {
+      // Already using CDN classes
+    }
+
+    let currentStaff = null; // {username, role, token}
+    let replyToMessage = null; // for threading: {id, subject, from}
+
+    function showStaffTab(tab) {
+      document.querySelectorAll('.staff-section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.staff-tab').forEach(t => t.classList.remove('active'));
+
+      document.getElementById('section-' + tab).classList.add('active');
+      document.getElementById('tab-' + tab).classList.add('active');
+
+      if (tab === 'messages') loadMessages();
+      if (tab === 'resources') loadResources();
+      if (tab === 'directory') loadDirectory();
+    }
+
+    async function staffLogin() {
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value.trim();
+      const totp_code = (document.getElementById('login-totp')?.value || '').replace(/\D/g, '');
+      const errEl = document.getElementById('login-error');
+      errEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/staff/login?_=' + Date.now(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, totp_code })
+        });
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (parseErr) {
+          console.error('Non-JSON response from /api/staff/login:', text);
+          throw new Error('Server returned non-JSON (old cached page or proxy problem). Hard refresh or use /staff URL.');
+        }
+        if (!data.ok) throw new Error(data.error || 'Login failed');
+
+        // Store token + basic info
+        localStorage.setItem('mt_staff_token', data.token);
+        currentStaff = { username: data.user.username, role: data.user.role, token: data.token };
+
+        showStaffUI();
+      } catch (e) {
+        console.error('Staff login exception:', e);
+        let msg = e.message || 'Login failed';
+        if (msg.includes('match the expected pattern') || msg.includes('Invalid salt')) {
+          msg = 'Server password hash problem (fixed in DB). Hard refresh page or try again in 30s.';
+        }
+        errEl.textContent = msg;
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    // One-click quick login for each role (passwords coming later)
+    async function quickLogin(role) {
+      const errEl = document.getElementById('login-error');
+      errEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/staff/quick-login?_=' + Date.now(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role })
+        });
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (parseErr) {
+          console.error('Non-JSON from quick-login:', text);
+          throw new Error('Server returned non-JSON. Hard refresh or try the /staff URL.');
+        }
+        if (!data.ok) throw new Error(data.error || 'Quick login failed');
+
+        localStorage.setItem('mt_staff_token', data.token);
+        currentStaff = { 
+          username: data.user.username, 
+          role: data.user.role, 
+          token: data.token 
+        };
+
+        showStaffUI();
+      } catch (e) {
+        console.error('Quick login failed:', e);
+        errEl.textContent = e.message || 'Quick login failed. Try hard refresh.';
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    // ===== ROLE-SPECIFIC REPORT / COMMAND RUNNERS =====
+
+    async function runTesterReport(type) {
+      const output = document.getElementById('tester-report-output');
+      output.classList.remove('hidden');
+      output.innerHTML = 'Loading...';
+
+      try {
+        let url = '';
+        let key = '';
+        if (type === 'events') url = '/api/admin/events?limit=20';
+        else if (type === 'geo') url = '/api/geo?limit=50';
+        else if (type === 'traffic') url = '/api/admin/traffic';
+        else if (type === 'vitals') url = '/api/admin/vitals';
+
+        if (url.includes('/admin/')) {
+          key = localStorage.getItem('mt_tester_admin_key') || prompt('Enter TEST or ADMIN key for full reports:') || '';
+          if (key) localStorage.setItem('mt_tester_admin_key', key);
+        }
+
+        const headers = key ? { 'X-Admin-Key': key } : {};
+        const res = await fetch(url, { headers });
+        const data = await res.json();
+        output.innerHTML = `<pre class="whitespace-pre-wrap">${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (e) {
+        output.innerHTML = `Error: ${e.message}`;
+      }
+    }
+
+    async function runAdminReport(type) {
+      const output = document.getElementById('admin-report-output');
+      output.classList.remove('hidden');
+      output.innerHTML = 'Loading...';
+
+      const keyInput = document.getElementById('admin-key-input');
+      const key = keyInput.value.trim() || localStorage.getItem('mt_admin_key') || prompt('Enter ADMIN_API_KEY or TEST_API_KEY:') || '';
+      if (key) {
+        localStorage.setItem('mt_admin_key', key);
+        keyInput.value = key;
+      }
+
+      try {
+        let url = '';
+        if (type === 'overview') url = '/api/admin/overview';
+        else if (type === 'events') url = '/api/admin/events?limit=30';
+        else if (type === 'vitals') url = '/api/admin/vitals';
+        else if (type === 'traffic') url = '/api/admin/traffic';
+        else if (type === 'geo') url = '/api/admin/geo?limit=100';
+        else if (type === 'rules') url = '/api/admin/rules';
+
+        const res = await fetch(url, { headers: { 'X-Admin-Key': key } });
+        const data = await res.json();
+        output.innerHTML = `<pre class="whitespace-pre-wrap">${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (e) {
+        output.innerHTML = `Error: ${e.message} (check key)`;
+      }
+    }
+
+    async function runDevCommand(cmd) {
+      const output = document.getElementById('dev-command-output');
+      output.classList.remove('hidden');
+      output.innerHTML = 'Running...';
+
+      const key = document.getElementById('dev-admin-key').value.trim() || localStorage.getItem('mt_dev_key') || '';
+      if (key) localStorage.setItem('mt_dev_key', key);
+
+      try {
+        let url = '';
+        let method = 'GET';
+        let body = null;
+        let headers = { 'X-Staff-Token': currentStaff.token };
+
+        if (cmd === 'staff-me') url = '/api/staff/me';
+        else if (cmd === 'staff-messages') url = '/api/staff/messages';
+        else if (cmd === 'staff-resources') url = '/api/staff/resources';
+        else if (cmd === 'staff-directory') url = '/api/staff/directory';
+        else if (cmd === 'admin-overview') { url = '/api/admin/overview'; headers['X-Admin-Key'] = key; }
+        else if (cmd === 'admin-events') { url = '/api/admin/events?limit=20'; headers['X-Admin-Key'] = key; }
+        else if (cmd === 'admin-geo') url = '/api/geo?limit=30';
+        else if (cmd === 'admin-health') url = '/api/health';
+
+        const opts = { method, headers };
+        if (body) { opts.body = JSON.stringify(body); headers['Content-Type'] = 'application/json'; }
+
+        const res = await fetch(url, opts);
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = text; }
+        output.innerHTML = `<pre class="whitespace-pre-wrap">${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}</pre>`;
+      } catch (e) {
+        output.innerHTML = `Error: ${e.message}`;
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('mt_staff_token');
+      currentStaff = null;
+      location.reload();
+    }
+
+    function showStaffUI() {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('staff-ui').classList.remove('hidden');
+      document.getElementById('header-user').classList.remove('hidden');
+      document.getElementById('header-user').classList.add('flex');
+
+      document.getElementById('user-name').textContent = currentStaff.username;
+      const roleEl = document.getElementById('user-role');
+      roleEl.textContent = currentStaff.role.toUpperCase();
+      roleEl.className = `role-badge ml-2 ${currentStaff.role === 'admin' ? 'bg-emerald-500 text-black' : 'bg-zinc-700 text-white'}`;
+
+      document.getElementById('welcome-name').textContent = currentStaff.username;
+
+      // Marketer-specific onboarding content (shown for marketer + admin)
+      const marketerDiv = document.getElementById('marketer-onboarding');
+      if (marketerDiv) {
+        if (currentStaff.role === 'marketer' || currentStaff.role === 'admin') {
+          marketerDiv.classList.remove('hidden');
+        } else {
+          marketerDiv.classList.add('hidden');
+        }
+      }
+
+      // Tester tools
+      const testerDiv = document.getElementById('tester-tools');
+      if (testerDiv) {
+        if (currentStaff.role === 'tester' || currentStaff.role === 'admin') {
+          testerDiv.classList.remove('hidden');
+        } else {
+          testerDiv.classList.add('hidden');
+        }
+      }
+
+      // Admin reports
+      const adminDiv = document.getElementById('admin-reports');
+      if (adminDiv) {
+        if (currentStaff.role === 'admin') {
+          adminDiv.classList.remove('hidden');
+          const savedKey = localStorage.getItem('mt_admin_key');
+          if (savedKey) document.getElementById('admin-key-input').value = savedKey;
+        } else {
+          adminDiv.classList.add('hidden');
+        }
+      }
+
+      // Developer APIs
+      const devDiv = document.getElementById('developer-apis');
+      if (devDiv) {
+        if (currentStaff.role === 'developer' || currentStaff.role === 'admin') {
+          devDiv.classList.remove('hidden');
+          const savedKey = localStorage.getItem('mt_dev_key');
+          if (savedKey) document.getElementById('dev-admin-key').value = savedKey;
+        } else {
+          devDiv.classList.add('hidden');
+        }
+      }
+
+      // Moderator Studio
+      const modDiv = document.getElementById('moderator-studio');
+      if (modDiv) {
+        if (currentStaff.role === 'moderator' || currentStaff.role === 'admin') {
+          modDiv.classList.remove('hidden');
+          // Auto-refresh stats when studio becomes visible
+          setTimeout(() => refreshStudioStats(), 300);
+        } else {
+          modDiv.classList.add('hidden');
+        }
+      }
+
+      // Default tab
+      showStaffTab('home');
+    }
+
+    async function loadMessages() {
+      const container = document.getElementById('messages-list');
+      container.innerHTML = '<div class="text-zinc-500 p-4">Loading messages...</div>';
+
+      try {
+        const res = await fetch('/api/staff/messages', {
+          headers: { 'X-Staff-Token': currentStaff.token }
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error('Failed to load');
+
+        if (data.messages.length === 0) {
+          container.innerHTML = '<div class="p-6 text-center text-zinc-400">No messages yet. Use the Compose button to start a thread.</div>';
+          return;
+        }
+
+        container.innerHTML = '';
+
+        // Simple thread grouping: parents first, then replies indented
+        const parents = data.messages.filter(m => !m.parent_id);
+        const replies = data.messages.filter(m => m.parent_id);
+
+        parents.forEach(msg => {
+          const div = document.createElement('div');
+          div.className = `message border border-zinc-800 rounded-lg p-3 hover:border-zinc-700 cursor-pointer ${msg.read ? 'opacity-75' : 'unread bg-zinc-900/40'}`;
+          div.innerHTML = `
+            <div class="flex justify-between text-xs">
+              <div><span class="font-medium">${msg.from_username}</span> → <span class="text-emerald-400">${msg.to_recipient}</span></div>
+              <div class="text-zinc-500">${new Date(msg.ts).toLocaleString()}</div>
+            </div>
+            <div class="font-semibold mt-0.5">${msg.subject}</div>
+            <div class="text-sm text-zinc-400 line-clamp-2 mt-0.5">${msg.body.substring(0, 180)}</div>
+            <button class="reply-btn mt-2 text-xs px-2 py-0.5 border border-white/20 rounded hover:bg-white/5">Reply to thread</button>
+          `;
+          div.querySelector('.reply-btn').onclick = (e) => {
+            e.stopImmediatePropagation();
+            startReply(msg);
+          };
+          div.onclick = () => markAsRead(msg.id, div);
+          container.appendChild(div);
+
+          // Append direct replies indented
+          const threadReplies = replies.filter(r => r.parent_id === msg.id);
+          threadReplies.forEach(reply => {
+            const rdiv = document.createElement('div');
+            rdiv.className = `message ml-6 border-l-2 border-zinc-700 pl-3 mt-1 border border-zinc-800 rounded-lg p-2 hover:border-zinc-700 cursor-pointer text-sm ${reply.read ? 'opacity-75' : 'unread bg-zinc-900/30'}`;
+            rdiv.innerHTML = `
+              <div class="flex justify-between text-xs">
+                <div><span class="font-medium">${reply.from_username}</span> (reply)</div>
+                <div class="text-zinc-500">${new Date(reply.ts).toLocaleString()}</div>
+              </div>
+              <div class="font-medium">${reply.subject}</div>
+              <div class="text-zinc-400 text-xs line-clamp-1">${reply.body.substring(0, 120)}</div>
+            `;
+            rdiv.onclick = () => markAsRead(reply.id, rdiv);
+            container.appendChild(rdiv);
+          });
+        });
+
+        // Orphan replies (should be rare)
+        const orphans = replies.filter(r => !parents.some(p => p.id === r.parent_id));
+        orphans.forEach(msg => {
+          const div = document.createElement('div');
+          div.className = `message ml-6 border-l-2 border-zinc-700 pl-3 mt-1 border border-zinc-800 rounded-lg p-2 hover:border-zinc-700 cursor-pointer text-sm ${msg.read ? 'opacity-75' : 'unread bg-zinc-900/30'}`;
+          div.innerHTML = `
+            <div class="flex justify-between text-xs">
+              <div><span class="font-medium">${msg.from_username}</span> → <span class="text-emerald-400">${msg.to_recipient}</span></div>
+              <div class="text-zinc-500">${new Date(msg.ts).toLocaleString()}</div>
+            </div>
+            <div class="font-medium">${msg.subject}</div>
+            <div class="text-zinc-400 text-xs line-clamp-1">${msg.body.substring(0, 120)}</div>
+            <button class="reply-btn mt-1 text-xs px-2 py-0.5 border border-white/20 rounded hover:bg-white/5">Reply</button>
+          `;
+          div.querySelector('.reply-btn').onclick = (e) => {
+            e.stopImmediatePropagation();
+            startReply(msg);
+          };
+          div.onclick = () => markAsRead(msg.id, div);
+          container.appendChild(div);
+        });
+      } catch (e) {
+        container.innerHTML = `<div class="p-4 text-red-400">Error loading messages: ${e.message}</div>`;
+      }
+    }
+
+    function startReply(msg) {
+      replyToMessage = { id: msg.id, subject: msg.subject, from: msg.from_username };
+      const composeModal = document.getElementById('compose-modal');
+      document.getElementById('compose-to').value = msg.from_username; // or keep original to
+      document.getElementById('compose-subject').value = 'Re: ' + msg.subject;
+      document.getElementById('compose-body').value = '';
+      composeModal.classList.remove('hidden');
+      document.getElementById('compose-body').focus();
+    }
+
+    async function markAsRead(id, el) {
+      try {
+        await fetch(`/api/staff/messages/${id}/read`, {
+          method: 'POST',
+          headers: { 'X-Staff-Token': currentStaff.token }
+        });
+        el.classList.remove('unread', 'bg-zinc-900/40');
+        el.classList.add('opacity-75');
+      } catch (e) {}
+    }
+
+    function showComposeModal() {
+      document.getElementById('compose-modal').classList.remove('hidden');
+      document.getElementById('compose-to').focus();
+    }
+    function hideComposeModal() {
+      document.getElementById('compose-modal').classList.add('hidden');
+      document.getElementById('compose-to').value = '';
+      document.getElementById('compose-subject').value = '';
+      document.getElementById('compose-body').value = '';
+      replyToMessage = null;
+    }
+
+    async function sendMessage() {
+      const to = document.getElementById('compose-to').value.trim();
+      const subject = document.getElementById('compose-subject').value.trim();
+      const body = document.getElementById('compose-body').value.trim();
+
+      if (!to || !subject || !body) {
+        alert('Please fill in To, Subject and Message');
+        return;
+      }
+
+      try {
+        const payload = { to, subject, body };
+        if (replyToMessage && replyToMessage.id) {
+          payload.parent_id = replyToMessage.id;
+        }
+        const res = await fetch('/api/staff/messages', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Staff-Token': currentStaff.token 
+          },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error);
+
+        replyToMessage = null; // clear after send
+        hideComposeModal();
+        // Refresh messages if we're on that tab
+        if (document.getElementById('section-messages').classList.contains('active')) {
+          loadMessages();
+        }
+        alert('Message sent.');
+      } catch (e) {
+        alert('Failed to send: ' + e.message);
+      }
+    }
+
+    async function loadResources() {
+      const container = document.getElementById('resources-list');
+      container.innerHTML = '<div class="text-zinc-500 p-4 col-span-full">Loading resources...</div>';
+
+      try {
+        const res = await fetch('/api/staff/resources', {
+          headers: { 'X-Staff-Token': currentStaff.token }
+        });
+        const data = await res.json();
+
+        container.innerHTML = '';
+        data.resources.forEach(r => {
+          const a = document.createElement('a');
+          a.href = r.url;
+          a.target = '_blank';
+          a.className = 'card p-4 block hover:border-emerald-900 transition';
+          a.innerHTML = `
+            <div class="font-medium">${r.title}</div>
+            <div class="text-xs text-emerald-400 mt-0.5">${r.url}</div>
+          `;
+          container.appendChild(a);
+        });
+      } catch (e) {
+        container.innerHTML = `<div class="p-4 text-red-400 col-span-full">Failed to load resources.</div>`;
+      }
+    }
+
+    async function loadDirectory() {
+      const container = document.getElementById('directory-list');
+      container.innerHTML = '<div class="text-zinc-500 p-4 col-span-full">Loading directory...</div>';
+
+      try {
+        const res = await fetch('/api/staff/directory', {
+          headers: { 'X-Staff-Token': currentStaff.token }
+        });
+        const data = await res.json();
+
+        container.innerHTML = '';
+        data.users.forEach(u => {
+          const div = document.createElement('div');
+          div.className = 'flex items-center justify-between py-1 border-b border-white/5 last:border-0';
+          div.innerHTML = `
+            <div>
+              <span class="font-medium">${u.full_name || u.username}</span>
+              <span class="text-xs ml-2 text-zinc-400">(@${u.username})</span>
+            </div>
+            <span class="role-badge ${u.role === 'admin' ? 'bg-emerald-500 text-black' : 'bg-zinc-700'}">${u.role}</span>
+          `;
+          container.appendChild(div);
+        });
+      } catch (e) {
+        container.innerHTML = `<div class="p-4 text-red-400 col-span-full">Failed to load directory.</div>`;
+      }
+    }
+
+    // Boot
+    function bootStaffPortal() {
+      initTailwind();
+
+      const savedToken = localStorage.getItem('mt_staff_token');
+      if (savedToken) {
+        // Validate token quickly
+        fetch('/api/staff/me', {
+          headers: { 'X-Staff-Token': savedToken }
+        }).then(r => r.json()).then(data => {
+          if (data.ok && data.staff) {
+            currentStaff = { ...data.staff, token: savedToken };
+            showStaffUI();
+          } else {
+            localStorage.removeItem('mt_staff_token');
+          }
+        }).catch(() => {
+          localStorage.removeItem('mt_staff_token');
+        });
+      }
+    }
+
+    window.onload = bootStaffPortal;
+  </script>
+</body>
+</html>

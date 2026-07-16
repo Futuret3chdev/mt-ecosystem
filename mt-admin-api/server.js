@@ -1,11 +1,13 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const geoip = require('geoip-lite');
 const WebSocket = require('ws');
 const db = require('./src/db');
 const path = require('path');
+const { isAdmin2faEnabled, admin2faConfigured, verifyAdminTotp } = require('./src/admin-totp');
 
 // Staff system (additive only — does not touch existing key auth or admin APIs)
 const {
@@ -47,6 +49,48 @@ const broadcast = (data) => {
 };
 
 app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false }));
+
+function parseCookies(req) {
+  const raw = req.headers.cookie || '';
+  const out = {};
+  raw.split(';').forEach((part) => {
+    const idx = part.indexOf('=');
+    if (idx < 1) return;
+    const k = part.slice(0, idx).trim();
+    const v = part.slice(idx + 1).trim();
+    if (k) out[k] = decodeURIComponent(v);
+  });
+  return out;
+}
+
+function signDashboardSession(keyHint) {
+  const exp = Date.now() + 2 * 60 * 60 * 1000;
+  const payload = Buffer.from(JSON.stringify({ exp, h: keyHint })).toString('base64url');
+  const sig = crypto.createHmac('sha256', ADMIN_API_KEY).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
+}
+
+function verifyDashboardSession(token) {
+  if (!token || !token.includes('.')) return false;
+  const [payload, sig] = token.split('.');
+  const expected = crypto.createHmac('sha256', ADMIN_API_KEY).update(payload).digest('base64url');
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return false;
+  } catch {
+    return false;
+  }
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return typeof data.exp === 'number' && data.exp > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function isValidAdminKey(key) {
+  return key === ADMIN_API_KEY || (TEST_API_KEY && key === TEST_API_KEY);
+}
 
 // Protected tester admin page (must be before generic /static)
 app.get('/static/admin_messages.html', requireAustralianAdmin, (req, res) => {
@@ -232,15 +276,23 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'mt-admin
 
 /* ====================== STAFF SYSTEM ROUTES (new — no changes to any existing routes) ====================== */
 
-// Staff login (username + password). Returns a token to be used as X-Staff-Token.
+// Staff login (username + password + TOTP). Returns a token to be used as X-Staff-Token.
 app.post('/api/staff/login', requireAustralianAdmin, (req, res) => {
-  const { username, password } = req.body || {};
+  const { username, password, totp_code } = req.body || {};
   if (!username || !password) {
-    return res.status(400).json({ error: 'username and password required' });
+    return res.status(400).json({ error: 'username, password and totp_code required' });
   }
   const user = verifyStaffCredentials(username, password);
   if (!user) {
     return res.status(401).json({ error: 'Invalid credentials' });
+  }
+  if (isAdmin2faEnabled()) {
+    if (!admin2faConfigured()) {
+      return res.status(503).json({ error: '2fa_not_configured', message: 'ADMIN_TOTP_SECRET required' });
+    }
+    if (!verifyAdminTotp(totp_code)) {
+      return res.status(401).json({ error: 'invalid_2fa', message: 'Invalid authenticator code' });
+    }
   }
   const tokenInfo = issueStaffToken(user.username, user.role);
   res.json({
@@ -319,52 +371,62 @@ app.get('/staff', requireAustralianAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, 'static', 'staff.html'));
 });
 
-// (The master /dashboard key login and all /api/admin/* routes remain completely unchanged)
+app.post('/dashboard/login', requireAustralianAdmin, (req, res) => {
+  const key = String(req.body?.key || '').trim();
+  const totp = String(req.body?.totp || '').trim();
+  if (!isValidAdminKey(key)) {
+    return res.redirect('/dashboard?err=key');
+  }
+  if (isAdmin2faEnabled()) {
+    if (!admin2faConfigured()) return res.redirect('/dashboard?err=2fa_setup');
+    if (!verifyAdminTotp(totp)) return res.redirect('/dashboard?err=2fa');
+  }
+  const cookie = signDashboardSession(key.slice(0, 6));
+  res.setHeader('Set-Cookie', `mt_admin_dash=${encodeURIComponent(cookie)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=7200${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`);
+  return res.redirect('/dashboard');
+});
 
-// Serve the ambitious live dashboard (globe with red bot dots, traffic, firewall, API playground with runnable examples, WS live updates)
-// Gate behind valid key so the dashboard *always* requires a password (ADMIN_API_KEY or separate TEST_API_KEY for devs).
-// No key or wrong key -> show a clean login form that redirects with ?key=
 app.get('/dashboard', requireAustralianAdmin, (req, res) => {
-  const key = req.headers['x-admin-key'] || req.query.key;
-  const isValid = key === ADMIN_API_KEY || (TEST_API_KEY && key === TEST_API_KEY);
+  const cookies = parseCookies(req);
+  const sessionOk = verifyDashboardSession(cookies.mt_admin_dash);
+  const headerKey = req.headers['x-admin-key'];
+  const queryKey = req.query.key;
+  const legacyKeyOk =
+    !isAdmin2faEnabled() && (isValidAdminKey(headerKey) || isValidAdminKey(queryKey));
 
-  if (isValid) {
+  if (sessionOk || legacyKeyOk) {
     res.sendFile(path.join(__dirname, 'static', 'dashboard.html'));
     return;
   }
 
-  const hadKey = !!key;
-  const errMsg = hadKey ? '<p style="color:#f66;margin:0 0 .5rem">Invalid key — try again or use the correct TEST_API_KEY.</p>' : '';
+  const err = String(req.query.err || '');
+  const errMsg =
+    err === 'key' ? '<p style="color:#f66;margin:0 0 .5rem">Invalid admin key.</p>' :
+    err === '2fa' ? '<p style="color:#f66;margin:0 0 .5rem">Invalid authenticator code.</p>' :
+    err === '2fa_setup' ? '<p style="color:#f66;margin:0 0 .5rem">2FA not configured on server.</p>' : '';
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(`<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>MT Admin — Login</title>
-<style>body{font-family:system-ui;background:#111;color:#ddd;display:flex;align-items:center;justify-content:center;height:100vh;margin:0} .box{background:#1a1a1f;border:1px solid #333;padding:2rem;border-radius:12px;max-width:380px;width:100%;text-align:center} input{width:100%;padding:.6rem;background:#111;border:1px solid #444;color:#fff;margin:1rem 0;border-radius:6px} button{background:#10b981;color:#000;padding:.6rem 1.2rem;border:none;border-radius:6px;font-weight:600;cursor:pointer} .note{font-size:.8rem;opacity:.7;margin-top:1rem}</style>
+<style>body{font-family:system-ui;background:#111;color:#ddd;display:flex;align-items:center;justify-content:center;height:100vh;margin:0} .box{background:#1a1a1f;border:1px solid #333;padding:2rem;border-radius:12px;max-width:380px;width:100%;text-align:center} input{width:100%;padding:.6rem;background:#111;border:1px solid #444;color:#fff;margin:.5rem 0;border-radius:6px} button{background:#10b981;color:#000;padding:.6rem 1.2rem;border:none;border-radius:6px;font-weight:600;cursor:pointer;width:100%;margin-top:.5rem} .note{font-size:.8rem;opacity:.7;margin-top:1rem}</style>
 </head><body>
 <div class="box">
   <h2 style="margin:0 0 1rem">MT Admin</h2>
-  <p style="margin:0 0 1rem">Enter your key to access the full dashboard and live globe.</p>
+  <p style="margin:0 0 1rem">Australian staff · admin key + authenticator</p>
   ${errMsg}
-  <form onsubmit="doLogin(event)">
-    <input id="k" placeholder="ADMIN_API_KEY or TEST_API_KEY" autofocus>
+  <form method="POST" action="/dashboard/login">
+    <input name="key" type="password" placeholder="ADMIN_API_KEY or TEST_API_KEY" autocomplete="current-password" required>
+    <input name="totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit 2FA code" autocomplete="one-time-code">
     <button type="submit">Login</button>
   </form>
   <div class="note">
-    Use your master ADMIN_API_KEY for full access.<br>
-    Or the separate TEST_API_KEY for developers (does not expose the master password).<br>
+    Use Google Authenticator, Authy, or 1Password for the 6-digit code.<br>
     Public sample data: <a href="/api/geo" style="color:#10b981">/api/geo</a>
   </div>
   <div style="margin-top:1rem;font-size:.75rem;opacity:.6">
-    Staff members (admins, developers, marketers, testers):<br>
-    <a href="/staff" style="color:#10b981;text-decoration:underline">Open Staff Portal</a> (separate login + internal email + resources)
+    <a href="/staff" style="color:#10b981;text-decoration:underline">Staff Portal</a>
   </div>
 </div>
-<script>
-function doLogin(e){ e.preventDefault(); 
-  const key = document.getElementById('k').value.trim();
-  if(key) location.href = '/dashboard?key=' + encodeURIComponent(key);
-}
-</script>
 </body></html>`);
 });
 

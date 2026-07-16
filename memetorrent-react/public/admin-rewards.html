@@ -65,9 +65,10 @@
 
     <div id="lockedView" class="panel locked">
         <p>🔐 Australian staff only — secure admin access.</p>
-        <p style="font-size:12px;color:#64748b">You must be in Australia (or on AU VPN approved by the team). Session expires after 2 hours.</p>
+        <p style="font-size:12px;color:#64748b">Australia only · staff key + authenticator app · session 2 hours</p>
         <div class="toolbar">
             <input type="password" id="staffKeyInput" placeholder="Staff key" autocomplete="current-password">
+            <input type="text" id="totpInput" placeholder="6-digit 2FA code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" style="width:130px">
             <button type="button" class="btn btn-primary" id="btnUnlock">Unlock</button>
         </div>
         <div class="status err" id="unlockStatus"></div>
@@ -278,12 +279,13 @@
 
         async function tryUnlock(key) {
             const statusEl = document.getElementById('unlockStatus');
+            const totp = (document.getElementById('totpInput').value || '').replace(/\D/g, '');
             setStatus(statusEl, 'Verifying…', false);
             try {
                 const res = await fetch('/api/admin/auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ staff_key: key }),
+                    body: JSON.stringify({ staff_key: key, totp_code: totp }),
                 });
                 const data = await res.json();
                 if (!res.ok) {
@@ -292,6 +294,12 @@
                     }
                     if (data.error === 'rate_limited') {
                         throw new Error(data.message || 'Too many attempts. Wait and retry.');
+                    }
+                    if (data.error === 'invalid_2fa') {
+                        throw new Error(data.message || 'Invalid authenticator code.');
+                    }
+                    if (data.error === '2fa_not_configured') {
+                        throw new Error(data.message || '2FA not configured on server.');
                     }
                     throw new Error(data.message || 'Invalid staff key.');
                 }
@@ -313,6 +321,20 @@
             if (!key) return;
             tryUnlock(key);
         });
+
+        document.getElementById('totpInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('btnUnlock').click();
+        });
+
+        fetch('/api/admin/auth').then(r => r.json()).then((cfg) => {
+            const totpEl = document.getElementById('totpInput');
+            if (cfg.requires_2fa) {
+                totpEl.required = true;
+                totpEl.placeholder = '2FA code (Google Authenticator)';
+            } else {
+                totpEl.style.display = 'none';
+            }
+        }).catch(() => {});
 
         document.getElementById('btnLock').addEventListener('click', () => {
             if (!confirm('Lock admin panel?')) return;
