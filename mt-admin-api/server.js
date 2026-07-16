@@ -7,14 +7,32 @@ const WebSocket = require('ws');
 const db = require('./src/db');
 const path = require('path');
 
+// Staff system (additive only — does not touch existing key auth or admin APIs)
+const {
+  seedDefaultStaffUsers,
+  verifyStaffCredentials,
+  issueStaffToken,
+  validateStaffToken,
+  getStaffMessagesFor,
+  sendStaffMessage,
+  markStaffMessageRead,
+  getStaffResourcesFor,
+  getAllStaffUsers,
+  quickStaffLogin
+} = db;
+
 const app = express();
 const PORT = process.env.PORT || 4003;
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'dev-key-change-me';
 const TEST_API_KEY = process.env.TEST_API_KEY || '';
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'https://admin.futuret3ch.com.au,http://admin.futuret3ch.com.au,https://admin.futuret3ch.com.au:*,http://localhost:*,https://*.vercel.app').split(',').map(s => s.trim()).filter(Boolean);
+const ADMIN_DOMAIN = 'admin.futuret3ch.com.au';
 
 // Initialize DB tables on startup (idempotent)
 db.initDB();
+
+// Seed default staff accounts (only if none exist). Change passwords on first use!
+seedDefaultStaffUsers();
 
 // WebSocket for live updates (globe dots, events as they happen)
 let wss;
@@ -30,27 +48,92 @@ const broadcast = (data) => {
 
 app.use(express.json({ limit: '1mb' }));
 
-// Serve static assets (admin_messages.html, dashboard.html, etc.)
-// This must come early.
+// Protected tester admin page (must be before generic /static)
+app.get('/static/admin_messages.html', requireAustralianAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'static', 'admin_messages.html'));
+});
+
+// Serve static assets (dashboard.html, staff.html, etc.)
 app.use('/static', express.static(path.join(__dirname, 'static')));
 
 // CORS for playground sites + future SDKs
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) {
+    if (!origin) {
+      return callback(null, true); // server-to-server, curl, etc.
+    }
+    // Always allow requests from our own admin domain (covers http/https + any port)
+    if (origin.includes(ADMIN_DOMAIN)) {
+      return callback(null, true);
+    }
+    if (ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.length === 0) {
+      return callback(null, true);
+    }
+    // Exact match or simple wildcard support (e.g. https://*.vercel.app or :* for ports)
+    const isAllowed = ALLOWED_ORIGINS.some(allowed => {
+      if (allowed === origin) return true;
+      if (allowed.includes('*')) {
+        const regex = new RegExp('^' + allowed.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
+        return regex.test(origin);
+      }
+      return false;
+    });
+    if (isAllowed) {
       callback(null, true);
     } else {
+      console.error(`CORS blocked origin: ${origin}. Allowed: ${ALLOWED_ORIGINS.join(', ')}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true
 }));
 
+function clientIp(req) {
+  const xf = req.headers['x-forwarded-for'];
+  if (xf) return String(xf).split(',')[0].trim();
+  return req.ip || req.socket?.remoteAddress || '';
+}
+
+/** Admin surfaces: Australian connections only (geoip-lite). Set ALLOW_NON_AU_ADMIN=true to bypass. */
+function requireAustralianAdmin(req, res, next) {
+  if (process.env.ALLOW_NON_AU_ADMIN === 'true') return next();
+  const ip = clientIp(req);
+  const lookup = ip ? geoip.lookup(ip) : null;
+  if (!lookup || lookup.country !== 'AU') {
+    return res.status(403).json({
+      error: 'geo_restricted',
+      message: 'Admin access is restricted to Australian connections only.'
+    });
+  }
+  next();
+}
+
 // Simple API key middleware for admin / internal sources
 function requireAdminKey(req, res, next) {
   const key = req.headers['x-admin-key'] || req.query.key;
   if (key === ADMIN_API_KEY || (TEST_API_KEY && key === TEST_API_KEY)) return next();
   res.status(401).json({ error: 'Unauthorized - invalid admin key' });
+}
+
+function requireAdminKeyAu(req, res, next) {
+  requireAustralianAdmin(req, res, () => requireAdminKey(req, res, next));
+}
+
+/* ====================== STAFF AUTH (new, completely additive) ====================== */
+function requireStaffAuth(req, res, next) {
+  const token = req.headers['x-staff-token'] || req.query.staff_token;
+  const staff = validateStaffToken(token);
+  if (!staff) {
+    return res.status(401).json({ error: 'Staff login required' });
+  }
+  req.staff = staff; // { username, role }
+  next();
+}
+
+function requireStaffAuthAu(req, res, next) {
+  requireAustralianAdmin(req, res, () => requireStaffAuth(req, res, next));
 }
 
 // Public tracking endpoint (used by web trackers in playgrounds + future SDKs)
@@ -108,35 +191,35 @@ app.post('/api/track', (req, res) => {
 });
 
 // Admin-only endpoints (protected by key)
-app.get('/api/admin/overview', requireAdminKey, (req, res) => {
+app.get('/api/admin/overview', requireAdminKeyAu, (req, res) => {
   const range = req.query.range || '7d';
   res.json(db.getOverview(range));
 });
 
-app.get('/api/admin/events', requireAdminKey, (req, res) => {
+app.get('/api/admin/events', requireAdminKeyAu, (req, res) => {
   const { source, type, limit = 100, offset = 0 } = req.query;
   res.json(db.getEvents({ source, type, limit: parseInt(limit), offset: parseInt(offset) }));
 });
 
-app.get('/api/admin/vitals', requireAdminKey, (req, res) => {
+app.get('/api/admin/vitals', requireAdminKeyAu, (req, res) => {
   res.json(db.getVitalsSummary(req.query));
 });
 
-app.get('/api/admin/traffic', requireAdminKey, (req, res) => {
+app.get('/api/admin/traffic', requireAdminKeyAu, (req, res) => {
   res.json(db.getTrafficSummary(req.query));
 });
 
-app.post('/api/admin/rule', requireAdminKey, (req, res) => {
+app.post('/api/admin/rule', requireAdminKeyAu, (req, res) => {
   const rule = db.addRule(req.body);
   res.json({ ok: true, rule });
 });
 
-app.get('/api/admin/rules', requireAdminKey, (req, res) => {
+app.get('/api/admin/rules', requireAdminKeyAu, (req, res) => {
   res.json(db.getRules());
 });
 
 // Geo for live globe (protected + public test alias)
-app.get('/api/admin/geo', requireAdminKey, (req, res) => {
+app.get('/api/admin/geo', requireAdminKeyAu, (req, res) => {
   res.json(db.getRecentGeoEvents(parseInt(req.query.limit) || 300));
 });
 
@@ -147,10 +230,101 @@ app.get('/api/geo', (req, res) => {
 // Health
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'mt-admin-api', time: Date.now() }));
 
+/* ====================== STAFF SYSTEM ROUTES (new — no changes to any existing routes) ====================== */
+
+// Staff login (username + password). Returns a token to be used as X-Staff-Token.
+app.post('/api/staff/login', requireAustralianAdmin, (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ error: 'username and password required' });
+  }
+  const user = verifyStaffCredentials(username, password);
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+  const tokenInfo = issueStaffToken(user.username, user.role);
+  res.json({
+    ok: true,
+    token: tokenInfo.token,
+    expires_at: tokenInfo.expires_at,
+    user: { username: user.username, role: user.role, full_name: user.full_name }
+  });
+});
+
+// One-click quick login for testing/demo (no password). Role: admin | developer | marketer | tester
+// We will replace this with real password auth later.
+app.post('/api/staff/quick-login', requireAustralianAdmin, (req, res) => {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_STAFF_QUICK_LOGIN !== 'true') {
+    return res.status(403).json({ error: 'quick_login_disabled', message: 'Quick login disabled in production.' });
+  }
+  const { role } = req.body || {};
+  const allowed = ['admin', 'developer', 'marketer', 'tester', 'moderator'];
+  if (!allowed.includes(role)) {
+    return res.status(400).json({ error: 'Invalid role. Use one of: ' + allowed.join(', ') });
+  }
+  const result = quickStaffLogin(role);
+  if (!result) {
+    return res.status(404).json({ error: 'No user found for role' });
+  }
+  res.json({ ok: true, ...result, note: 'Quick login (testing only — passwords coming later)' });
+});
+
+// Get current staff profile (requires token)
+app.get('/api/staff/me', requireStaffAuthAu, (req, res) => {
+  const profile = db.getStaffUser ? db.getStaffUser(req.staff.username) : { username: req.staff.username, role: req.staff.role };
+  res.json({ ok: true, staff: req.staff, profile });
+});
+
+// Internal messages (email-like)
+app.get('/api/staff/messages', requireStaffAuthAu, (req, res) => {
+  const msgs = getStaffMessagesFor(req.staff.username, req.staff.role);
+  res.json({ ok: true, messages: msgs });
+});
+
+app.post('/api/staff/messages', requireStaffAuthAu, (req, res) => {
+  const { to, subject, body, parent_id } = req.body || {};
+  if (!to || !subject || !body) {
+    return res.status(400).json({ error: 'to, subject and body are required' });
+  }
+  // to can be 'all', a role, or a specific username
+  // parent_id for replying to a thread/trend
+  const msg = sendStaffMessage(req.staff.username, to, subject, body, parent_id || null);
+  res.json({ ok: true, message: msg });
+});
+
+app.post('/api/staff/messages/:id/read', requireStaffAuthAu, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  markStaffMessageRead(id, req.staff.username);
+  res.json({ ok: true });
+});
+
+// Staff resources (role-aware links to internal tools, docs, etc.)
+app.get('/api/staff/resources', requireStaffAuthAu, (req, res) => {
+  const resources = getStaffResourcesFor(req.staff.role);
+  res.json({ ok: true, resources, role: req.staff.role });
+});
+
+// Staff directory (visible to all staff)
+app.get('/api/staff/directory', requireStaffAuthAu, (req, res) => {
+  const users = getAllStaffUsers();
+  res.json({ ok: true, users });
+});
+
+// Convenience route: /staff serves the staff portal (in addition to /static/staff.html via nginx)
+app.get('/staff', requireAustralianAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'static', 'staff.html'));
+});
+
+// (The master /dashboard key login and all /api/admin/* routes remain completely unchanged)
+
 // Serve the ambitious live dashboard (globe with red bot dots, traffic, firewall, API playground with runnable examples, WS live updates)
 // Gate behind valid key so the dashboard *always* requires a password (ADMIN_API_KEY or separate TEST_API_KEY for devs).
 // No key or wrong key -> show a clean login form that redirects with ?key=
-app.get('/dashboard', (req, res) => {
+app.get('/dashboard', requireAustralianAdmin, (req, res) => {
   const key = req.headers['x-admin-key'] || req.query.key;
   const isValid = key === ADMIN_API_KEY || (TEST_API_KEY && key === TEST_API_KEY);
 
@@ -180,6 +354,10 @@ app.get('/dashboard', (req, res) => {
     Or the separate TEST_API_KEY for developers (does not expose the master password).<br>
     Public sample data: <a href="/api/geo" style="color:#10b981">/api/geo</a>
   </div>
+  <div style="margin-top:1rem;font-size:.75rem;opacity:.6">
+    Staff members (admins, developers, marketers, testers):<br>
+    <a href="/staff" style="color:#10b981;text-decoration:underline">Open Staff Portal</a> (separate login + internal email + resources)
+  </div>
 </div>
 <script>
 function doLogin(e){ e.preventDefault(); 
@@ -204,4 +382,6 @@ server.listen(PORT, () => {
   console.log('Protected endpoints require X-Admin-Key header (or ?key=). TEST_API_KEY also works for developer read access.');
   console.log('WebSocket live updates (globe + events) available on same port');
   if (TEST_API_KEY) console.log('TEST_API_KEY configured for limited developer testing (does not expose master ADMIN_API_KEY)');
+  console.log('Staff Portal (new, additive): /staff  or  https://admin.futuret3ch.com.au/static/staff.html');
+  console.log('Staff API: POST /api/staff/login  |  X-Staff-Token header for /api/staff/*');
 });

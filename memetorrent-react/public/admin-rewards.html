@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin — Assign $MT Rewards | MemeTorrent</title>
+    <meta name="robots" content="noindex, nofollow">
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Arial, sans-serif; background: linear-gradient(135deg, #111 0%, #1f2937 100%); color: #fff; margin: 0; padding: 20px; min-height: 100vh; }
@@ -63,9 +64,10 @@
     </div>
 
     <div id="lockedView" class="panel locked">
-        <p>Enter staff key to manage claimable balances.</p>
+        <p>🔐 Australian staff only — secure admin access.</p>
+        <p style="font-size:12px;color:#64748b">You must be in Australia (or on AU VPN approved by the team). Session expires after 2 hours.</p>
         <div class="toolbar">
-            <input type="text" id="staffKeyInput" placeholder="Staff key" autocomplete="off">
+            <input type="password" id="staffKeyInput" placeholder="Staff key" autocomplete="current-password">
             <button type="button" class="btn btn-primary" id="btnUnlock">Unlock</button>
         </div>
         <div class="status err" id="unlockStatus"></div>
@@ -124,8 +126,9 @@
     </div>
 
     <script type="module">
-        const STORAGE_KEY = 'mt_admin_rewards_key';
-        let staffKey = null;
+        const STORAGE_KEY = 'mt_admin_session_token';
+        const EXPIRES_KEY = 'mt_admin_session_exp';
+        let adminToken = null;
         let allUsers = [];
         let selectedUserId = null;
         let memberPage = 0;
@@ -177,9 +180,13 @@
             renderTable();
         }
 
+        function adminHeaders() {
+            return { 'x-admin-token': adminToken };
+        }
+
         async function loadUsers() {
-            const res = await fetch('/api/claimable-rewards?staff_key=' + encodeURIComponent(staffKey), {
-                headers: { 'x-staff-key': staffKey },
+            const res = await fetch('/api/claimable-rewards', {
+                headers: adminHeaders(),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Load failed');
@@ -252,7 +259,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-staff-key': staffKey,
+                        ...adminHeaders(),
                     },
                     body: JSON.stringify({ user_id: userId, amount_mt: amount, mode, note: note || null }),
                 });
@@ -269,18 +276,36 @@
             }
         }
 
-        function tryUnlock(key) {
+        async function tryUnlock(key) {
             const statusEl = document.getElementById('unlockStatus');
-            setStatus(statusEl, 'Checking…', false);
-            fetch('/api/wallet-lookup?platform=telegram&user_id=1&staff_key=' + encodeURIComponent(key))
-                .then(r => {
-                    if (!r.ok) throw new Error('Invalid staff key');
-                    staffKey = key;
-                    try { sessionStorage.setItem(STORAGE_KEY, key); } catch {}
-                    showAdmin(true);
-                    loadUsers().catch(e => setStatus(document.getElementById('actionStatus'), e.message, true));
-                })
-                .catch(() => setStatus(statusEl, 'Invalid staff key.', true));
+            setStatus(statusEl, 'Verifying…', false);
+            try {
+                const res = await fetch('/api/admin/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ staff_key: key }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    if (data.error === 'geo_restricted' || data.error === 'geo_unknown') {
+                        throw new Error(data.message || 'Australian connection required.');
+                    }
+                    if (data.error === 'rate_limited') {
+                        throw new Error(data.message || 'Too many attempts. Wait and retry.');
+                    }
+                    throw new Error(data.message || 'Invalid staff key.');
+                }
+                adminToken = data.token;
+                try {
+                    sessionStorage.setItem(STORAGE_KEY, adminToken);
+                    sessionStorage.setItem(EXPIRES_KEY, data.expires_at || '');
+                } catch {}
+                showAdmin(true);
+                document.getElementById('staffKeyInput').value = '';
+                await loadUsers();
+            } catch (e) {
+                setStatus(statusEl, e.message || 'Login failed.', true);
+            }
         }
 
         document.getElementById('btnUnlock').addEventListener('click', () => {
@@ -291,9 +316,12 @@
 
         document.getElementById('btnLock').addEventListener('click', () => {
             if (!confirm('Lock admin panel?')) return;
-            staffKey = null;
+            adminToken = null;
             selectedUserId = null;
-            try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
+            try {
+                sessionStorage.removeItem(STORAGE_KEY);
+                sessionStorage.removeItem(EXPIRES_KEY);
+            } catch {}
             showAdmin(false);
             document.getElementById('staffKeyInput').value = '';
         });
@@ -336,13 +364,19 @@
         });
 
         const saved = (() => { try { return sessionStorage.getItem(STORAGE_KEY); } catch { return null; } })();
-        if (saved) {
-            staffKey = saved;
+        const savedExp = (() => { try { return sessionStorage.getItem(EXPIRES_KEY); } catch { return null; } })();
+        if (saved && savedExp && new Date(savedExp).getTime() > Date.now()) {
+            adminToken = saved;
             showAdmin(true);
             loadUsers().catch(() => {
-                staffKey = null;
+                adminToken = null;
                 showAdmin(false);
             });
+        } else if (saved) {
+            try {
+                sessionStorage.removeItem(STORAGE_KEY);
+                sessionStorage.removeItem(EXPIRES_KEY);
+            } catch {}
         }
     </script>
 </body>

@@ -1,15 +1,14 @@
 import { NextRequest } from 'next/server';
-import {
-  fetchAllClaimableUsers,
-  staffKeyFromRequest,
-  verifyStaffKey,
-} from '@/lib/rewards-db';
+import { geoBlockedResponse, isAdminAuthorized, isAustralianRequest } from '@/lib/admin-security';
+import { fetchAllClaimableUsers } from '@/lib/rewards-db';
 import { treasuryConfigured } from '@/lib/treasury-send';
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
-  const staffKey = staffKeyFromRequest(request.headers, url);
-  const isStaff = verifyStaffKey(staffKey);
+  const isStaff = isAdminAuthorized(request);
+  if (isStaff && !isAustralianRequest(request)) {
+    return geoBlockedResponse();
+  }
 
   try {
     const users = await fetchAllClaimableUsers();

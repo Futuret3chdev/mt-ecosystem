@@ -1,18 +1,10 @@
 import { NextRequest } from 'next/server';
-import {
-  getTrackingDb,
-  getUserDb,
-  logReward,
-  staffKeyFromRequest,
-  verifyStaffKey,
-  WALLET_RE,
-} from '@/lib/rewards-db';
+import { requireAdminApiAccess } from '@/lib/admin-security';
+import { getTrackingDb, getUserDb, logReward, WALLET_RE } from '@/lib/rewards-db';
 
 export async function POST(request: NextRequest) {
-  const staffKey = staffKeyFromRequest(request.headers, new URL(request.url));
-  if (!verifyStaffKey(staffKey)) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = requireAdminApiAccess(request);
+  if (denied) return denied;
 
   let body: any;
   try {

@@ -3,15 +3,13 @@ import mysql from 'mysql2/promise';
 export const DB_HOST = '50.6.160.248';
 export const DB_USER = 'tcvkxete_admin';
 export const DB_PASS = 'Shinhwa1@@';
-export const STAFF_KEY = process.env.STAFF_REWARD_KEY || 'Hiptonic1@@';
+export { verifyStaffKey, isAdminAuthorized } from '@/lib/admin-security';
+
 export const WALLET_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
-export function verifyStaffKey(key: string | null | undefined): boolean {
-  return !!key && key === STAFF_KEY;
-}
-
-export function staffKeyFromRequest(headers: Headers, url: URL): string | null {
-  return headers.get('x-staff-key') || url.searchParams.get('staff_key');
+/** @deprecated Use x-admin-token header only — never pass keys in URLs. */
+export function staffKeyFromRequest(headers: Headers, _url: URL): string | null {
+  return headers.get('x-staff-key');
 }
 
 export async function getUserDb() {

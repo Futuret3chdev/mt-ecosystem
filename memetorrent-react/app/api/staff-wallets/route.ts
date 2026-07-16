@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
-
-const STAFF_KEY = process.env.STAFF_REWARD_KEY || 'Hiptonic1@@';
+import { requireAdminApiAccess } from '@/lib/admin-security';
 
 /** Team treasury pubkeys staff may pay rewards from (configure in Vercel env). */
 const DEFAULT_WALLETS = [
@@ -16,13 +15,6 @@ const DEFAULT_WALLETS = [
   },
 ];
 
-function verifyStaffKey(request: NextRequest): boolean {
-  const key =
-    request.headers.get('x-staff-key') ||
-    new URL(request.url).searchParams.get('staff_key');
-  return key === STAFF_KEY;
-}
-
 function parseEnvWallets(): typeof DEFAULT_WALLETS {
   const raw = process.env.STAFF_REWARD_WALLETS;
   if (!raw) return DEFAULT_WALLETS;
@@ -34,9 +26,8 @@ function parseEnvWallets(): typeof DEFAULT_WALLETS {
 }
 
 export async function GET(request: NextRequest) {
-  if (!verifyStaffKey(request)) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = requireAdminApiAccess(request);
+  if (denied) return denied;
 
   return Response.json({
     wallets: parseEnvWallets(),
