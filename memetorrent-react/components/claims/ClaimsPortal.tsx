@@ -24,7 +24,8 @@ type MyRow = {
 
 export default function ClaimsPortal() {
   const { connection } = useConnection();
-  const { publicKey, connected, connect, disconnect, select, wallets, signTransaction } = useWallet();
+  const { publicKey, connected, connect, disconnect, select, wallets, signTransaction, sendTransaction } =
+    useWallet();
   const [allUsers, setAllUsers] = useState<ClaimUser[]>([]);
   const [myRow, setMyRow] = useState<MyRow | null>(null);
   const [search, setSearch] = useState('');
@@ -147,7 +148,12 @@ export default function ClaimsPortal() {
   }
 
   async function handleClaim() {
-    if (!walletAddress || !myRow || myRow.claimable_mt <= 0 || !signTransaction) return;
+    if (!walletAddress || !myRow || myRow.claimable_mt <= 0) return;
+    if (!signTransaction && !sendTransaction) {
+      setStatus('Your wallet does not support signing — try Phantom, Solflare, or Backpack.');
+      setStatusErr(true);
+      return;
+    }
     setClaiming(true);
     setSuccess(null);
     setStatus('Preparing claim — approve in your wallet…');
@@ -159,19 +165,36 @@ export default function ClaimsPortal() {
         body: JSON.stringify({ wallet_address: walletAddress }),
       });
       const prep = await prepRes.json();
-      if (!prepRes.ok) throw new Error(prep.message || prep.error || 'Prepare failed');
+      if (!prepRes.ok) {
+        if (prep.error === 'use_prepare_confirm' || prepRes.status === 404) {
+          throw new Error(
+            'Claims are updating — refresh in a minute, then connect your wallet and approve the popup.'
+          );
+        }
+        throw new Error(prep.message || prep.error || 'Prepare failed');
+      }
 
       if (prep.fee_note) setFeeHint(prep.fee_note);
 
       const tx = Transaction.from(Buffer.from(prep.transaction_base64, 'base64'));
-      const signed = await signTransaction(tx);
-      setStatus('Submitting transaction…');
+      setStatus('Approve the transaction in your wallet…');
 
-      const sig = await connection.sendRawTransaction(signed.serialize(), {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
-        maxRetries: 3,
-      });
+      let sig: string;
+      if (sendTransaction) {
+        sig = await sendTransaction(tx, connection, {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      } else {
+        const signed = await signTransaction!(tx);
+        setStatus('Submitting transaction…');
+        sig = await connection.sendRawTransaction(signed.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      }
 
       await connection.confirmTransaction(
         {
