@@ -63,4 +63,4 @@ export function sendTrack(pathname: string, type = 'page_view', extra: Record<st
     body: JSON.stringify(payload),
     keepalive: true,
   }).catch(() => {});
-}
+}// tracker deploy 20260716T152253Z
