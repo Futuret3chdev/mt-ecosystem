@@ -5,6 +5,7 @@ export default function Footer() {
         <div>© {new Date().getFullYear()} MT-ECO SYSTEM — Developed by Futuret3ch and MemeTorrent. All core components self-hosted and self-built.</div>
         <div className="flex flex-wrap gap-x-6 gap-y-1">
           <a href="https://www.futuret3ch.com.au" target="_blank" className="hover:text-white">Futuret3ch</a>
+          <a href="/claims" className="hover:text-white">Claim $MT</a>
           <a href="/status" className="hover:text-white">Status</a>
           <a href="/developers" className="hover:text-white">Developers</a>
           <a href="/media" className="hover:text-white">Media</a>

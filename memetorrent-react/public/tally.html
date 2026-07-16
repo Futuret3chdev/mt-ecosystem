@@ -5,138 +5,1095 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Message Stats | MemeTorrent</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script>
-        if (typeof jQuery === 'undefined') {
-            document.write('<script src="/jquery-3.6.0.min.js"><\/script>');
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <style>
         * { box-sizing: border-box; }
-        body {font-family: 'Segoe UI', Arial, sans-serif;background: linear-gradient(135deg, #111 0%, #222 100%);color: #fff;padding: 20px;margin: 0;min-height: 100vh;}
-        .header {text-align: center;margin-bottom: 30px;}
-        .header h1 {font-size: 2.2em;margin: 0;background: linear-gradient(45deg, #28a745, #20c997);-webkit-background-clip: text;-webkit-text-fill-color: transparent;text-shadow: 0 0 20px rgba(40,167,69,0.3);}
-        .last-updated {color: #aaa;font-size: 0.9em;margin-top: 5px;font-family: 'Courier New', monospace;}
-        .tabs {display: flex;justify-content: center;margin: 20px auto;max-width: 800px;background: rgba(255,255,255,0.1);border-radius: 25px;padding: 4px;box-shadow: 0 4px 15px rgba(0,0,0,0.3);}
-        .tablink {background: transparent;color: #fff;padding: 12px 24px;border: none;cursor: pointer;border-radius: 20px;font-size: 1em;transition: all .3s;flex: 1;text-align: center;}
-        .tablink:hover {background: rgba(255,255,255,0.1);transform: translateY(-2px);}
-        .tablink.active {background: linear-gradient(45deg, #28a745, #20c997);box-shadow: 0 4px 15px rgba(40,167,69,0.3);}
-        .tabcontent {display: none;max-width: 800px;margin: 20px auto;background: rgba(255,255,255,0.08);border-radius: 15px;padding: 25px;box-shadow: 0 8px 25px rgba(0,0,0,0.3);backdrop-filter: blur(10px);}
-        .tabcontent.active {display: block;}
-        .section {margin-bottom: 30px;}
-        .section h3 {color: #28a745;border-bottom: 2px solid #28a745;padding-bottom: 8px;margin-bottom: 15px;font-size: 1.3em;}
-        .range-controls {text-align: center;margin-bottom: 15px;}
-        .range-controls input {padding: 8px;border-radius: 6px;border: none;background: rgba(255,255,255,0.15);color:#fff;margin:0 5px;}
-        .range-controls button {padding: 8px 16px;border-radius: 6px;background: #28a745;color:#fff;border:none;cursor:pointer;}
-        table {width: 100%;border-collapse: collapse;margin-top: 10px;background: rgba(255,255,255,0.05);border-radius: 10px;overflow: hidden;}
-        th, td {padding: 12px 8px;text-align: left;border-bottom: 1px solid rgba(255,255,255,0.1);}
-        th {background: linear-gradient(45deg, #218838, #28a745);font-weight:600;text-transform:uppercase;font-size:0.85em;letter-spacing:0.5px;}
-        tr:hover {background: rgba(40,167,69,0.1);transform:scale(1.01);transition:.2s;}
-        .user-id {width:100px;font-family:'Courier New',monospace;}
-        .username {width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:help;}
-        .message-count {width:100px;text-align:right;font-weight:600;color:#28a745;}
-        .no-data, .loading, .error {text-align:center;padding:20px;}
-        .loading {color:#28a745;font-style:italic;animation:pulse 1.5s infinite;}
-        @keyframes pulse {0%,100%{opacity:1}50%{opacity:0.5}}
-        @media (max-width:600px){.tabs{flex-direction:column;}.tablink{border-radius:10px;margin:2px 0;}}
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: linear-gradient(135deg, #111 0%, #222 100%); color: #fff; padding: 20px; margin: 0; min-height: 100vh; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { font-size: 2.2em; margin: 0; background: linear-gradient(45deg, #28a745, #20c997); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .subtitle { color: #9ca3af; font-size: 0.95em; margin-top: 6px; }
+        .last-updated { color: #aaa; font-size: 0.9em; margin-top: 8px; font-family: 'Courier New', monospace; }
+        .staff-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; max-width: 960px; margin: 0 auto 18px; padding: 14px; background: rgba(255,255,255,0.08); border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); }
+        .staff-toolbar input[type="text"] { flex: 1; min-width: 200px; padding: 10px 12px; border-radius: 8px; border: 1px solid #4b5563; background: #fff; color: #111827; font-size: 14px; }
+        .staff-toolbar input::placeholder { color: #6b7280; }
+        .btn { padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; }
+        .btn-primary { background: linear-gradient(45deg, #28a745, #20c997); color: #fff; }
+        .btn-secondary { background: #374151; color: #fff; }
+        .btn:hover { opacity: 0.92; transform: translateY(-1px); }
+        .tabs { display: flex; justify-content: center; margin: 16px auto; max-width: 960px; background: rgba(255,255,255,0.1); border-radius: 25px; padding: 4px; }
+        .tablink { background: transparent; color: #fff; padding: 12px 24px; border: none; cursor: pointer; border-radius: 20px; font-size: 1em; flex: 1; text-align: center; transition: all .3s; }
+        .tablink.active { background: linear-gradient(45deg, #28a745, #20c997); }
+        .tabcontent { display: none; max-width: 960px; margin: 16px auto; background: rgba(255,255,255,0.08); border-radius: 15px; padding: 22px; }
+        .tabcontent.active { display: block; }
+        .section { margin-bottom: 28px; }
+        .section h3 { color: #28a745; border-bottom: 2px solid #28a745; padding-bottom: 8px; margin-bottom: 12px; font-size: 1.2em; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+        .section-actions { font-size: 12px; font-weight: normal; }
+        .section-actions button { background: #1f2937; color: #e5e7eb; border: 1px solid #4b5563; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        .chart-wrap { background: rgba(0,0,0,0.25); border-radius: 10px; padding: 12px; margin-bottom: 14px; height: 280px; }
+        .range-controls { text-align: center; margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
+        .range-controls input { padding: 8px; border-radius: 6px; border: none; background: rgba(255,255,255,0.15); color: #fff; }
+        table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.05); border-radius: 10px; overflow: hidden; }
+        th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        th { background: linear-gradient(45deg, #218838, #28a745); font-size: 0.8em; text-transform: uppercase; }
+        tr:hover { background: rgba(40,167,69,0.1); }
+        .user-id { width: 90px; font-family: 'Courier New', monospace; font-size: 0.85em; }
+        .username { max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .message-count { text-align: right; font-weight: 600; color: #28a745; white-space: nowrap; }
+        .trend { text-align: center; width: 70px; font-size: 0.9em; }
+        .trend-up { color: #4ade80; }
+        .trend-down { color: #f87171; }
+        .trend-same { color: #9ca3af; }
+        .trend-new { color: #60a5fa; }
+        .badge-yesterday { font-size: 0.75em; color: #fbbf24; margin-left: 4px; }
+        .state-box { text-align: center; padding: 22px 16px; border-radius: 10px; line-height: 1.5; }
+        .state-loading { color: #28a745; font-style: italic; animation: pulse 1.5s infinite; }
+        .state-empty { background: rgba(255,255,255,0.05); color: #d1d5db; }
+        .state-error { background: rgba(220,38,38,0.15); color: #fecaca; border: 1px solid rgba(248,113,113,0.4); }
+        .state-filtered { background: rgba(59,130,246,0.12); color: #bfdbfe; }
+        @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.5} }
+        .btn-reward { background: linear-gradient(45deg, #7c3aed, #a855f7); color: #fff; padding: 4px 10px; border-radius: 6px; border: none; cursor: pointer; font-size: 11px; font-weight: 600; white-space: nowrap; }
+        .btn-reward:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn-reward.no-wallet { background: #4b5563; }
+        .staff-wallet { font-size: 12px; color: #a7f3d0; font-family: 'Courier New', monospace; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .staff-locked-hint { font-size: 12px; color: #9ca3af; }
+        .wallet-panel { display: none; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; width: 100%; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; }
+        .wallet-panel.open { display: flex; }
+        .wallet-panel-label { font-size: 12px; color: #9ca3af; width: 100%; text-align: center; margin-bottom: 2px; }
+        .wallet-opt { padding: 8px 12px; border-radius: 8px; border: 1px solid #4b5563; background: #1f2937; color: #e5e7eb; cursor: pointer; font-size: 12px; font-weight: 600; }
+        .wallet-opt:hover { background: #374151; }
+        .wallet-opt.active { border-color: #28a745; background: rgba(40,167,69,0.2); color: #86efac; }
+        .wallet-opt.recommended::after { content: ' ★'; color: #fbbf24; font-size: 10px; }
+        .wallet-hint { width: 100%; font-size: 11px; color: #9ca3af; text-align: center; line-height: 1.4; }
+        .wallet-hint.warn { color: #fcd34d; }
+        .treasury-pick { width: 100%; max-width: 360px; padding: 8px 10px; border-radius: 8px; border: 1px solid #4b5563; background: #fff; color: #111827; font-size: 13px; }
+        .wallet-connected-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; width: 100%; }
+        .reward-col { width: 88px; text-align: center; }
+        .reward-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.72); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 16px; }
+        .reward-modal.open { display: flex; }
+        .reward-modal-inner { background: #1f2937; border: 1px solid #4b5563; border-radius: 14px; padding: 22px; max-width: 420px; width: 100%; box-shadow: 0 20px 50px rgba(0,0,0,0.45); }
+        .reward-modal-inner h3 { margin: 0 0 8px; color: #a78bfa; }
+        .reward-modal-inner p { margin: 0 0 12px; font-size: 13px; color: #d1d5db; line-height: 1.45; }
+        .reward-modal-inner label { display: block; font-size: 12px; color: #9ca3af; margin-bottom: 4px; }
+        .reward-modal-inner input[type="number"], .reward-modal-inner input[type="text"] { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #4b5563; background: #fff; color: #111827; margin-bottom: 10px; font-size: 14px; }
+        .reward-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .reward-presets button { padding: 6px 12px; border-radius: 6px; border: 1px solid #6b7280; background: #374151; color: #e5e7eb; cursor: pointer; font-size: 12px; }
+        .reward-presets button:hover { background: #4b5563; }
+        .reward-actions { display: flex; gap: 8px; margin-top: 14px; }
+        .reward-actions .btn { flex: 1; }
+        .reward-status { margin-top: 12px; font-size: 13px; min-height: 1.2em; color: #86efac; word-break: break-all; }
+        .reward-status.err { color: #fca5a5; }
+        .reward-success { display: none; margin-top: 14px; padding: 14px; border-radius: 10px; background: rgba(34,197,94,0.12); border: 1px solid rgba(74,222,128,0.45); }
+        .reward-success.visible { display: block; }
+        .reward-success h4 { margin: 0 0 8px; color: #4ade80; font-size: 15px; }
+        .reward-tx-box { font-family: 'Courier New', monospace; font-size: 11px; word-break: break-all; background: rgba(0,0,0,0.35); padding: 10px; border-radius: 8px; color: #d1fae5; line-height: 1.5; user-select: all; }
+        .reward-success-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .reward-success-actions .btn { flex: 1; min-width: 120px; font-size: 13px; }
+        .reward-form-fields.hidden { display: none; }
+        @media (max-width: 640px) { .tabs { flex-direction: column; } .staff-toolbar { flex-direction: column; } table { font-size: 0.85em; } }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>Message Leaderboard Maintenance</h1>
+        <h1>Message Leaderboard</h1>
+        <div class="subtitle">Moderator / Admin / Manager view — Australia/Melbourne (AEST)</div>
         <div class="last-updated" id="lastUpdated">Loading...</div>
+        <div style="margin-top:12px;font-size:13px">
+            <a href="/claims" style="color:#93c5fd;margin:0 10px">Claim $MT rewards</a>
+        </div>
+    </div>
+
+    <div class="staff-toolbar">
+        <input type="text" id="userSearch" placeholder="Search @username or user ID…" autocomplete="off">
+        <button class="btn btn-secondary" id="btnRefresh" type="button">Refresh</button>
+        <button class="btn btn-primary" id="btnExportCsv" type="button">Export CSV (this tab)</button>
+        <button class="btn btn-secondary" id="btnStaffUnlock" type="button">Unlock rewards</button>
+        <span class="staff-locked-hint" id="staffHint">Staff: unlock to send $MT rewards</span>
+        <div id="walletPanel" class="wallet-panel">
+            <div class="wallet-panel-label">Pay rewards from — pick your wallet app, then connect</div>
+            <button type="button" class="wallet-opt recommended" data-provider="solflare">Solflare</button>
+            <button type="button" class="wallet-opt recommended" data-provider="backpack">Backpack</button>
+            <button type="button" class="wallet-opt" data-provider="phantom">Phantom</button>
+            <a class="wallet-opt" data-provider="infinite" href="https://mt.futuret3ch.com.au/" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block">Infinite Wallet</a>
+            <select id="treasuryPick" class="treasury-pick" title="Which team treasury are you paying from?">
+                <option value="">Team treasury (optional label)…</option>
+            </select>
+            <button class="btn btn-primary" id="btnConnectWallet" type="button">Connect selected wallet</button>
+            <button class="btn btn-secondary" id="btnDisconnectWallet" type="button" style="display:none">Switch wallet</button>
+            <div class="wallet-connected-row" id="walletConnectedRow" style="display:none">
+                <span class="staff-wallet" id="staffWalletLabel"></span>
+                <span class="staff-wallet" id="staffProviderLabel" style="color:#c4b5fd"></span>
+            </div>
+            <div class="wallet-hint" id="walletHelp">Phantom blocking this site? Use <strong>Solflare</strong> or <strong>Backpack</strong>, or open this tally page inside your wallet app’s browser.</div>
+            <div class="wallet-hint warn" id="walletDeeplinkHint" style="display:none"></div>
+        </div>
+    </div>
+
+    <div id="rewardModal" class="reward-modal" aria-hidden="true">
+        <div class="reward-modal-inner">
+            <h3 id="rewardModalTitle">Reward member</h3>
+            <p id="rewardModalMeta"></p>
+            <div id="rewardFormFields" class="reward-form-fields">
+                <label for="rewardAmount">Amount ($MT)</label>
+                <input type="number" id="rewardAmount" min="0.000001" step="0.000001" placeholder="e.g. 500">
+                <div class="reward-presets">
+                    <button type="button" data-amt="100">100</button>
+                    <button type="button" data-amt="500">500</button>
+                    <button type="button" data-amt="1000">1,000</button>
+                    <button type="button" data-amt="5000">5,000</button>
+                    <button type="button" data-amt="10000">10,000</button>
+                </div>
+                <label for="rewardNote">Note (optional)</label>
+                <input type="text" id="rewardNote" maxlength="200" placeholder="e.g. Daily top talker">
+            </div>
+            <div class="reward-actions">
+                <button class="btn btn-secondary" id="rewardCancel" type="button">Cancel</button>
+                <button class="btn btn-primary" id="rewardConfirm" type="button">Send $MT</button>
+            </div>
+            <div class="reward-status" id="rewardStatus"></div>
+            <div class="reward-success" id="rewardSuccess" aria-live="polite">
+                <h4>Reward sent successfully</h4>
+                <p id="rewardSuccessSummary" style="margin:0 0 8px;font-size:13px;color:#bbf7d0"></p>
+                <div class="reward-tx-box" id="rewardTxDisplay" title="Click to select all"></div>
+                <div class="reward-success-actions">
+                    <button type="button" class="btn btn-secondary" id="rewardCopyTx">Copy tx signature</button>
+                    <a class="btn btn-primary" id="rewardSolscanLink" href="#" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;line-height:1.4;padding-top:10px">View on Solscan</a>
+                    <button type="button" class="btn btn-secondary" id="rewardDone">Done</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="tabs">
-        <button class="tablink active" onclick="openTab(event,'Telegram')">Telegram</button>
-        <button class="tablink" onclick="openTab(event,'Discord')">Discord</button>
-        <button class="tablink" onclick="openTab(event,'Custom')">Custom Range</button>
+        <button class="tablink active" data-tab="Telegram">Telegram</button>
+        <button class="tablink" data-tab="Discord">Discord</button>
+        <button class="tablink" data-tab="Custom">Custom Range</button>
     </div>
 
-    <!-- Telegram -->
     <div id="Telegram" class="tabcontent active">
-        <div class="section"><h3>Daily Top Talkers</h3><div id="tg_daily" class="loading">Loading...</div></div>
-        <div class="section"><h3>Monthly Champions</h3><div id="tg_monthly" class="loading">Loading...</div></div>
+        <div class="section">
+            <h3>Daily Top Talkers <span class="section-actions"><button type="button" data-export="tg_daily">CSV daily</button></span></h3>
+            <div class="chart-wrap"><canvas id="chartTgDaily"></canvas></div>
+            <div id="tg_daily" class="state-box state-loading">Loading…</div>
+        </div>
+        <div class="section">
+            <h3>Monthly Champions <span class="section-actions"><button type="button" data-export="tg_monthly">CSV monthly</button></span></h3>
+            <div class="chart-wrap"><canvas id="chartTgMonthly"></canvas></div>
+            <div id="tg_monthly" class="state-box state-loading">Loading…</div>
+        </div>
     </div>
 
-    <!-- Discord -->
     <div id="Discord" class="tabcontent">
-        <div class="section"><h3>Daily Top Talkers</h3><div id="dc_daily" class="loading">Loading...</div></div>
-        <div class="section"><h3>Monthly Champions</h3><div id="dc_monthly" class="loading">Loading...</div></div>
+        <div class="section">
+            <h3>Daily Top Talkers <span class="section-actions"><button type="button" data-export="dc_daily">CSV daily</button></span></h3>
+            <div class="chart-wrap"><canvas id="chartDcDaily"></canvas></div>
+            <div id="dc_daily" class="state-box state-loading">Loading…</div>
+        </div>
+        <div class="section">
+            <h3>Monthly Champions <span class="section-actions"><button type="button" data-export="dc_monthly">CSV monthly</button></span></h3>
+            <div class="chart-wrap"><canvas id="chartDcMonthly"></canvas></div>
+            <div id="dc_monthly" class="state-box state-loading">Loading…</div>
+        </div>
     </div>
 
-    <!-- Custom Range -->
     <div id="Custom" class="tabcontent">
         <div class="range-controls">
             <input type="text" id="startDate" placeholder="Start (YYYY-MM-DD)">
             <input type="text" id="endDate" placeholder="End (YYYY-MM-DD)">
-            <button onclick="loadCustom()">Search</button>
+            <button class="btn btn-primary" id="btnCustomSearch" type="button">Search range</button>
+            <button class="btn btn-secondary" type="button" data-preset="7">Last 7 days</button>
+            <button class="btn btn-secondary" type="button" data-preset="month">This month</button>
         </div>
-        <div class="section"><h3>Telegram</h3><div id="custom_tg" class="loading">Select dates...</div></div>
-        <div class="section"><h3>Discord</h3><div id="custom_dc" class="loading">Select dates...</div></div>
+        <div class="section">
+            <h3>Telegram (custom) <span class="section-actions"><button type="button" data-export="custom_tg">CSV range</button></span></h3>
+            <div class="chart-wrap"><canvas id="chartCustomTg"></canvas></div>
+            <div id="custom_tg" class="state-box state-empty">Select dates and search.</div>
+        </div>
+        <div class="section">
+            <h3>Discord (custom) <span class="section-actions"><button type="button" data-export="custom_dc">CSV range</button></span></h3>
+            <div class="chart-wrap"><canvas id="chartCustomDc"></canvas></div>
+            <div id="custom_dc" class="state-box state-empty">Select dates and search.</div>
+        </div>
     </div>
 
     <script>
-        const fpStart = flatpickr("#startDate", {dateFormat: "Y-m-d"});
-        const fpEnd   = flatpickr("#endDate",   {dateFormat: "Y-m-d"});
+    (function () {
+        const onMemetorrent = /memetorrent\.futuret3ch\.com\.au/i.test(location.hostname);
+        const DATA_SOURCES = onMemetorrent ? [
+            q => '/api/message-counts' + q,
+            q => 'message_counts.php' + q,
+            q => 'https://futuret3ch.com.au/message_counts.php' + q
+        ] : [
+            q => 'message_counts.php' + q,
+            q => '/api/message-counts' + q,
+            q => 'https://futuret3ch.com.au/message_counts.php' + q
+        ];
 
-        function openTab(evt, name) {
-            $('.tabcontent').removeClass('active');
-            $('#'+name).addClass('active');
-            $('.tablink').removeClass('active');
-            $(evt.currentTarget).addClass('active');
-            if (name !== 'Custom') updateAll();
+        const charts = {};
+        const store = {
+            activeTab: 'Telegram',
+            lastPayload: null,
+            customRange: null,
+            loadFailed: false,
+            sections: {}
+        };
+
+        const fpStart = flatpickr('#startDate', { dateFormat: 'Y-m-d' });
+        const fpEnd = flatpickr('#endDate', { dateFormat: 'Y-m-d' });
+
+        function esc(t) {
+            return !t ? 'Anonymous' : String(t).replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
         }
 
-        function renderTable(data, container) {
-            if (!data || data.length === 0) return $(container).html('<div class="no-data">No messages</div>');
-            let html = '<table><thead><tr><th class="user-id">ID</th><th class="username">Username</th><th class="message-count">Messages</th></tr></thead><tbody>';
-            data.forEach((row, i) => {
+        function medal(r) { return ({ 1: '1st', 2: '2nd', 3: '3rd' })[r] || ''; }
+
+        function getSearch() {
+            return (document.getElementById('userSearch').value || '').trim().toLowerCase().replace(/^@/, '');
+        }
+
+        function filterRows(rows) {
+            const q = getSearch();
+            if (!q) return rows || [];
+            return (rows || []).filter(row => {
+                const un = String(row.username || '').toLowerCase();
+                const id = String(row.user_id || '');
+                return un.includes(q) || id.includes(q);
+            });
+        }
+
+        function buildPrevRankMap(previousRows) {
+            const map = {};
+            (previousRows || []).forEach((row, i) => { map[String(row.user_id)] = i + 1; });
+            return map;
+        }
+
+        function trendHtml(currentRank, userId, prevMap) {
+            const prev = prevMap[String(userId)];
+            if (prev == null) return '<span class="trend trend-new" title="New today">NEW</span>';
+            const delta = prev - currentRank;
+            if (delta > 0) return `<span class="trend trend-up" title="Was #${prev} yesterday">↑${delta}</span>`;
+            if (delta < 0) return `<span class="trend trend-down" title="Was #${prev} yesterday">↓${Math.abs(delta)}</span>`;
+            return `<span class="trend trend-same" title="Same as yesterday (#${prev})">→</span>`;
+        }
+
+        function emptyMessage(opts) {
+            const { platform, period, apiError, hadRows, filtered } = opts;
+            if (filtered) {
+                return '<div class="state-box state-filtered">No users match your search. Clear the search box to see everyone.</div>';
+            }
+            if (apiError) {
+                return '<div class="state-box state-error"><strong>API error</strong><br>Could not load message stats. Try Refresh, or use the legacy board at <a href="https://futuret3ch.com.au/tally.html" style="color:#86efac">futuret3ch.com.au/tally.html</a>.</div>';
+            }
+            if (platform === 'discord') {
+                return '<div class="state-box state-empty"><strong>No Discord messages for this period</strong><br>Either nobody chatted, or Discord tracking is not feeding this dashboard yet. Telegram stats are unaffected.</div>';
+            }
+            if (period === 'custom') {
+                return '<div class="state-box state-empty"><strong>No Telegram messages in that date range</strong><br>Try widening the range or pick different dates (Melbourne time).</div>';
+            }
+            if (period === 'monthly') {
+                return '<div class="state-box state-empty"><strong>No monthly totals yet</strong><br>The month may have just started, or monthly aggregation has not run.</div>';
+            }
+            return '<div class="state-box state-empty"><strong>No messages recorded for today</strong><br>Quiet day, or daily counts have not synced yet.</div>';
+        }
+
+        function renderTable(data, container, opts) {
+            const { platform, period, prevMap, apiError } = opts;
+            const allRows = data || [];
+            const rows = filterRows(allRows);
+            store.sections[container] = { rows: allRows, platform, period, prevMap };
+
+            if (apiError) {
+                $(container).html(emptyMessage({ platform, period, apiError: true }));
+                return;
+            }
+            if (!allRows.length) {
+                $(container).html(emptyMessage({ platform, period }));
+                return;
+            }
+            if (!rows.length) {
+                $(container).html(emptyMessage({ platform, period, filtered: true }));
+                return;
+            }
+
+            const showTrend = period === 'daily' && prevMap && Object.keys(prevMap).length > 0;
+            const showReward = window.mtStaff && window.mtStaff.unlocked;
+            let html = '<table><thead><tr><th>#</th><th>ID</th><th>Username</th>';
+            if (showTrend) html += '<th>Trend</th>';
+            html += '<th>Messages</th>';
+            if (showReward) html += '<th class="reward-col">Reward</th>';
+            html += '</tr></thead><tbody>';
+
+            rows.forEach((row, i) => {
                 const cnt = row.message_count ?? row.total_message_count;
                 const rank = i + 1;
-                const color = rank===1?'#ffd700':rank===2?'#c0c0c0':rank===3?'#cd7f32':'#fff';
+                const color = rank === 1 ? '#ffd700' : rank === 2 ? '#c0c0c0' : rank === 3 ? '#cd7f32' : '#fff';
+                const wasFirst = showTrend && prevMap[String(row.user_id)] === 1;
                 html += `<tr>
+                    <td>${rank}</td>
                     <td class="user-id">${row.user_id}</td>
-                    <td class="username" title="${esc(row.username)}">${esc(row.username)}</td>
-                    <td class="message-count"><span style="color:${color}">${cnt}</span>${rank<=3?`<span style="color:${color};font-size:0.8em;margin-left:5px">${medal(rank)}</span>`:''}</td>
-                </tr>`;
+                    <td class="username" title="${esc(row.username)}">${esc(row.username)}${wasFirst ? '<span class="badge-yesterday" title="#1 yesterday">★ was #1</span>' : ''}</td>`;
+                if (showTrend) html += `<td>${trendHtml(rank, row.user_id, prevMap)}</td>`;
+                html += `<td class="message-count"><span style="color:${color}">${cnt}</span>${rank <= 3 ? ` <span style="color:${color};font-size:0.8em">${medal(rank)}</span>` : ''}</td>`;
+                if (showReward) {
+                    const plat = platform === 'discord' ? 'discord' : 'telegram';
+                    const encUser = encodeURIComponent(row.username || '');
+                    html += `<td class="reward-col"><button type="button" class="btn-reward" data-platform="${plat}" data-user-id="${esc(String(row.user_id))}" data-username="${encUser}">Reward</button></td>`;
+                }
+                html += '</tr>';
             });
             html += '</tbody></table>';
             $(container).html(html);
         }
 
-        function esc(t){return !t?'Anonymous':String(t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
-        function medal(r){return {1:'1st',2:'2nd',3:'3rd'}[r]||'';}
+        function destroyChart(id) {
+            if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+        }
+
+        function renderBarChart(canvasId, rows, label) {
+            destroyChart(canvasId);
+            const el = document.getElementById(canvasId);
+            if (!el) return;
+            const top = filterRows(rows).slice(0, 10);
+            if (!top.length) return;
+            const labels = top.map(r => (r.username || r.user_id || '?').toString().slice(0, 18));
+            const values = top.map(r => Number(r.message_count ?? r.total_message_count ?? 0));
+            charts[canvasId] = new Chart(el, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{ label, data: values, backgroundColor: 'rgba(40,167,69,0.65)', borderColor: '#28a745', borderWidth: 1 }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#d1d5db' }, grid: { color: 'rgba(255,255,255,0.08)' } },
+                        y: { ticks: { color: '#e5e7eb' }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function loadCounts(query, onSuccess, onFail, idx) {
+            idx = idx || 0;
+            if (idx >= DATA_SOURCES.length) return onFail();
+            $.getJSON(DATA_SOURCES[idx](query || ''))
+                .done(onSuccess)
+                .fail(xhr => {
+                    if (xhr && xhr.responseText && xhr.responseText.indexOf('<?php') === 0) {
+                        loadCounts(query, onSuccess, onFail, idx + 1);
+                    } else {
+                        loadCounts(query, onSuccess, onFail, idx + 1);
+                    }
+                });
+        }
+
+        function rerenderAll() {
+            if (!store.lastPayload) return;
+            paintDashboard(store.lastPayload, false);
+        }
+
+        function paintDashboard(res, isError) {
+            store.lastPayload = res;
+            store.loadFailed = !!isError;
+            const apiError = isError || res?.meta?.api_error;
+            const tgPrev = buildPrevRankMap(res.telegram?.daily_previous);
+            const dcPrev = buildPrevRankMap(res.discord?.daily_previous);
+
+            if (res.timestamp) {
+                const next = new Date(Date.now() + 300000).toLocaleTimeString();
+                $('#lastUpdated').text(`Updated: ${res.timestamp} · Auto-refresh ~5 min (next ~${next})`);
+            }
+
+            renderTable(res.telegram?.daily, '#tg_daily', { platform: 'telegram', period: 'daily', prevMap: tgPrev, apiError });
+            renderTable(res.telegram?.monthly, '#tg_monthly', { platform: 'telegram', period: 'monthly', apiError });
+            renderTable(res.discord?.daily, '#dc_daily', { platform: 'discord', period: 'daily', prevMap: dcPrev, apiError });
+            renderTable(res.discord?.monthly, '#dc_monthly', { platform: 'discord', period: 'monthly', apiError });
+
+            renderBarChart('chartTgDaily', res.telegram?.daily, 'Today');
+            renderBarChart('chartTgMonthly', res.telegram?.monthly, 'Month');
+            renderBarChart('chartDcDaily', res.discord?.daily, 'Today');
+            renderBarChart('chartDcMonthly', res.discord?.monthly, 'Month');
+
+            if (store.customRange) {
+                renderTable(res.telegram?.range, '#custom_tg', { platform: 'telegram', period: 'custom', apiError });
+                renderTable(res.discord?.range, '#custom_dc', { platform: 'discord', period: 'custom', apiError });
+                renderBarChart('chartCustomTg', res.telegram?.range, 'Range TG');
+                renderBarChart('chartCustomDc', res.discord?.range, 'Range DC');
+            }
+        }
 
         function updateAll() {
-            $('#tg_daily, #tg_monthly, #dc_daily, #dc_monthly').html('<div class="loading">Updating...</div>');
-            $.getJSON('message_counts.php', res => {
-                $('#lastUpdated').text(`Last updated: ${res.timestamp} (Melbourne)`);
-                renderTable(res.telegram.daily, '#tg_daily');
-                renderTable(res.telegram.monthly, '#tg_monthly');
-                renderTable(res.discord.daily, '#dc_daily');
-                renderTable(res.discord.monthly, '#dc_monthly');
-            }).fail(()=>$('.tabcontent .section > div').html('<div class="error">Load error</div>'));
+            $('#tg_daily, #tg_monthly, #dc_daily, #dc_monthly').html('<div class="state-box state-loading">Updating…</div>');
+            store.customRange = null;
+            loadCounts('', res => paintDashboard(res, false), () => {
+                paintDashboard({ telegram: {}, discord: {}, meta: { api_error: true } }, true);
+            });
         }
 
-        function loadCustom() {
-            const start = $('#startDate').val(), end = $('#endDate').val();
+        function loadCustom(start, end) {
             if (!start || !end) return alert('Pick both dates');
-            $('#custom_tg, #custom_dc').html('<div class="loading">Loading...</div>');
-            $.getJSON(`message_counts.php?start_date=${start}&end_date=${end}`, res => {
-                renderTable(res.telegram.range, '#custom_tg');
-                renderTable(res.discord.range, '#custom_dc');
-            }).fail(()=>$('#custom_tg, #custom_dc').html('<div class="error">Error</div>'));
+            store.customRange = { start, end };
+            $('#custom_tg, #custom_dc').html('<div class="state-box state-loading">Loading…</div>');
+            const q = `?start_date=${start}&end_date=${end}`;
+            loadCounts(q, res => paintDashboard(res, false), () => {
+                $('#custom_tg, #custom_dc').html(emptyMessage({ platform: 'telegram', period: 'custom', apiError: true }));
+            });
         }
 
-        $(function(){
-            updateAll();
-            setInterval(updateAll, 300000);
-            // default today for custom
-            const today = new Date().toISOString().split('T')[0];
-            fpStart.setDate(today); fpEnd.setDate(today);
+        function rowsForExport(key) {
+            const map = {
+                tg_daily: () => filterRows(store.lastPayload?.telegram?.daily),
+                tg_monthly: () => filterRows(store.lastPayload?.telegram?.monthly),
+                dc_daily: () => filterRows(store.lastPayload?.discord?.daily),
+                dc_monthly: () => filterRows(store.lastPayload?.discord?.monthly),
+                custom_tg: () => filterRows(store.lastPayload?.telegram?.range),
+                custom_dc: () => filterRows(store.lastPayload?.discord?.range),
+            };
+            return (map[key] || (() => []))();
+        }
+
+        function exportCsv(key, label) {
+            const rows = rowsForExport(key);
+            if (!rows.length) return alert('Nothing to export for this section (empty or filtered out).');
+            const showTrend = key.endsWith('_daily') && !key.startsWith('custom');
+            const prevKey = key.startsWith('dc') ? 'discord' : 'telegram';
+            const prevMap = showTrend ? buildPrevRankMap(store.lastPayload?.[prevKey]?.daily_previous) : {};
+
+            const header = ['Rank', 'User ID', 'Username', 'Messages', 'Trend vs yesterday', 'Platform', 'Period', 'Exported At'];
+            const lines = [header.join(',')];
+            const period = key.includes('monthly') ? 'monthly' : key.includes('custom') ? `range ${store.customRange?.start || ''} to ${store.customRange?.end || ''}` : 'daily';
+            const platform = key.startsWith('dc') ? 'Discord' : 'Telegram';
+            const ts = store.lastPayload?.timestamp || new Date().toISOString();
+
+            rows.forEach((row, i) => {
+                const rank = i + 1;
+                const cnt = row.message_count ?? row.total_message_count;
+                let trend = '';
+                if (showTrend) {
+                    const prev = prevMap[String(row.user_id)];
+                    if (prev == null) trend = 'NEW';
+                    else if (prev > rank) trend = `UP from #${prev}`;
+                    else if (prev < rank) trend = `DOWN from #${prev}`;
+                    else trend = `SAME #${prev}`;
+                }
+                const un = `"${String(row.username || '').replace(/"/g, '""')}"`;
+                lines.push([rank, row.user_id, un, cnt, `"${trend}"`, platform, `"${label || period}"`, `"${ts}"`].join(','));
+            });
+
+            const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `memetorrent-tally-${key}-${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        function exportActiveTab() {
+            const tab = store.activeTab;
+            if (tab === 'Telegram') {
+                exportCsv('tg_daily', 'daily');
+                exportCsv('tg_monthly', 'monthly');
+            } else if (tab === 'Discord') {
+                exportCsv('dc_daily', 'daily');
+                exportCsv('dc_monthly', 'monthly');
+            } else if (store.customRange) {
+                exportCsv('custom_tg', 'custom telegram');
+                exportCsv('custom_dc', 'custom discord');
+            } else {
+                alert('Run a custom range search first, or use the per-section CSV buttons.');
+            }
+        }
+
+        function melbourneToday() {
+            return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+        }
+
+        function openTab(name) {
+            store.activeTab = name;
+            $('.tabcontent').removeClass('active');
+            $('#' + name).addClass('active');
+            $('.tablink').removeClass('active');
+            $(`.tablink[data-tab="${name}"]`).addClass('active');
+            if (name !== 'Custom') updateAll();
+        }
+
+        $('.tablink').on('click', function () { openTab($(this).data('tab')); });
+        $('#btnRefresh').on('click', () => store.activeTab === 'Custom' && store.customRange
+            ? loadCustom(store.customRange.start, store.customRange.end) : updateAll());
+        $('#btnExportCsv').on('click', exportActiveTab);
+        $('#btnCustomSearch').on('click', () => loadCustom($('#startDate').val(), $('#endDate').val()));
+        $('#userSearch').on('input', rerenderAll);
+        $('[data-export]').on('click', function () { exportCsv($(this).data('export')); });
+        $('[data-preset]').on('click', function () {
+            const today = melbourneToday();
+            const end = today;
+            let start = today;
+            if ($(this).data('preset') === '7') {
+                const [y, m, d] = today.split('-').map(Number);
+                const dt = new Date(Date.UTC(y, m - 1, d - 6));
+                start = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
+            } else {
+                start = today.slice(0, 8) + '01';
+            }
+            fpStart.setDate(start);
+            fpEnd.setDate(end);
+            loadCustom(start, end);
+            openTab('Custom');
         });
+
+        window.mtStaff = window.mtStaff || { unlocked: false, staffKey: null, wallet: null, provider: 'solflare', treasuryId: '' };
+        try {
+            const saved = sessionStorage.getItem('mt_tally_staff_key');
+            if (saved) {
+                window.mtStaff.unlocked = true;
+                window.mtStaff.staffKey = saved;
+            }
+            const prov = sessionStorage.getItem('mt_tally_wallet_provider');
+            if (prov) window.mtStaff.provider = prov;
+        } catch (e) {}
+
+        function refreshStaffChrome() {
+            const s = window.mtStaff;
+            const unlocked = !!s.unlocked;
+            const connected = !!(unlocked && s.wallet);
+            $('#btnStaffUnlock').text(unlocked ? 'Staff unlocked' : 'Unlock rewards');
+            $('#staffHint').toggle(!unlocked);
+            $('#walletPanel').toggleClass('open', unlocked);
+            $('#btnConnectWallet').toggle(unlocked && !connected);
+            $('#btnDisconnectWallet').toggle(unlocked && connected);
+            $('#walletConnectedRow').toggle(unlocked && connected);
+            $('.wallet-opt[data-provider]').removeClass('active');
+            $('.wallet-opt[data-provider="' + (s.provider || 'solflare') + '"]').addClass('active');
+            if (connected) {
+                $('#staffWalletLabel').text('Connected: ' + s.wallet.slice(0, 4) + '…' + s.wallet.slice(-4));
+                $('#staffProviderLabel').text('via ' + (s.provider || 'wallet'));
+            }
+            if (unlocked && window.mtReward && window.mtReward.loadTreasuryList) {
+                window.mtReward.loadTreasuryList();
+            }
+            if (window.mtReward && window.mtReward.onStaffChange) window.mtReward.onStaffChange();
+            rerenderAll();
+        }
+
+        $(document).on('click', '.wallet-opt[data-provider]', function (e) {
+            if ($(this).attr('href')) return;
+            e.preventDefault();
+            const p = $(this).data('provider');
+            window.mtStaff.provider = p;
+            try { sessionStorage.setItem('mt_tally_wallet_provider', p); } catch (err) {}
+            $('.wallet-opt[data-provider]').removeClass('active');
+            $(this).addClass('active');
+            if (window.mtReward && window.mtReward.onProviderSelected) window.mtReward.onProviderSelected(p);
+        });
+
+        $('#treasuryPick').on('change', function () {
+            window.mtStaff.treasuryId = $(this).val() || '';
+        });
+
+        $('#btnStaffUnlock').on('click', function () {
+            if (window.mtStaff.unlocked) {
+                if (!confirm('Lock staff reward tools?')) return;
+                window.mtStaff.unlocked = false;
+                window.mtStaff.staffKey = null;
+                try { sessionStorage.removeItem('mt_tally_staff_key'); } catch (e) {}
+                refreshStaffChrome();
+                return;
+            }
+            const key = prompt('Staff key (mods / admins / managers):');
+            if (!key) return;
+            fetch('/api/wallet-lookup?platform=telegram&user_id=1&staff_key=' + encodeURIComponent(key))
+                .then(r => r.status === 401 ? Promise.reject() : r.json())
+                .then(() => {
+                    window.mtStaff.unlocked = true;
+                    window.mtStaff.staffKey = key;
+                    try { sessionStorage.setItem('mt_tally_staff_key', key); } catch (e) {}
+                    refreshStaffChrome();
+                })
+                .catch(() => alert('Invalid staff key.'));
+        });
+
+        $(document).on('click', '.btn-reward', function () {
+            if (!window.mtStaff.unlocked) return alert('Unlock staff rewards first.');
+            if (!window.mtReward) return alert('Reward module still loading — try again in a moment.');
+            const $btn = $(this);
+            let uname = '';
+            try { uname = decodeURIComponent($btn.attr('data-username') || ''); } catch (e) { uname = $btn.attr('data-username') || ''; }
+            window.mtReward.openForRow({
+                platform: $btn.data('platform'),
+                userId: String($btn.data('user-id')),
+                username: uname
+            });
+        });
+
+        window.refreshStaffChrome = refreshStaffChrome;
+        refreshStaffChrome();
+
+        const today = melbourneToday();
+        fpStart.setDate(today);
+        fpEnd.setDate(today);
+        updateAll();
+        setInterval(updateAll, 300000);
+    })();
+    </script>
+    <script type="module">
+    import { PublicKey, Transaction } from 'https://esm.sh/@solana/web3.js@1.98.4';
+    import {
+        getAssociatedTokenAddress,
+        createAssociatedTokenAccountInstruction,
+        createTransferInstruction,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
+    } from 'https://esm.sh/@solana/spl-token@0.4.13';
+
+    const MT_MINT = new PublicKey('ELywDcVX2WumHm4xEfqF8NdEKaeGCAaq9JmwtjE8pump');
+    const MT_DECIMALS = 6;
+
+    function bytesToBase64(bytes) {
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        return btoa(binary);
+    }
+
+    async function accountExists(address) {
+        const res = await fetch('/api/solana/account-info?address=' + encodeURIComponent(address));
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not check token account');
+        return !!data.exists;
+    }
+
+    async function sendTransactionViaApi(serializedTx) {
+        const res = await fetch('/api/solana/send-transaction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transaction: bytesToBase64(serializedTx) })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Transaction send failed');
+        return data.signature;
+    }
+
+    async function waitForConfirmation(signature) {
+        const deadline = Date.now() + 90000;
+        while (Date.now() < deadline) {
+            const res = await fetch('/api/solana/signature-status?signature=' + encodeURIComponent(signature));
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Could not confirm transaction');
+            if (data.err) throw new Error('Transaction failed on-chain');
+            if (data.confirmed) return;
+            await new Promise(r => setTimeout(r, 2000));
+        }
+        throw new Error('Confirmation timed out — check Solscan for tx ' + signature);
+    }
+
+    let pendingReward = null;
+    let walletProvider = null;
+    let selectedProviderName = 'solflare';
+
+    const PROVIDER_DEEPLINKS = {
+        phantom: url => 'https://phantom.app/ul/browse/' + encodeURIComponent(url) + '?ref=mt-tally',
+        solflare: url => 'https://solflare.com/ul/browse/' + encodeURIComponent(url),
+        backpack: url => 'https://backpack.app/ul/browse/' + encodeURIComponent(url)
+    };
+
+    function staffKey() {
+        return window.mtStaff?.staffKey || null;
+    }
+
+    function getProviderByName(name) {
+        const w = window;
+        if (name === 'phantom') {
+            const p = w.phantom?.solana || (w.solana?.isPhantom ? w.solana : null);
+            return p ? { name: 'phantom', provider: p } : null;
+        }
+        if (name === 'solflare' && w.solflare) {
+            return { name: 'solflare', provider: w.solflare };
+        }
+        if (name === 'backpack') {
+            const p = w.backpack?.solana || w.backpack;
+            return p ? { name: 'backpack', provider: p } : null;
+        }
+        return null;
+    }
+
+    function pubkeyToString(pk) {
+        if (!pk) return null;
+        if (typeof pk === 'string') return pk;
+        if (pk.toString) return pk.toString();
+        if (pk.toBase58) return pk.toBase58();
+        return null;
+    }
+
+    function showDeeplinkHint(name) {
+        const el = document.getElementById('walletDeeplinkHint');
+        const url = window.location.href;
+        const link = PROVIDER_DEEPLINKS[name];
+        if (!link) {
+            el.style.display = 'none';
+            return;
+        }
+        el.style.display = 'block';
+        el.innerHTML = 'No ' + name + ' extension detected. <a href="' + link(url) + '" target="_blank" rel="noopener" style="color:#86efac">Open this page inside ' + name + '</a>, then click Connect again.';
+    }
+
+    function onProviderSelected(name) {
+        selectedProviderName = name;
+        document.getElementById('walletDeeplinkHint').style.display = 'none';
+        const help = document.getElementById('walletHelp');
+        if (name === 'phantom') {
+            help.className = 'wallet-hint warn';
+            help.innerHTML = 'Phantom often blocks dApps. If connect fails, switch to <strong>Solflare</strong> or <strong>Backpack</strong>, or open this page in the wallet in-app browser.';
+        } else if (name === 'infinite') {
+            help.className = 'wallet-hint';
+            help.innerHTML = 'Open <strong>Infinite Wallet</strong>, use its browser to visit this tally page, then connect with Solflare/Backpack inside that session if needed.';
+        } else {
+            help.className = 'wallet-hint';
+            help.innerHTML = 'Using <strong>' + name + '</strong>. On mobile, open the deeplink if the extension is not detected.';
+        }
+    }
+
+    async function loadTreasuryList() {
+        const key = staffKey();
+        const sel = document.getElementById('treasuryPick');
+        if (!key || !sel) return;
+        try {
+            const res = await fetch('/api/staff-wallets?staff_key=' + encodeURIComponent(key));
+            const data = await res.json();
+            if (!res.ok) return;
+            const current = sel.value;
+            sel.innerHTML = '<option value="">Team treasury (optional label)…</option>';
+            (data.wallets || []).forEach(w => {
+                const opt = document.createElement('option');
+                opt.value = w.id || w.address;
+                opt.textContent = (w.label || 'Treasury') + ' — ' + (w.address || '').slice(0, 6) + '…';
+                opt.dataset.address = w.address || '';
+                sel.appendChild(opt);
+            });
+            if (current) sel.value = current;
+        } catch (e) {}
+    }
+
+    function disconnectWallet() {
+        const p = walletProvider;
+        if (p && p.disconnect) {
+            try { p.disconnect(); } catch (e) {}
+        }
+        walletProvider = null;
+        window.mtStaff.wallet = null;
+        if (typeof window.refreshStaffChrome === 'function') window.refreshStaffChrome();
+        else {
+            document.getElementById('btnConnectWallet').style.display = '';
+            document.getElementById('btnDisconnectWallet').style.display = 'none';
+            document.getElementById('walletConnectedRow').style.display = 'none';
+        }
+    }
+
+    async function connectWallet(forcedName) {
+        const name = forcedName || window.mtStaff?.provider || selectedProviderName || 'solflare';
+        selectedProviderName = name;
+        window.mtStaff.provider = name;
+        onProviderSelected(name);
+
+        const injected = getProviderByName(name);
+        if (!injected) {
+            showDeeplinkHint(name);
+            if (name === 'infinite') {
+                window.open('https://mt.futuret3ch.com.au/', '_blank');
+            }
+            return false;
+        }
+
+        try {
+            const resp = await injected.provider.connect();
+            const addr = pubkeyToString(resp?.publicKey || injected.provider.publicKey);
+            if (!addr) throw new Error('No public key returned from ' + name);
+
+            const treasurySel = document.getElementById('treasuryPick');
+            const expected = treasurySel?.selectedOptions?.[0]?.dataset?.address;
+            if (expected && expected !== addr) {
+                const ok = confirm(
+                    'Connected wallet ' + addr.slice(0, 6) + '… does not match the selected treasury ' +
+                    expected.slice(0, 6) + '…. Send anyway?'
+                );
+                if (!ok) {
+                    if (injected.provider.disconnect) try { await injected.provider.disconnect(); } catch (e) {}
+                    return false;
+                }
+            }
+
+            window.mtStaff.wallet = addr;
+            window.mtStaff.provider = name;
+            walletProvider = injected.provider;
+            try { sessionStorage.setItem('mt_tally_wallet_provider', name); } catch (e) {}
+            document.getElementById('walletDeeplinkHint').style.display = 'none';
+        if (typeof window.refreshStaffChrome === 'function') window.refreshStaffChrome();
+        return true;
+        } catch (e) {
+            if (e?.code === 4001 || String(e?.message || '').includes('User rejected')) {
+                showDeeplinkHint(name);
+            } else {
+                showDeeplinkHint(name);
+                alert(name + ' connect failed: ' + (e?.message || e) + '\n\nTry Solflare or Backpack, or open this page inside the wallet app browser.');
+            }
+            return false;
+        }
+    }
+
+    async function submitTransaction(transaction) {
+        setStatus('Approve the transaction in your wallet…');
+
+        if (walletProvider?.signAndSendTransaction) {
+            try {
+                const outcome = await walletProvider.signAndSendTransaction(transaction, { skipPreflight: false });
+                const sig = typeof outcome === 'string' ? outcome : (outcome?.signature || outcome?.txid);
+                if (sig) {
+                    setStatus('Confirming on-chain…');
+                    await waitForConfirmation(sig);
+                    return sig;
+                }
+            } catch (e) {
+                if (e?.code === 4001 || String(e?.message || '').includes('User rejected')) throw e;
+            }
+        }
+
+        if (!walletProvider?.signTransaction) {
+            throw new Error('This wallet cannot sign transactions. Try Solflare or Backpack.');
+        }
+
+        const signed = await walletProvider.signTransaction(transaction);
+        setStatus('Submitting transaction…');
+        const sig = await sendTransactionViaApi(signed.serialize());
+        setStatus('Confirming on-chain…');
+        await waitForConfirmation(sig);
+        return sig;
+    }
+
+    let lastTxSignature = null;
+
+    function resetRewardModalUi() {
+        document.getElementById('rewardFormFields').classList.remove('hidden');
+        document.getElementById('rewardSuccess').classList.remove('visible');
+        document.getElementById('rewardStatus').textContent = '';
+        document.getElementById('rewardStatus').classList.remove('err');
+        document.getElementById('rewardConfirm').textContent = 'Send $MT';
+        document.getElementById('rewardConfirm').disabled = false;
+        document.getElementById('rewardCancel').style.display = '';
+        lastTxSignature = null;
+    }
+
+    function closeModal() {
+        const m = document.getElementById('rewardModal');
+        m.classList.remove('open');
+        m.setAttribute('aria-hidden', 'true');
+        pendingReward = null;
+        resetRewardModalUi();
+    }
+
+    function showRewardSuccess(sig, amount, username) {
+        lastTxSignature = sig;
+        document.getElementById('rewardFormFields').classList.add('hidden');
+        document.getElementById('rewardSuccess').classList.add('visible');
+        document.getElementById('rewardSuccessSummary').textContent =
+            (amount ? amount.toLocaleString() + ' $MT ' : '') +
+            'sent to ' + (username ? '@' + username : 'member') + '. Save the signature below:';
+        document.getElementById('rewardTxDisplay').textContent = sig;
+        document.getElementById('rewardSolscanLink').href =
+            'https://solscan.io/tx/' + encodeURIComponent(sig);
+        document.getElementById('rewardStatus').textContent = '';
+        document.getElementById('rewardConfirm').style.display = 'none';
+        document.getElementById('rewardCancel').textContent = 'Close';
+    }
+
+    function setStatus(msg, isErr) {
+        const el = document.getElementById('rewardStatus');
+        el.textContent = msg;
+        el.classList.toggle('err', !!isErr);
+    }
+
+    async function lookupWallet(platform, userId) {
+        const key = staffKey();
+        if (!key) throw new Error('Staff session expired — unlock again.');
+        const res = await fetch(
+            '/api/wallet-lookup?platform=' + encodeURIComponent(platform) +
+            '&user_id=' + encodeURIComponent(userId) +
+            '&staff_key=' + encodeURIComponent(key)
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Lookup failed');
+        return data;
+    }
+
+    async function sendMtReward(recipientWallet, amountMt, note) {
+        if (!walletProvider || !window.mtStaff.wallet) {
+            const ok = await connectWallet();
+            if (!ok) throw new Error('Connect your rewards wallet first.');
+        }
+        const sender = new PublicKey(window.mtStaff.wallet);
+        const recipient = new PublicKey(recipientWallet);
+        const transaction = new Transaction();
+
+        const senderAta = await getAssociatedTokenAddress(MT_MINT, sender, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+        const recipientAta = await getAssociatedTokenAddress(MT_MINT, recipient, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+
+        const recipientAtaStr = recipientAta.toBase58();
+        if (!(await accountExists(recipientAtaStr))) {
+            transaction.add(
+                createAssociatedTokenAccountInstruction(
+                    sender, recipientAta, recipient, MT_MINT, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+                )
+            );
+        }
+
+        const raw = BigInt(Math.round(amountMt * Math.pow(10, MT_DECIMALS)));
+        if (raw <= 0n) throw new Error('Enter a valid $MT amount.');
+
+        transaction.add(
+            createTransferInstruction(senderAta, recipientAta, sender, raw, [], TOKEN_PROGRAM_ID)
+        );
+
+        const bhRes = await fetch('/api/solana/blockhash');
+        const bhData = await bhRes.json();
+        if (bhData.error) throw new Error(bhData.error);
+        transaction.recentBlockhash = bhData.blockhash;
+        transaction.feePayer = sender;
+
+        return await submitTransaction(transaction);
+    }
+
+    async function logReward(payload) {
+        const key = staffKey();
+        if (!key) return;
+        await fetch('/api/reward-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Staff-Key': key },
+            body: JSON.stringify(payload)
+        });
+    }
+
+    async function openForRow({ platform, userId, username }) {
+        if (!window.mtStaff?.unlocked) return alert('Unlock staff rewards first.');
+        if (!walletProvider && !window.mtStaff.wallet) {
+            const ok = await connectWallet();
+            if (!ok) return;
+        }
+
+        resetRewardModalUi();
+        document.getElementById('rewardConfirm').style.display = '';
+        document.getElementById('rewardCancel').textContent = 'Cancel';
+        setStatus('Looking up linked wallet…', false);
+        document.getElementById('rewardModal').classList.add('open');
+        document.getElementById('rewardModal').setAttribute('aria-hidden', 'false');
+        document.getElementById('rewardModalTitle').textContent = 'Reward ' + (username ? '@' + username : 'member');
+        document.getElementById('rewardAmount').value = '';
+        document.getElementById('rewardNote').value = platform === 'discord' ? 'Discord leaderboard reward' : 'Telegram leaderboard reward';
+
+        try {
+            const info = await lookupWallet(platform, userId);
+            if (!info.linked || !info.wallet_address) {
+                document.getElementById('rewardModalMeta').innerHTML =
+                    '<strong>No wallet on file</strong> for this ' + platform + ' user (ID ' + userId + '). They need to link via the portal / bot first.';
+                document.getElementById('rewardConfirm').disabled = true;
+                pendingReward = null;
+                setStatus('', false);
+                return;
+            }
+            document.getElementById('rewardConfirm').disabled = false;
+            document.getElementById('rewardModalMeta').innerHTML =
+                'Send <strong>$MT</strong> from your connected wallet to:<br>' +
+                '<span style="font-family:monospace;font-size:12px">' + info.wallet_address + '</span><br>' +
+                (info.verified ? '✓ Verified member' : 'Member not verified in DB');
+            pendingReward = {
+                platform,
+                userId,
+                username: info.username || username,
+                wallet: info.wallet_address
+            };
+            setStatus('', false);
+        } catch (e) {
+            document.getElementById('rewardModalMeta').textContent = '';
+            setStatus(e.message || 'Could not load wallet', true);
+            document.getElementById('rewardConfirm').disabled = true;
+            pendingReward = null;
+        }
+    }
+
+    document.getElementById('btnConnectWallet').addEventListener('click', () => connectWallet());
+    document.getElementById('btnDisconnectWallet').addEventListener('click', disconnectWallet);
+    document.getElementById('rewardCancel').addEventListener('click', closeModal);
+    document.getElementById('rewardDone').addEventListener('click', closeModal);
+    document.getElementById('rewardCopyTx').addEventListener('click', async () => {
+        if (!lastTxSignature) return;
+        try {
+            await navigator.clipboard.writeText(lastTxSignature);
+            document.getElementById('rewardCopyTx').textContent = 'Copied!';
+            setTimeout(() => { document.getElementById('rewardCopyTx').textContent = 'Copy tx signature'; }, 2000);
+        } catch (e) {
+            const box = document.getElementById('rewardTxDisplay');
+            const range = document.createRange();
+            range.selectNodeContents(box);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            alert('Select the signature above and copy (Ctrl+C).');
+        }
+    });
+    document.getElementById('rewardModal').addEventListener('click', e => {
+        if (e.target.id === 'rewardModal' && !lastTxSignature) closeModal();
+    });
+    document.querySelectorAll('.reward-presets button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.getElementById('rewardAmount').value = btn.getAttribute('data-amt');
+        });
+    });
+
+    document.getElementById('rewardConfirm').addEventListener('click', async () => {
+        if (!pendingReward) return;
+        const amount = parseFloat(document.getElementById('rewardAmount').value);
+        if (!amount || amount <= 0) return setStatus('Enter a valid $MT amount.', true);
+        const note = document.getElementById('rewardNote').value.trim();
+        const btn = document.getElementById('rewardConfirm');
+        btn.disabled = true;
+        try {
+            const sig = await sendMtReward(pendingReward.wallet, amount, note);
+            await logReward({
+                platform: pendingReward.platform,
+                user_id: pendingReward.userId,
+                username: pendingReward.username,
+                recipient_wallet: pendingReward.wallet,
+                amount_mt: amount,
+                tx_signature: sig,
+                sender_wallet: window.mtStaff.wallet,
+                note: note || null
+            });
+            showRewardSuccess(sig, amount, pendingReward.username);
+        } catch (e) {
+            if (e?.code === 4001 || String(e?.message || '').includes('User rejected')) {
+                setStatus('Transaction cancelled in wallet.', true);
+            } else {
+                setStatus('Failed: ' + (e?.message || e), true);
+            }
+            btn.disabled = false;
+        }
+    });
+
+    window.mtReward = {
+        openForRow,
+        onStaffChange() {},
+        connectWallet,
+        loadTreasuryList,
+        onProviderSelected,
+        disconnectWallet
+    };
+
+    selectedProviderName = window.mtStaff?.provider || 'solflare';
+    onProviderSelected(selectedProviderName);
+    if (window.mtStaff?.unlocked) loadTreasuryList();
+    if (window.mtStaff?.unlocked && window.mtStaff?.wallet) {
+        const p = getProviderByName(window.mtStaff.provider || 'solflare');
+        walletProvider = p?.provider || null;
+    }
     </script>
 </body>
 </html>
