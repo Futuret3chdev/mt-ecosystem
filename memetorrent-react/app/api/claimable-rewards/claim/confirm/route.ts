@@ -5,7 +5,11 @@ import {
   logReward,
   WALLET_RE,
 } from '@/lib/rewards-db';
-import { treasuryConfigured, verifyClaimTransaction } from '@/lib/treasury-send';
+import {
+  coSignAndSendUserClaim,
+  treasuryConfigured,
+  verifyClaimTransaction,
+} from '@/lib/treasury-send';
 
 export async function POST(request: NextRequest) {
   if (!(await treasuryConfigured())) {
@@ -20,12 +24,16 @@ export async function POST(request: NextRequest) {
   }
 
   const wallet = String(body?.wallet_address || '').trim();
-  const signature = String(body?.tx_signature || '').trim();
+  const signedTx = String(body?.signed_transaction_base64 || '').trim();
+  let signature = String(body?.tx_signature || '').trim();
   if (!wallet || !WALLET_RE.test(wallet)) {
     return Response.json({ error: 'Valid wallet_address required' }, { status: 400 });
   }
-  if (!signature || signature.length < 80) {
-    return Response.json({ error: 'Valid tx_signature required' }, { status: 400 });
+  if (!signedTx && (!signature || signature.length < 80)) {
+    return Response.json(
+      { error: 'signed_transaction_base64 or tx_signature required' },
+      { status: 400 }
+    );
   }
 
   let userConn = null;
@@ -59,16 +67,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ok = await verifyClaimTransaction(signature, wallet, claimable);
-    if (!ok) {
-      await trackConn.rollback();
-      return Response.json(
-        {
-          error: 'tx_not_verified',
-          message: 'Transaction not confirmed or amount mismatch. Balance unchanged.',
-        },
-        { status: 400 }
-      );
+    let senderWallet = body?.sender_wallet || 'treasury';
+
+    if (signedTx) {
+      const sent = await coSignAndSendUserClaim(signedTx, wallet, claimable);
+      signature = sent.signature;
+      senderWallet = sent.senderWallet;
+    } else {
+      const ok = await verifyClaimTransaction(signature, wallet, claimable);
+      if (!ok) {
+        await trackConn.rollback();
+        return Response.json(
+          {
+            error: 'tx_not_verified',
+            message: 'Transaction not confirmed or amount mismatch. Balance unchanged.',
+          },
+          { status: 400 }
+        );
+      }
     }
 
     await trackConn.execute(
@@ -76,8 +92,6 @@ export async function POST(request: NextRequest) {
       [userId]
     );
     await trackConn.commit();
-
-    const senderWallet = body?.sender_wallet || 'treasury';
 
     await logReward(userConn, {
       platform: 'telegram',
@@ -105,7 +119,10 @@ export async function POST(request: NextRequest) {
       } catch {}
     }
     console.error('claim confirm', err?.message);
-    return Response.json({ error: 'confirm_failed' }, { status: 500 });
+    return Response.json(
+      { error: 'confirm_failed', message: err?.message || 'Claim confirm failed' },
+      { status: 500 }
+    );
   } finally {
     if (userConn) await userConn.end();
     if (trackConn) await trackConn.end();

@@ -1,9 +1,22 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
 import { Transaction } from '@solana/web3.js';
 import Link from 'next/link';
+import {
+  connectDirectWallet,
+  disconnectDirectWallet,
+  onDirectWalletAccountChange,
+  signWithDirectWallet,
+  type DirectWallet,
+  type WalletKind,
+} from '@/lib/direct-solana-wallet';
+
+const WALLET_OPTIONS: { id: WalletKind; label: string }[] = [
+  { id: 'phantom', label: 'Phantom' },
+  { id: 'solflare', label: 'Solflare' },
+  { id: 'backpack', label: 'Backpack' },
+];
 
 type ClaimUser = {
   user_id: string;
@@ -23,23 +36,25 @@ type MyRow = {
 };
 
 export default function ClaimsPortal() {
-  const { publicKey, connected, connect, disconnect, select, wallets, signTransaction } = useWallet();
   const [allUsers, setAllUsers] = useState<ClaimUser[]>([]);
   const [myRow, setMyRow] = useState<MyRow | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [statusErr, setStatusErr] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [success, setSuccess] = useState<{ amount: number; tx: string; solscan: string } | null>(null);
   const [summary, setSummary] = useState({ pending: 0, withBalance: 0, total: 0 });
   const [treasuryReady, setTreasuryReady] = useState(true);
   const [feeHint, setFeeHint] = useState<string | null>(null);
-  const [selectedWallet, setSelectedWallet] = useState('Phantom');
+  const [selectedWallet, setSelectedWallet] = useState<WalletKind>('phantom');
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [directWallet, setDirectWallet] = useState<DirectWallet | null>(null);
   const [showAllMembers, setShowAllMembers] = useState(false);
   const [memberPage, setMemberPage] = useState(0);
   const MEMBERS_PER_PAGE = 50;
 
-  const walletAddress = publicKey?.toBase58() ?? null;
+  const connected = !!walletAddress && !!directWallet;
 
   const isBlankMember = (u: ClaimUser) => {
     const name = (u.username || '').trim().toLowerCase();
@@ -128,42 +143,44 @@ export default function ClaimsPortal() {
   }, [loadList]);
 
   useEffect(() => {
-    if (connected && walletAddress) {
+    if (walletAddress) {
       matchWallet(walletAddress);
     } else {
       setMyRow(null);
     }
-  }, [connected, walletAddress, matchWallet]);
+  }, [walletAddress, matchWallet]);
+
+  useEffect(() => onDirectWalletAccountChange(directWallet, setWalletAddress), [directWallet]);
 
   async function handleConnect() {
+    setConnecting(true);
+    setStatus('');
+    setStatusErr(false);
     try {
-      select(selectedWallet as any);
-      await connect();
+      const { address, wallet } = await connectDirectWallet(selectedWallet);
+      setWalletAddress(address);
+      setDirectWallet(wallet);
+      setStatus(`Connected ${address.slice(0, 4)}…${address.slice(-4)}`);
+      setStatusErr(false);
     } catch (e: any) {
       setStatus(e.message || 'Connect failed');
       setStatusErr(true);
+    } finally {
+      setConnecting(false);
     }
   }
 
-  async function waitForConfirmation(signature: string, timeoutMs = 60000) {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      const res = await fetch(`/api/solana/signature-status?signature=${encodeURIComponent(signature)}`);
-      const data = await res.json();
-      if (data.confirmed) return;
-      if (data.err) throw new Error('Transaction failed on-chain');
-      await new Promise((r) => setTimeout(r, 1500));
-    }
-    throw new Error('Transaction confirmation timed out — check Solscan for status');
+  async function handleDisconnect() {
+    await disconnectDirectWallet(directWallet);
+    setDirectWallet(null);
+    setWalletAddress(null);
+    setMyRow(null);
+    setStatus('');
+    setStatusErr(false);
   }
 
   async function handleClaim() {
-    if (!walletAddress || !myRow || myRow.claimable_mt <= 0) return;
-    if (!signTransaction) {
-      setStatus('Your wallet does not support signing — try Phantom, Solflare, or Backpack.');
-      setStatusErr(true);
-      return;
-    }
+    if (!walletAddress || !directWallet || !myRow || myRow.claimable_mt <= 0) return;
     setClaiming(true);
     setSuccess(null);
     setStatus('Preparing claim — approve in your wallet…');
@@ -189,30 +206,15 @@ export default function ClaimsPortal() {
       const tx = Transaction.from(Buffer.from(prep.transaction_base64, 'base64'));
       setStatus('Approve the transaction in your wallet…');
 
-      // Partial-signed treasury tx: Phantom requires signTransaction (not sendTransaction).
-      const signed = await signTransaction(tx);
-      setStatus('Submitting transaction…');
-
-      const sendRes = await fetch('/api/solana/send-transaction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transaction: Buffer.from(signed.serialize()).toString('base64'),
-        }),
-      });
-      const sendData = await sendRes.json();
-      if (!sendRes.ok) throw new Error(sendData.error || 'Submit failed');
-
-      const sig = sendData.signature as string;
-      setStatus('Waiting for on-chain confirmation…');
-      await waitForConfirmation(sig);
+      const signed = await signWithDirectWallet(directWallet, tx);
+      setStatus('Completing claim on-chain…');
 
       const confirmRes = await fetch('/api/claimable-rewards/claim/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           wallet_address: walletAddress,
-          tx_signature: sig,
+          signed_transaction_base64: Buffer.from(signed.serialize()).toString('base64'),
           sender_wallet: prep.sender_wallet,
         }),
       });
@@ -334,34 +336,36 @@ export default function ClaimsPortal() {
 
       <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-6 mb-6">
         <div className="flex flex-wrap gap-2 items-center justify-center">
-          {wallets.map((w) => (
+          {WALLET_OPTIONS.map((w) => (
             <button
-              key={w.adapter.name}
+              key={w.id}
               type="button"
-              onClick={() => setSelectedWallet(w.adapter.name)}
+              onClick={() => setSelectedWallet(w.id)}
+              disabled={connected}
               className={`px-3 py-1.5 rounded-lg text-xs border ${
-                selectedWallet === w.adapter.name
+                selectedWallet === w.id
                   ? 'border-emerald-400/60 bg-emerald-400/10'
                   : 'border-white/20 hover:bg-white/5'
-              }`}
+              } disabled:opacity-50`}
             >
-              {w.adapter.name}
+              {w.label}
             </button>
           ))}
           {!connected ? (
             <button
               type="button"
               onClick={handleConnect}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-500 font-semibold text-sm"
+              disabled={connecting}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-500 font-semibold text-sm disabled:opacity-50"
             >
-              Connect wallet
+              {connecting ? 'Connecting…' : 'Connect wallet'}
             </button>
           ) : (
             <>
               <span className="font-mono text-xs text-emerald-300">
                 {walletAddress?.slice(0, 4)}…{walletAddress?.slice(-4)}
               </span>
-              <button type="button" onClick={() => disconnect()} className="px-3 py-1.5 rounded-lg text-xs border border-white/20">
+              <button type="button" onClick={handleDisconnect} className="px-3 py-1.5 rounded-lg text-xs border border-white/20">
                 Disconnect
               </button>
             </>

@@ -175,9 +175,10 @@ export async function buildUserPaidClaimTransaction(
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = recipient;
-  transaction.partialSign(treasury);
 
-  const simulation = await connection.simulateTransaction(transaction);
+  const simTx = Transaction.from(transaction.serialize({ requireAllSignatures: false }));
+  simTx.partialSign(treasury);
+  const simulation = await connection.simulateTransaction(simTx);
   if (simulation.value.err) {
     const logs = simulation.value.logs?.join(' | ') || JSON.stringify(simulation.value.err);
     throw new Error(`Simulation failed: ${logs}`);
@@ -194,6 +195,77 @@ export async function buildUserPaidClaimTransaction(
     senderWallet: sender.toBase58(),
     amountMt,
   };
+}
+
+/** User signed first (fee payer); treasury co-signs and broadcasts. */
+export async function coSignAndSendUserClaim(
+  userSignedBase64: string,
+  recipientWallet: string,
+  amountMt: number
+): Promise<{ signature: string; senderWallet: string }> {
+  const treasury = await getTreasuryKeypair();
+  if (!treasury) throw new Error('Rewards treasury wallet is not configured on the server.');
+
+  const connection = await getConnection();
+  const recipient = new PublicKey(recipientWallet);
+  const sender = treasury.publicKey;
+  const tx = Transaction.from(Buffer.from(userSignedBase64, 'base64'));
+
+  if (!tx.feePayer?.equals(recipient)) {
+    throw new Error('Transaction fee payer must be your wallet.');
+  }
+
+  const recipientAta = await getAssociatedTokenAddress(
+    MT_MINT,
+    recipient,
+    false,
+    TOKEN_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
+  const senderAta = await getAssociatedTokenAddress(
+    MT_MINT,
+    sender,
+    false,
+    TOKEN_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
+  const expectedRaw = BigInt(Math.round(amountMt * Math.pow(10, MT_DECIMALS)));
+
+  let sawTransfer = false;
+  for (const ix of tx.instructions) {
+    if (!ix.programId.equals(TOKEN_PROGRAM_ID)) continue;
+    const data = ix.data;
+    if (data[0] === 3) {
+      const dest = ix.keys[1]?.pubkey;
+      const auth = ix.keys[2]?.pubkey;
+      const amt = data.readBigUInt64LE(1);
+      if (dest?.equals(recipientAta) && auth?.equals(sender) && amt === expectedRaw) {
+        sawTransfer = true;
+      }
+    }
+  }
+  if (!sawTransfer) throw new Error('Transaction does not match the expected $MT claim transfer.');
+
+  tx.partialSign(treasury);
+
+  const simulation = await connection.simulateTransaction(tx);
+  if (simulation.value.err) {
+    const logs = simulation.value.logs?.join(' | ') || JSON.stringify(simulation.value.err);
+    throw new Error(`Simulation failed: ${logs}`);
+  }
+
+  try {
+    const signature = await connection.sendRawTransaction(tx.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+      maxRetries: 3,
+    });
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+    await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+    return { signature, senderWallet: sender.toBase58() };
+  } catch (err) {
+    throw new Error(await formatSendError(connection, err));
+  }
 }
 
 export async function verifyClaimTransaction(
