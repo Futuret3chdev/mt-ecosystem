@@ -365,18 +365,24 @@ app.get('/api/staff/directory', requireStaffAuthAu, (req, res) => {
 
 /* ====================== REWARDS ADMIN (staff key + 2FA, AU only) ====================== */
 
-app.get('/api/rewards-admin/auth', requireAustralianAdmin, (req, res) => {
+function rewardsAuthGet(req, res) {
   res.set('Cache-Control', 'no-store');
   res.json(rewardsAdmin.handleAuthGet());
-});
+}
 
-app.post('/api/rewards-admin/auth', requireAustralianAdmin, (req, res) => {
+function rewardsAuthPost(req, res) {
   const result = rewardsAdmin.handleAuthPost(req.body || {});
   if (result.error) {
     return res.status(result.status || 400).json(result);
   }
   res.json(result);
-});
+}
+
+app.get('/api/rewards-admin/auth', requireAustralianAdmin, rewardsAuthGet);
+app.get('/api/admin/auth', requireAustralianAdmin, rewardsAuthGet);
+
+app.post('/api/rewards-admin/auth', requireAustralianAdmin, rewardsAuthPost);
+app.post('/api/admin/auth', requireAustralianAdmin, rewardsAuthPost);
 
 function requireRewardsAdminSession(req, res, next) {
   if (!rewardsAdmin.isRewardsAdminAuthorized(req)) {
@@ -385,7 +391,7 @@ function requireRewardsAdminSession(req, res, next) {
   next();
 }
 
-app.get('/api/rewards-admin/users', requireAustralianAdmin, requireRewardsAdminSession, async (req, res) => {
+async function rewardsUsersGet(req, res) {
   try {
     const users = await rewardsAdmin.fetchAllClaimableUsers();
     const withBalance = users.filter((u) => u.claimable_mt > 0);
@@ -412,9 +418,9 @@ app.get('/api/rewards-admin/users', requireAustralianAdmin, requireRewardsAdminS
     console.error('rewards-admin users', err?.message);
     res.status(500).json({ error: 'database_error' });
   }
-});
+}
 
-app.post('/api/rewards-admin/assign', requireAustralianAdmin, requireRewardsAdminSession, async (req, res) => {
+async function rewardsAssignPost(req, res) {
   const userId = String(req.body?.user_id || '').trim();
   const amount = Number(req.body?.amount_mt);
   const mode = req.body?.mode === 'set' ? 'set' : 'add';
@@ -435,7 +441,13 @@ app.post('/api/rewards-admin/assign', requireAustralianAdmin, requireRewardsAdmi
     return res.status(result.status || 400).json({ error: result.error });
   }
   res.json(result);
-});
+}
+
+app.get('/api/rewards-admin/users', requireAustralianAdmin, requireRewardsAdminSession, rewardsUsersGet);
+app.get('/api/claimable-rewards', requireAustralianAdmin, requireRewardsAdminSession, rewardsUsersGet);
+
+app.post('/api/rewards-admin/assign', requireAustralianAdmin, requireRewardsAdminSession, rewardsAssignPost);
+app.post('/api/claimable-rewards/assign', requireAustralianAdmin, requireRewardsAdminSession, rewardsAssignPost);
 
 app.get('/admin-rewards.html', requireAustralianAdmin, (req, res) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate');

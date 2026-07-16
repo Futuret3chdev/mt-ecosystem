@@ -5,7 +5,65 @@
   "installCommand": "npm install",
   "devCommand": "next dev --port $PORT",
   "rewrites": [
-    { "source": "/message_counts.php", "destination": "/api/message-counts" },
-    { "source": "/message_counts.php(.*)", "destination": "/api/message-counts$1" }
+    {
+      "source": "/admin-rewards.html",
+      "destination": "https://admin.futuret3ch.com.au/admin-rewards.html"
+    },
+    {
+      "source": "/api/admin/auth",
+      "destination": "https://admin.futuret3ch.com.au/api/admin/auth"
+    },
+    {
+      "source": "/api/claimable-rewards/assign",
+      "destination": "https://admin.futuret3ch.com.au/api/claimable-rewards/assign"
+    },
+    {
+      "source": "/api/claimable-rewards",
+      "destination": "https://admin.futuret3ch.com.au/api/claimable-rewards"
+    },
+    {
+      "destination": "/auth.txt",
+      "source": "/auth.php"
+    },
+    {
+      "destination": "/callback.txt",
+      "source": "/callback.php"
+    },
+    {
+      "destination": "/logout.txt",
+      "source": "/logout.php"
+    },
+    {
+      "destination": "/get-latest-scam.txt",
+      "source": "/get-latest-scam.php"
+    },
+    {
+      "destination": "/submit-scam.txt",
+      "source": "/submit-scam.php"
+    },
+    {
+      "destination": "/sendToTelegram.txt",
+      "source": "/sendToTelegram.php"
+    },
+    {
+      "destination": "/telegram-webhook.txt",
+      "source": "/telegram-webhook.php"
+    },
+    {
+      "destination": "/wallet_callback.txt",
+      "source": "/wallet_callback.php"
+    },
+    {
+      "destination": "/update_discord_verification.txt",
+      "source": "/update_discord_verification.php"
+    },
+    {
+      "destination": "/store_discord_member.txt",
+      "source": "/store_discord_member.php"
+    },
+    {
+      "destination": "https://futuret3ch.com.au/message_counts.php",
+      "source": "/message_counts.php"
+    }
   ]
 }

@@ -186,7 +186,7 @@
         }
 
         async function loadUsers() {
-            const res = await fetch('/api/rewards-admin/users', {
+            const res = await fetch('/api/claimable-rewards', {
                 headers: adminHeaders(),
             });
             const data = await res.json();
@@ -256,7 +256,7 @@
             }
             setStatus(statusEl, 'Updating balance…', false);
             try {
-                const res = await fetch('/api/rewards-admin/assign', {
+                const res = await fetch('/api/claimable-rewards/assign', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -282,7 +282,7 @@
             const totp = (document.getElementById('totpInput').value || '').replace(/\D/g, '');
             setStatus(statusEl, 'Verifying…', false);
             try {
-                const res = await fetch('/api/rewards-admin/auth', {
+                const res = await fetch('/api/admin/auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ staff_key: key, totp_code: totp }),
@@ -341,7 +341,7 @@
             totpEl.required = true;
             totpEl.style.display = '';
             totpEl.placeholder = '6-digit 2FA code (Google Authenticator)';
-            fetch('/api/rewards-admin/auth')
+            fetch('/api/admin/auth')
                 .then((r) => (r.ok ? r.json() : null))
                 .then((cfg) => {
                     if (cfg?.admin_count > 0) {
