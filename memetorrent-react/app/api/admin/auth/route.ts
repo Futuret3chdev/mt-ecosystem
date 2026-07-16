@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     {
       requires_2fa: isAdmin2faEnabled(),
       totp_configured: hint.configured,
+      admin_count: hint.admin_count,
       issuer: hint.issuer,
     },
     { headers: adminSecurityHeaders() }
