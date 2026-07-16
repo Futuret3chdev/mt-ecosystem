@@ -10,6 +10,9 @@ const ALLOWED_METHODS = new Set([
   'getSignatureStatuses',
   'getSlot',
   'getTokenAccountBalance',
+  'getTokenAccountsByOwner',
+  'getMultipleAccounts',
+  'getProgramAccounts',
   'getVersion',
   'simulateTransaction',
 ]);
