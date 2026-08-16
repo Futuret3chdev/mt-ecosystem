@@ -7,6 +7,7 @@ export default function Footer() {
           <a href="https://www.futuret3ch.com.au" target="_blank" className="hover:text-white">Futuret3ch</a>
           <a href="/claims" className="hover:text-white">Claim $MT</a>
           <a href="/status" className="hover:text-white">Status</a>
+          <a href="/software" className="hover:text-white">Software</a>
           <a href="/developers" className="hover:text-white">Developers</a>
           <a href="/media" className="hover:text-white">Media</a>
           <a href="/updates" className="hover:text-white">Updates</a>
