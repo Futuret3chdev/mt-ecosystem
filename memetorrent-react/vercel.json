@@ -6,6 +6,18 @@
   "devCommand": "next dev --port $PORT",
   "rewrites": [
     {
+      "source": "/vpn",
+      "destination": "https://admin.futuret3ch.com.au/vpn/"
+    },
+    {
+      "source": "/vpn/",
+      "destination": "https://admin.futuret3ch.com.au/vpn/"
+    },
+    {
+      "source": "/vpn/:path*",
+      "destination": "https://admin.futuret3ch.com.au/vpn/:path*"
+    },
+    {
       "source": "/admin-rewards.html",
       "destination": "https://admin.futuret3ch.com.au/admin-rewards.html"
     },
